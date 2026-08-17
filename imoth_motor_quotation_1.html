@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Imoth Insurance Brokers — Online Motor Quotation</title>
+<style>
+  :root{
+    --imoth-blue:#1b3f8b;
+    --imoth-red:#e2231a;
+    --ink:#1c1c1c;
+    --paper:#ffffff;
+    --muted:#5a5f6a;
+    --line:#d8dce3;
+    --panel:#f4f6fb;
+    --ok:#1b7a43;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI", Arial, Helvetica, sans-serif;
+    background:linear-gradient(180deg,#eef1f7 0%,#e4e8f1 100%);
+    color:var(--ink);
+    padding:24px 16px 60px;
+  }
+  .app{max-width:1180px;margin:0 auto;}
+  .topbar{
+    display:flex;align-items:center;gap:16px;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-top:5px solid var(--imoth-red);
+    border-radius:10px;
+    padding:16px 20px;
+    margin-bottom:18px;
+    box-shadow:0 2px 10px rgba(20,30,60,.06);
+  }
+  .topbar img{height:56px;width:auto;display:block;}
+  .topbar .titles h1{margin:0;font-size:19px;color:var(--imoth-blue);letter-spacing:.2px;}
+  .topbar .titles p{margin:2px 0 0;font-size:12.5px;color:var(--muted);}
+  .topbar .badge{
+    margin-left:auto;font-size:11.5px;color:var(--imoth-red);font-weight:700;
+    border:1px solid var(--imoth-red);border-radius:20px;padding:5px 12px;
+    white-space:nowrap;
+  }
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px;}
+  .tab-btn{
+    flex:none;cursor:pointer;border:1px solid var(--line);background:var(--paper);
+    padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);
+  }
+  .tab-btn.active{background:var(--imoth-blue);color:#fff;border-color:var(--imoth-blue);}
+
+  .grid{display:grid;grid-template-columns:380px 1fr;gap:18px;align-items:start;}
+  @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+
+  .panel{
+    background:var(--paper);border:1px solid var(--line);border-radius:10px;
+    padding:18px 18px 20px;box-shadow:0 2px 10px rgba(20,30,60,.05);
+  }
+  .panel h2{margin:0 0 14px;font-size:14.5px;color:var(--imoth-blue);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--panel);padding-bottom:8px;}
+  label{display:block;font-size:12.5px;font-weight:600;color:#333;margin:12px 0 5px;}
+  label.first{margin-top:0;}
+  select,input[type=text],input[type=number]{
+    width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:7px;font-size:13.5px;
+    background:#fbfcfe;color:var(--ink);
+  }
+  select:disabled,input:disabled{background:#eef0f4;color:#98a0ac;}
+  .hint{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .chk{display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:12.5px;color:#333;}
+  .chk input{margin-top:3px;}
+  .optbox{border:1px dashed var(--line);border-radius:8px;padding:10px 12px;margin-top:12px;background:#fafbfd;}
+  .optbox .ot{font-size:11.5px;font-weight:700;color:var(--imoth-blue);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+  .warn{margin-top:10px;background:#fff4e5;border:1px solid #f0c36d;color:#7a5200;font-size:12px;padding:8px 10px;border-radius:7px;}
+  .btnrow{display:flex;gap:10px;margin-top:18px;}
+  button.primary{
+    flex:1;background:var(--imoth-red);color:#fff;border:none;border-radius:8px;
+    padding:12px 14px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px;
+  }
+  button.primary:hover{filter:brightness(1.06);}
+  button.secondary{
+    background:#fff;color:var(--imoth-blue);border:1px solid var(--imoth-blue);border-radius:8px;
+    padding:12px 14px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+
+  /* ---- Quote sheet (mirrors IMOTH MOTOR QUOTE layout) ---- */
+  #quoteWrap{display:none;}
+  .sheet{
+    background:var(--paper);border:1px solid var(--line);border-radius:10px;
+    padding:26px 28px 22px;box-shadow:0 2px 10px rgba(20,30,60,.05);
+  }
+  .sheet-head{display:flex;align-items:center;gap:16px;border-bottom:3px solid var(--imoth-blue);padding-bottom:14px;margin-bottom:14px;}
+  .sheet-head img{height:64px;}
+  .sheet-head .sh-mid{flex:1;}
+  .sheet-head .sh-mid h2{margin:0;font-size:20px;color:var(--imoth-blue);}
+  .sheet-head .sh-mid p{margin:2px 0 0;font-size:11.5px;color:var(--muted);}
+  .sheet-head .sh-right{text-align:right;}
+  .sheet-head .sh-right .insurer{font-weight:800;font-size:16px;color:var(--imoth-red);}
+  .sheet-head .sh-right .reg{font-weight:700;font-size:14px;color:var(--ink);margin-top:2px;}
+  .sheet-head .sh-right .date{font-size:11.5px;color:var(--muted);margin-top:2px;}
+
+  table.qtable{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.8px;}
+  table.qtable th{
+    background:var(--imoth-blue);color:#fff;text-align:left;padding:8px 9px;font-size:11.5px;
+    text-transform:uppercase;letter-spacing:.3px;
+  }
+  table.qtable td{padding:7px 9px;border-bottom:1px solid var(--panel);vertical-align:top;}
+  table.qtable tr.section td{background:var(--panel);font-weight:700;color:var(--imoth-blue);}
+  table.qtable tr.total td{border-top:2px solid var(--imoth-blue);font-weight:800;font-size:13.5px;background:#fbfcfe;}
+  .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:14px;}
+  @media (max-width:760px){.twocol{grid-template-columns:1fr;}}
+  .twocol h3{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--imoth-blue);margin:0 0 8px;border-bottom:1px solid var(--panel);padding-bottom:6px;}
+  .twocol ul{margin:0;padding-left:18px;font-size:12px;line-height:1.65;color:#333;}
+
+  .footnote{font-size:10.8px;color:var(--muted);line-height:1.7;border-top:1px solid var(--panel);padding-top:10px;margin-top:6px;}
+  .footnote b{color:#333;}
+  .pay{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:10px;flex-wrap:wrap;gap:6px;}
+  .apa-flag{background:#fff2f1;border:1px solid #f4b7b3;color:#8a1f16;font-size:11.5px;padding:8px 10px;border-radius:7px;margin-bottom:14px;}
+
+  /* Compare tab */
+  table.cmp{width:100%;border-collapse:collapse;font-size:13px;}
+  table.cmp th{background:var(--imoth-blue);color:#fff;padding:9px 10px;text-align:left;font-size:11.5px;text-transform:uppercase;}
+  table.cmp td{padding:9px 10px;border-bottom:1px solid var(--panel);}
+  table.cmp tr:nth-child(odd) td{background:#fafbfd;}
+  table.cmp tr.best td{background:#eafaf0;}
+  .pill{display:inline-block;background:var(--ok);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px;}
+
+  @media print{
+    body{background:#fff;padding:0;}
+    .topbar,.tabs,#formPanel,.btnrow,.no-print{display:none !important;}
+    .grid{grid-template-columns:1fr;}
+    .sheet{box-shadow:none;border:none;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4RDcRXhpZgAATU0AKgAAAAgABAE7AAIAAAAGAAAISodpAAQAAAABAAAIUJydAAEAAAAMAAAQyOocAAcAAAgMAAAAPgAAAAAc6gAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAElNT1RIAAAFkAMAAgAAABQAABCekAQAAgAAABQAABCykpEAAgAAAAM4NwAAkpIAAgAAAAM4NwAA6hwABwAACAwAAAiSAAAAABzqAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAyMzoxMDoyNSAxMjoyNzozMgAyMDIzOjEwOjI1IDEyOjI3OjMyAAAASQBNAE8AVABIAAAA/+ELGGh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8APD94cGFja2V0IGJlZ2luPSfvu78nIGlkPSdXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQnPz4NCjx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iPjxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+PHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9InV1aWQ6ZmFmNWJkZDUtYmEzZC0xMWRhLWFkMzEtZDMzZDc1MTgyZjFiIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iLz48cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0idXVpZDpmYWY1YmRkNS1iYTNkLTExZGEtYWQzMS1kMzNkNzUxODJmMWIiIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyI+PHhtcDpDcmVhdGVEYXRlPjIwMjMtMTAtMjVUMTI6Mjc6MzIuODY2PC94bXA6Q3JlYXRlRGF0ZT48L3JkZjpEZXNjcmlwdGlvbj48cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0idXVpZDpmYWY1YmRkNS1iYTNkLTExZGEtYWQzMS1kMzNkNzUxODJmMWIiIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyI+PGRjOmNyZWF0b3I+PHJkZjpTZXEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj48cmRmOmxpPklNT1RIPC9yZGY6bGk+PC9yZGY6U2VxPg0KCQkJPC9kYzpjcmVhdG9yPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgPD94cGFja2V0IGVuZD0ndyc/Pv/bAEMABwUFBgUEBwYFBggHBwgK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" alt="Imoth Insurance Brokers"/>
+    <div class="titles">
+      <h1>Imoth Insurance Brokers Limited</h1>
+      <p>Online Motor Insurance Quotation — Insurance | Health | Pension</p>
+      <p class="db-status" style="margin-top:4px;font-size:11px;"></p>
+    </div>
+    <div class="badge">2026 / 2027 RATES</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBtnQuote" onclick="showTab('quote')">Generate Quote</button>
+    <button class="tab-btn" id="tabBtnCompare" onclick="showTab('compare')">Compare Insurers</button>
+    <button class="tab-btn" id="tabBtnHistory" onclick="showTab('history')">Saved Quotations <span id="histCount" class="pill" style="display:none;">0</span></button>
+    <button class="tab-btn" id="tabBtnAdmin" onclick="showTab('admin')">⚙ Manage Rates</button>
+  </div>
+
+  <!-- ================= QUOTE TAB ================= -->
+  <div id="tabQuote">
+  <div class="grid">
+    <div class="panel" id="formPanel">
+      <h2>Quotation Details</h2>
+
+      <label class="first">Client / Insured Name</label>
+      <input type="text" id="clientName" placeholder="e.g. John Mwangi">
+
+      <div class="row2">
+        <div>
+          <label>Registration No.</label>
+          <input type="text" id="regNo" placeholder="e.g. KCZ 538G">
+        </div>
+        <div>
+          <label>Vehicle Age (yrs)</label>
+          <input type="number" id="vehAge" min="0" placeholder="e.g. 5" oninput="onClassChange()">
+        </div>
+      </div>
+
+      <label>Insurance Company</label>
+      <select id="insurerSel" onchange="onInsurerChange()"></select>
+
+      <label>Class of Business</label>
+      <select id="classSel" onchange="onClassChange()"></select>
+      <div class="hint" id="classHint"></div>
+
+      <div id="siWrap">
+        <label>Sum Insured (KES)</label>
+        <input type="number" id="sumInsured" min="0" step="1000" placeholder="e.g. 1500000" oninput="onClassChange()">
+      </div>
+
+      <div id="optionsWrap"></div>
+
+      <label>Amount Paid (KES) <span style="font-weight:400;color:var(--muted);">— optional</span></label>
+      <input type="number" id="amountPaid" min="0" step="100" placeholder="0" value="0">
+      <div class="hint">Leave as 0 for a fresh quotation. Enter a part-payment to show the outstanding balance on the printed/PDF quote.</div>
+
+      <div class="warn" id="ageWarn" style="display:none;"></div>
+
+      <div class="btnrow">
+        <button class="primary" onclick="generateQuote()">Generate Quote</button>
+      </div>
+    </div>
+
+    <div>
+      <div id="quotePlaceholder" class="panel" style="text-align:center;color:var(--muted);padding:60px 20px;">
+        Fill in the details on the left and click <b>Generate Quote</b> to preview the formatted Imoth quotation.
+      </div>
+      <div id="quoteWrap">
+        <div class="btnrow no-print" style="margin:0 0 12px;">
+          <button class="primary" id="downloadPdfBtn" onclick="downloadPDF()">⬇ Download PDF</button>
+          <button class="secondary" onclick="window.print()">Print</button>
+          <button class="secondary" onclick="saveToHistory()">💾 Save Quotation</button>
+        </div>
+        <div class="sheet" id="sheet"></div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ================= HISTORY TAB ================= -->
+  <div id="tabHistory" style="display:none;">
+    <div class="panel">
+      <h2>Saved Quotations</h2>
+      <div class="hint db-status" style="margin-bottom:6px;font-size:12px;"></div>
+      <div class="hint" style="margin-bottom:14px;">
+        Quotations you save here go into the shared database (when available) so any teammate using this tool can see and re-download them. Click "🔄 Refresh" if a colleague may have added quotes since you opened this page.
+      </div>
+      <button class="secondary" style="margin-bottom:14px;" onclick="refreshHistoryFromDb()">🔄 Refresh</button>
+      <div id="historyEmpty" style="text-align:center;color:var(--muted);padding:30px 0;">No quotations saved yet.</div>
+      <div style="overflow-x:auto;">
+        <table class="cmp" id="historyTable" style="display:none;"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ADMIN / RATE MANAGEMENT TAB ================= -->
+  <div id="tabAdmin" style="display:none;">
+    <div class="panel">
+      <h2>Manage Rates — All Insurers</h2>
+      <div class="hint db-status" style="margin-bottom:6px;font-size:12px;"></div>
+      <div class="hint" style="margin-bottom:14px;">
+        Every rate band used by the quotation and comparison engine, in one editable table. Edits apply immediately to this browser session (new quotes will use the updated figures straight away). <b>Nothing here is saved automatically to a server</b> — use <b>Export Rates (JSON)</b> below to download a backup file, and <b>Import Rates (JSON)</b> next time you open this tool to restore it. "Reset to Original Rates" reverts everything back to the rates this tool shipped with.
+      </div>
+      <div class="row2" style="align-items:end;">
+        <div>
+          <label class="first">Filter by Insurer</label>
+          <select id="admInsurerFilter" onchange="renderAdmin()">
+            <option value="all">All Insurers</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="primary" style="flex:none;" onclick="saveAdminChanges()">💾 Save Changes</button>
+          <button class="secondary" onclick="exportRates()">⬇ Export Rates (JSON)</button>
+          <label class="secondary" style="display:inline-flex;align-items:center;cursor:pointer;padding:12px 14px;">
+            ⬆ Import Rates (JSON)
+            <input type="file" accept="application/json" onchange="importRatesFile(event)" style="display:none;">
+          </label>
+          <button class="secondary" style="border-color:var(--imoth-red);color:var(--imoth-red);" onclick="resetRates()">↺ Reset to Original Rates</button>
+        </div>
+      </div>
+
+      <div class="optbox" style="margin-top:16px;">
+        <div class="ot">➕ Add a New Insurance Company</div>
+        <div class="row2" style="align-items:end;">
+          <div>
+            <label class="first">Company Name</label>
+            <input type="text" id="newInsurerName" placeholder="e.g. Jubilee Allianz General Insurance">
+          </div>
+          <div>
+            <button class="secondary" style="width:100%;" onclick="addInsurer()">+ Add Insurer</button>
+          </div>
+        </div>
+        <div class="hint">This creates the company with no classes yet. Once added, select it in the "Filter by Insurer" box above to add its classes of business and rates below.</div>
+      </div>
+
+      <div class="optbox" id="addClassBox" style="display:none;margin-top:12px;">
+        <div class="ot" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>➕ Add a Class of Business to <span id="addClassInsurerName"></span></span>
+          <button class="secondary" style="padding:5px 10px;font-size:11px;color:var(--imoth-red);border-color:var(--imoth-red);" onclick="removeInsurer(document.getElementById('admInsurerFilter').value)">🗑 Remove this company</button>
+        </div>
+        <div class="row2">
+          <div><label class="first">Class Label</label><input type="text" id="newClassLabel" placeholder="e.g. Motor Private – Comprehensive"></div>
+          <div><label class="first">Category (for the Compare tab)</label>
+            <select id="newClassCategory">
+              <option value="private">Private Car</option>
+              <option value="commercial">Commercial (Own Goods / Gen. Cartage / Hybrid)</option>
+              <option value="institutional">Institutional / School Bus</option>
+              <option value="psv">PSV / Chauffeur Driven</option>
+              <option value="tuktuk">Tuk Tuk</option>
+              <option value="motorcycle">Motorcycle</option>
+              <option value="asset">Asset (New Units)</option>
+              <option value="special">Special Type (Farm/Construction)</option>
+              <option value="tpo">Third Party Only</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div><label>Pricing Type</label>
+            <select id="newClassType" onchange="toggleNewClassType()">
+              <option value="standard">Standard (rate % × Sum Insured)</option>
+              <option value="flat">Flat / TPO (fixed annual premium)</option>
+            </select>
+          </div>
+          <div><label>Max Vehicle Age (yrs, optional)</label><input type="number" id="newClassMaxAge" placeholder="e.g. 15"></div>
+        </div>
+
+        <div id="newClassStandardFields">
+          <div class="row2">
+            <div><label>Min Sum Insured (Kshs)</label><input type="number" id="newClassMinSI" value="500000"></div>
+            <div><label>Max Sum Insured (blank = open-ended)</label><input type="number" id="newClassMaxSI" placeholder="∞"></div>
+          </div>
+          <div class="row2">
+            <div><label>Rate (%)</label><input type="number" step="0.01" id="newClassRate" value="4"></div>
+            <div><label>Minimum Premium (Kshs)</label><input type="number" id="newClassMinPrem" value="30000"></div>
+          </div>
+          <div class="row2">
+            <div>
+              <label>Excess Protector (Own Damage)</label>
+              <div class="chk" style="margin-top:0;"><input type="checkbox" id="newClassEPIncluded" checked><div>Included in the basic rate</div></div>
+              <div class="row2" style="margin-top:6px;">
+                <input type="number" step="0.01" id="newClassEPRate" placeholder="rate % if separate">
+                <input type="number" id="newClassEPMin" placeholder="min premium if separate">
+              </div>
+            </div>
+            <div>
+              <label>PVT</label>
+              <div class="chk" style="margin-top:0;"><input type="checkbox" id="newClassPVTIncluded" checked><div>Included in the basic rate</div></div>
+              <div class="row2" style="margin-top:6px;">
+                <input type="number" step="0.01" id="newClassPVTRate" placeholder="rate % if separate">
+                <input type="number" id="newClassPVTMin" placeholder="min premium if separate">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="newClassFlatFields" style="display:none;">
+          <label>Flat Annual Premium (Kshs)</label>
+          <input type="number" id="newClassFlatPremium" placeholder="e.g. 3200">
+        </div>
+
+        <label>Passenger Legal Liability — Kshs per person (optional, for PSV/Institutional classes)</label>
+        <input type="number" id="newClassPLL" placeholder="e.g. 500">
+
+        <button class="primary" style="margin-top:12px;" onclick="addClass()">+ Add This Class</button>
+      </div>
+
+      <div style="overflow-x:auto;margin-top:16px;">
+        <table class="cmp" id="adminTable" style="font-size:11.5px;"></table>
+      </div>
+      <div class="hint" style="margin-top:12px;">Rate / EP / PVT % fields are entered as percentages (e.g. type 4.5 for 4.5%). Leave "Max SI" blank for an open-ended top band. "incl." checked means the cost is bundled into the basic rate; unchecked means the amount typed is charged as a separate optional add-on when selected on the quote form.</div>
+    </div>
+  </div>
+
+  <!-- ================= COMPARE TAB ================= -->
+  <div id="tabCompare" style="display:none;">
+    <div class="panel">
+      <h2>Compare Across Insurers</h2>
+      <div class="row2">
+        <div>
+          <label class="first">Vehicle Category</label>
+          <select id="cmpCategory" onchange="renderCompare()"></select>
+        </div>
+        <div>
+          <label class="first">Sum Insured (KES)</label>
+          <input type="number" id="cmpSI" min="0" step="1000" value="1500000" oninput="renderCompare()">
+        </div>
+      </div>
+      <div class="hint">Comparison shows the base annual premium (rate × sum insured, or the minimum premium, whichever is higher) including Excess Protector &amp; PVT where these are bundled into the insurer's rate. Levies (PHCF 0.25% + Training Levy 0.20%) and Kshs 40 stamp duty apply on top, as on the formal quote.</div>
+      <div style="margin-top:18px;overflow-x:auto;">
+        <table class="cmp" id="cmpTable"></table>
+      </div>
+    </div>
+  </div>
+
+  <p class="no-print" style="text-align:center;font-size:11px;color:var(--muted);margin-top:26px;">
+    Rates compiled from Imoth Insurance Brokers' 2026/2027 insurer rate cards &amp; binder terms (Pioneer, Kenya Orient, Monarch, CIC, Definite, Directline, APA, Britam). Rates are indicative and subject to each insurer's underwriting confirmation, satisfactory loss ratio, and standard policy terms.
+  </p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const LOGO_DATA_URI = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4RDcRXhpZgAATU0AKgAAAAgABAE7AAIAAAAGAAAISodpAAQAAAABAAAIUJydAAEAAAAMAAAQyOocAAcAAAgMAAAAPgAAAAAc6gAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAElNT1RIAAAFkAMAAgAAABQAABCekAQAAgAAABQAABCykpEAAgAAAAM4NwAAkpIAAgAAAAM4NwAA6hwABwAACAwAAAiSAAAAABzqAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAyMzoxMDoyNSAxMjoyNzozMgAyMDIzOjEwOjI1IDEyOjI3OjMyAAAASQBNAE8AVABIAAAA/+ELGGh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8APD94cGFja2V0IGJlZ2luPSfvu78nIGlkPSdXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQnPz4NCjx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iPjxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+PHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9InV1aWQ6ZmFmNWJkZDUtYmEzZC0xMWRhLWFkMzEtZDMzZDc1MTgyZjFiIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iLz48cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0idXVpZDpmYWY1YmRkNS1iYTNkLTExZGEtYWQzMS1kMzNkNzUxODJmMWIiIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyI+PHhtcDpDcmVhdGVEYXRlPjIwMjMtMTAtMjVUMTI6Mjc6MzIuODY2PC94bXA6Q3JlYXRlRGF0ZT48L3JkZjpEZXNjcmlwdGlvbj48cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0idXVpZDpmYWY1YmRkNS1iYTNkLTExZGEtYWQzMS1kMzNkNzUxODJmMWIiIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyI+PGRjOmNyZWF0b3I+PHJkZjpTZXEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj48cmRmOmxpPklNT1RIPC9yZGY6bGk+PC9yZGY6U2VxPg0KCQkJPC9kYzpjcmVhdG9yPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgPD94cGFja2V0IGVuZD0ndyc/Pv/bAEMABwUFBgUEBwYFBggHBwgK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";
+/* =========================================================================
+   IMOTH INSURANCE BROKERS — MOTOR QUOTATION ENGINE
+   Data compiled from: Pioneer, Kenya Orient, Monarch, CIC (Imoth Motor
+   Terms binder), Definite, Directline (TPO binder), APA (2026 retail
+   circular), Britam (Imoth scheme) rate cards / binder terms 2026/2027.
+   ========================================================================= */
+
+const LEVY_RATE = 0.0045;   // PHCF 0.25% + Training Levy 0.20%
+const STAMP_DUTY = 40;      // flat, per policy
+
+// ---- helper builders -----------------------------------------------------
+function band(minSI,maxSI,rate,minPrem,opts){
+  return Object.assign({minSI:minSI,maxSI:maxSI,rate:rate,minPrem:minPrem,
+    epIncluded:true,pvtIncluded:true,epRate:0,epMin:0,pvtRate:0,pvtMin:0,
+    epNotOffered:false,pvtNotOffered:false}, opts||{});
+}
+function flat(premium,note){ return {flat:true,premium:premium,note:note||""}; }
+
+// ---- INSURERS --------------------------------------------------------------
+const INSURERS = {
+
+  pioneer:{
+    name:"Pioneer General Insurance",
+    classes:{
+      private:{ label:"Motor Private – Comprehensive", category:"private", maxAge:15, minSI:500000,
+        excess:["Accidental Damage/Partial Theft – 2.5% of value, Min 30,000 / Max 100,000","Total Theft (with ATD) – 10% of value, Min 30,000","Total Theft (without ATD) – 20% of value, Min 30,000","Third Party Property Damage – Nil","Young Driver (<21yrs) / Novice (<2yrs) – Kshs 5,000 additional each"],
+        benefits:["Windscreen & Radio free limit Kshs 100,000 (+10% above limit)","Medical Expenses Kshs 30,000","Recovery Kshs 30,000","Repair Authority Kshs 50,000","Courtesy Car: 4,500 (10 days) / 7,500 (20 days)"],
+        limits:["Third Party Property Damage – Kshs 3,000,000","Passenger Legal Liability – any one person Kshs 3,000,000 / any one event Kshs 20,000,000","Third Party Person Injury – any one person Kshs 3,000,000 / unlimited any one event"],
+        bands:[
+          band(500000,999999,0.06,37500,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:false,pvtRate:0.0025,pvtMin:2500}),
+          band(1000000,1499999,0.05,37500),
+          band(1500000,2499999,0.04,37500),
+          band(2500000,4999999,0.0325,37500),
+          band(5000000,null,0.03,37500),
+        ]},
+      commercial_hybrid:{ label:"Motor Commercial Hybrid (Own Goods / Gen. Cartage)", category:"commercial", maxAge:15, minSI:500000,
+        excess:["Own Damage/Partial Theft – 5% Min 30,000","Theft with ATD – 10% Min 30,000","Theft without ATD – 20% Min 30,000"],
+        benefits:["Excess Protector & PVT inclusive of the basic rate","TPO by tonnage also available: up to 3T Kshs 7,500 / 4–8T Kshs 10,000 / 9–15T Kshs 15,000 / above 15T Kshs 20,000"],
+        limits:["Comprehensive on vehicle, standard commercial limits apply"],
+        bands:[ band(500000,4999999,0.045,50000) ]},
+      special_type:{ label:"Special Type (Farm & Warehouses / Construction)", category:"special", maxAge:20, minSI:500000,
+        excess:["As per Pioneer commercial excess schedule"], benefits:["Owner-operated plant/farm risks"], limits:["Comprehensive on vehicle"],
+        bands:[ band(500000,null,0.03,10000,{epIncluded:false,epRate:0.005,epMin:5000,pvtIncluded:false,pvtRate:0.0025,pvtMin:2500}) ]},
+      asset:{ label:"Asset Cover (Max 3 years, new units)", category:"asset", maxAge:3, minSI:500000,
+        excess:["Standard commercial excess schedule applies"], benefits:["Zero-mileage / showroom-condition unit"], limits:["Comprehensive on vehicle"],
+        bands:[ band(500000,null,0.045,40000) ]},
+      psv_uber:{ label:"PSV – Uber / Online Platform Taxis", category:"psv", maxAge:15, minSI:500000,
+        excess:["Standard Pioneer commercial excess schedule applies"],
+        benefits:["PVT included in rate (free)","No Excess Protector offered for this class","No TPO cover available — comprehensive only"],
+        limits:["Comprehensive on vehicle, standard PSV limits"],
+        pllPerSeat:500,
+        bands:[ band(500000,null,0.06,40000,{epIncluded:true,epNotOffered:true,pvtIncluded:true}) ]},
+      chauffeur_tour_tsv:{ label:"Chauffeur Driven – Tour Vans (TSV)", category:"psv", maxAge:15, minSI:500000,
+        excess:["Standard Pioneer commercial excess schedule applies"],
+        benefits:["Excess Protector & PVT included in rate","No TPO cover available — comprehensive only"],
+        limits:["Comprehensive on vehicle"],
+        pllPerSeat:500,
+        bands:[ band(500000,null,0.05,40000) ]},
+      school_bus:{ label:"School Bus / Van", category:"institutional", maxAge:15, minSI:500000,
+        excess:["Standard Pioneer commercial excess schedule applies"],
+        benefits:["Excess Protector & PVT included in rate","PLL free for the school's own students; Kshs 250/seat for affiliated group hire; Kshs 500/head for non-affiliated hire"],
+        limits:["Comprehensive on vehicle"],
+        pllOptions:[
+          {key:"student", label:"Own students (free)", rate:0},
+          {key:"affiliated", label:"Affiliated group hire", rate:250},
+          {key:"nonaffiliated", label:"Non-affiliated / general hire", rate:500},
+        ],
+        bands:[ band(500000,null,0.03,50000) ]},
+      motorcycle_corporate:{ label:"Motorcycle – Corporate & Delivery", category:"motorcycle", maxAge:null, minSI:0,
+        excess:[], benefits:["TPO flat premium also available at Kshs 3,000/yr"], limits:[],
+        bands:[ band(0,null,0.03,5000) ]},
+      tuktuk_corporate:{ label:"Tuk Tuk – Corporate & Delivery", category:"tuktuk", maxAge:null, minSI:0,
+        excess:[], benefits:["TPO flat premium also available at Kshs 5,000/yr"], limits:[],
+        bands:[ band(0,null,0.03,10000) ]},
+    }
+  },
+
+  kenyaorient:{
+    name:"Kenya Orient Insurance Ltd",
+    classes:{
+      private:{ label:"Motor Private – Comprehensive (Standard)", category:"private", maxAge:15, minSI:500000,
+        excess:["Accidental Damage/Partial Theft – 2.5% of value, Min 30,000 / Max 100,000","Total Theft (with ATD) – 10% Min 30,000","Total Theft (without ATD) – 20% Min 30,000","Third Party Property Damage – Kshs 30,000","Young Driver (<21) – Kshs 5,000 additional","Novice Driver (<2yrs) – Kshs 5,000 additional"],
+        benefits:["Windscreen & Radio free limit Kshs 50,000 (charge 10% above)","Medical Expenses Kshs 30,000","Recovery Kshs 30,000","Repair Authority Kshs 50,000"],
+        limits:["Third Party Property Damage – Kshs 3,000,000","Passenger Legal Liability – any one person Kshs 3,000,000 / any one event Kshs 20,000,000","Third Party Person Injury – any one person Kshs 3,000,000 / Unlimited any one event","Third Party Annual (TPO) – Kshs 3,100"],
+        bands:[
+          band(500000,999999,0.0375,40000),
+          band(1000000,1999999,0.035,40000),
+          band(2000000,2999999,0.0325,40000),
+          band(3000000,null,0.03,40000),
+        ]},
+      commercial:{ label:"Motor Commercial (Own Goods & General Cartage)", category:"commercial", maxAge:20, minSI:500000,
+        excess:["Own Damage/Partial Theft – 5% Min 30,000","Theft with ATD – 10% Min 30,000","Theft without ATD – 20% Min 30,000","Third Party Property Damage – Kshs 10,000","Young Driver (<25) – Kshs 10,000 additional","Novice Driver (<3yrs) – Kshs 10,000 additional"],
+        benefits:["General Cartage & Own Goods PVT 0.35% Min Kshs 3,000"], limits:["Third Party Property Damage – Kshs 5,000,000"],
+        bands:[ band(500000,null,0.045,60000,{pvtIncluded:false,pvtRate:0.0035,pvtMin:3000}) ]},
+      tpo_private:{ label:"Third Party Only – Private", category:"tpo", maxAge:null, minSI:0,
+        excess:[], benefits:[], limits:["Annual Third Party Only premium"], flatOnly:flat(3100,"Annual TPO premium") },
+    }
+  },
+
+  monarch:{
+    name:"Monarch Insurance Company Ltd",
+    classes:{
+      private:{ label:"Private Car – Comprehensive", category:"private", maxAge:15, minSI:500000,
+        excess:["Excess Protector 0.25% Min 3,000"], benefits:["Windscreen & Radio limits per policy schedule"], limits:["Standard Monarch private car limits"],
+        bands:[ band(500000,2500000,0.035,25000,{epIncluded:false,epRate:0.0025,epMin:3000,pvtIncluded:false,pvtRate:0.0025,pvtMin:2500}),
+                band(2500001,null,0.03,25000,{epIncluded:false,epRate:0.0025,epMin:3000,pvtIncluded:false,pvtRate:0.0025,pvtMin:2500}) ]},
+      private_400_499:{ label:"Private Car (Max age 20yrs, SI 400K–499,999)", category:"private", maxAge:20, minSI:400000, maxSI:499999,
+        excess:["No Excess Protector available"], benefits:[], limits:[],
+        bands:[ band(400000,499999,0.06,30000,{epIncluded:true,pvtIncluded:false,pvtRate:0.0025,pvtMin:2500}) ]},
+      private_400plus:{ label:"Private Car (Max age 20yrs, SI 400K and above)", category:"private", maxAge:20, minSI:400000,
+        excess:["No Excess Protector available"], benefits:[], limits:[],
+        bands:[ band(400000,null,0.06,30000,{epIncluded:true,pvtIncluded:true}) ]},
+      commercial_own_goods:{ label:"Commercial Own Goods", category:"commercial", maxAge:20, minSI:500000,
+        excess:[], benefits:[], limits:[],
+        bands:[ band(500000,2500000,0.0325,30000,{epIncluded:false,epRate:0.005,epMin:5000,pvtIncluded:false,pvtRate:0.0025,pvtMin:3500}),
+                band(2500001,null,0.03,30000,{epIncluded:false,epRate:0.005,epMin:5000,pvtIncluded:false,pvtRate:0.0025,pvtMin:3500}) ]},
+      commercial_general_cartage:{ label:"Commercial General Cartage", category:"commercial", maxAge:20, minSI:500000,
+        excess:[], benefits:[], limits:[],
+        bands:[ band(500000,2500000,0.0325,30000,{epIncluded:false,epRate:0.005,epMin:5000,pvtIncluded:false,pvtRate:0.0025,pvtMin:3500}),
+                band(2500001,null,0.03,30000,{epIncluded:false,epRate:0.005,epMin:5000,pvtIncluded:false,pvtRate:0.0025,pvtMin:3500}) ]},
+      commercial_institutional:{ label:"Commercial Institutional", category:"institutional", maxAge:20, minSI:500000,
+        excess:[], benefits:["Passenger Legal Liability – Kshs 500/person (organised groups) or Kshs 250/student"], limits:[],
+        pllOptions:[
+          {key:"organised", label:"Organised group / general hire", rate:500},
+          {key:"student", label:"Students", rate:250},
+        ],
+        bands:[ band(500000,2500000,0.0325,30000,{epIncluded:false,epRate:0.005,epMin:5000,pvtIncluded:false,pvtRate:0.0025,pvtMin:3500}),
+                band(2500001,null,0.03,30000,{epIncluded:false,epRate:0.005,epMin:5000,pvtIncluded:false,pvtRate:0.0025,pvtMin:3500}) ]},
+      psv_chauffeur:{ label:"PSV Chauffeur Driven", category:"psv", maxAge:15, minSI:500000,
+        excess:[], benefits:["Passenger Legal Liability – Kshs 500/person"], limits:[], pllPerSeat:500,
+        bands:[ band(500000,null,0.05,35000,{epIncluded:false,epRate:0.005,epMin:10000,pvtIncluded:false,pvtRate:0.0035,pvtMin:3500}) ]},
+      tuktuk_commercial:{ label:"Tuk Tuk – Commercial", category:"tuktuk", maxAge:10, minSI:250000,
+        excess:[], benefits:[], limits:[],
+        bands:[ band(250000,null,0.04,10000,{epIncluded:false,epRate:0.005,epMin:5000,pvtIncluded:false,pvtRate:0.0035,pvtMin:3500}) ]},
+      tuktuk_psv:{ label:"Tuk Tuk – PSV", category:"tuktuk", maxAge:10, minSI:250000,
+        excess:[], benefits:["No Excess Protector"], limits:[],
+        bands:[ band(250000,null,0.05,15000,{epIncluded:true,pvtIncluded:false,pvtRate:0.0035,pvtMin:3500}) ]},
+      private_hire_tours:{ label:"Private Hire – Tours (TSV)", category:"psv", maxAge:20, minSI:500000,
+        excess:[], benefits:["Passenger Legal Liability – Kshs 500/person"], limits:[], pllPerSeat:500,
+        bands:[ band(500000,null,0.04,35000,{epIncluded:false,epRate:0.005,epMin:5000,pvtIncluded:false,pvtRate:0.0035,pvtMin:3500}) ]},
+      motorcycle_private:{ label:"Motorcycle – Private", category:"motorcycle", maxAge:null, minSI:80000,
+        excess:[], benefits:["No Excess Protector"], limits:[],
+        bands:[ band(80000,null,0.04,5000,{epIncluded:true,pvtIncluded:false,pvtRate:0.0025,pvtMin:2500}) ]},
+      motorcycle_psv:{ label:"Motorcycle – PSV (Boda Boda)", category:"motorcycle", maxAge:7, minSI:80000,
+        excess:[], benefits:["Passenger Legal Liability – Kshs 500/person"], limits:[], pllPerSeat:500,
+        bands:[ band(80000,null,0.04,6000,{epIncluded:true,pvtIncluded:true}) ]},
+    }
+  },
+
+  cic:{
+    name:"CIC General Insurance Ltd",
+    classes:{
+      private:{ label:"Motor Private – Comprehensive", category:"private", maxAge:15, minSI:500000,
+        excess:["Own Damage & Partial Theft – 2.5% Min 20,000 / Max 100,000","Theft with ATD – 10% Min 20,000","Theft with Tracking Device – 2.5% Min 20,000","Theft without ATD – 20% Min 20,000","Third Party Property Damage – Kshs 7,500","New/Young Drivers – Kshs 5,000 additional"],
+        benefits:["Courtesy Car: 3,000 (10 days) / 6,000 (20 days)","AA Kenya Rescue – Kshs 7,500/yr (payable direct to provider)","Inclusive Own Damage Excess Waiver & PVT"],
+        limits:["Third Party Property Damage – Kshs 20,000,000","Death/Injury to third parties – any one person Kshs 5,000,000 / unlimited per event","Passenger Liability – any one person Kshs 5,000,000 / any one event Kshs 50,000,000","Windscreen/Radio Cassette – Kshs 100,000 each (+10% charge above limit)"],
+        bands:[
+          band(500000,1000000,0.055,40000),
+          band(1000001,1500000,0.045,40000),
+          band(1500001,2500000,0.0425,40000),
+          band(2500001,5000000,0.035,40000),
+          band(5000001,null,0.0325,40000),
+        ]},
+      institutional:{ label:"Commercial – Institutional Vehicle (School/Religious/Company Bus)", category:"institutional", maxAge:20, minSI:500000,
+        excess:["Own Damage & Partial Theft – 5% Min 20,000 / Max 150,000","Theft (alternators/starters) – 10% Min 20,000","Third Party Property Damage – Kshs 10,000","Young/New Drivers – Kshs 10,000 additional"],
+        benefits:["Alternators & starters covered free if fully reinforced","PLL – Kshs 200/seat for organised groups; free for students & school employees"],
+        limits:["Third Party Property Damage – Kshs 20,000,000","Passenger Liability – any one person Kshs 5,000,000 / any one event Kshs 50,000,000"],
+        pllOptions:[
+          {key:"organised", label:"Organised groups", rate:200},
+          {key:"student", label:"Students / school employees", rate:0},
+        ],
+        bands:[ band(500000,null,0.035,30000) ]},
+      hybrid_zero_trucks:{ label:"Commercial Hybrid – Zero Mileage Trucks (new units)", category:"commercial", maxAge:null, minSI:500000,
+        excess:["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000","Third Party Property Damage – up to 20t Kshs 20,000 / over 20t Kshs 30,000"],
+        benefits:["Inclusive Own Damage Excess Protection & Terrorism/Political Violence extension","PLL Kshs 500/seat (optional – not for drivers & loaders)"], limits:["Passenger Liability any one event – Kshs 50,000,000"], pllPerSeat:500,
+        bands:[ band(500000,null,0.045,50000) ]},
+      hybrid_nonzero_trucks:{ label:"Commercial Hybrid – Non-Zero Mileage Trucks (1–15yrs)", category:"commercial", maxAge:15, minSI:500000,
+        excess:["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000","Third Party Property Damage – up to 20t Kshs 20,000 / over 20t Kshs 30,000"],
+        benefits:["Rate depends on 3-yr Loss Ratio (LR): <60% = 5%, >60% = 6%"], limits:["Passenger Liability any one event – Kshs 50,000,000"],
+        bands:[ band(500000,null,0.05,50000) ], bandsAlt:[ band(500000,null,0.06,50000) ], hasLRToggle:true },
+      hybrid_zero_pickups:{ label:"Commercial Hybrid – Zero Mileage Pick-Ups (new units)", category:"commercial", maxAge:null, minSI:500000,
+        excess:["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000"], benefits:["Inclusive Own Damage Excess Protection"], limits:[],
+        bands:[ band(500000,null,0.04,50000) ]},
+      hybrid_nonzero_pickups:{ label:"Commercial Hybrid – Non-Zero Mileage Pick-Ups (1–15yrs)", category:"commercial", maxAge:15, minSI:500000,
+        excess:["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000"], benefits:["Rate depends on 3-yr Loss Ratio (LR): <60% = 4.95%, >60% = 5%"], limits:[],
+        bands:[ band(500000,null,0.0495,50000) ], bandsAlt:[ band(500000,null,0.05,50000) ], hasLRToggle:true },
+      motorcycle_corporate:{ label:"Motorcycle – Corporate", category:"motorcycle", maxAge:null, minSI:0,
+        excess:["Own Damage & Partial Theft – 5% Min 10,000","Theft – 10% Min 15,000","Third Party Property Damage – Kshs 2,500"], benefits:[], limits:["Third Party Bodily Injury – any one person Kshs 1,000,000 / unlimited any event"],
+        bands:[ band(0,null,0.03,5000) ]},
+    }
+  },
+
+  definite:{
+    name:"Definite Assurance Company Ltd",
+    note:"PSV / Chauffeur Driven rates for Definite were not included in the rate cards supplied — send that page and it can be added here.",
+    classes:{
+      private:{ label:"Motor Private – Comprehensive", category:"private", maxAge:15, minSI:500000,
+        excess:[], benefits:["PVT inclusive of rate; Excess Protector optional add-on"], limits:[],
+        bands:[ band(500000,null,0.0325,30000,{epIncluded:false,epRate:0.0025,epMin:3000,pvtIncluded:true}) ]},
+      commercial_hybrid:{ label:"Motor Commercial – Hybrid", category:"commercial", maxAge:15, minSI:500000,
+        excess:[], benefits:["No dedicated Excess Protector – flat 0.35% Min 5,000 charged instead"], limits:[],
+        bands:[ band(500000,2000000,0.0425,35000,{epIncluded:false,epRate:0.0035,epMin:5000,pvtIncluded:true}),
+                band(2000001,null,0.04,35000,{epIncluded:false,epRate:0.0035,epMin:5000,pvtIncluded:true}) ]},
+      commercial_institutional:{ label:"Motor Commercial – Institutional", category:"institutional", maxAge:15, minSI:500000,
+        excess:[], benefits:["Excess Protector & PVT inclusive"], limits:[],
+        bands:[ band(500000,null,0.0325,35000) ]},
+    }
+  },
+
+  apa:{
+    name:"APA Insurance Ltd",
+    disclaimer:"APA's 12 Jan 2026 circular states these RETAIL rates do NOT apply to supporters with Binder Contracts or corporate clients — confirm binder terms with APA before quoting a binder client on these figures.",
+    classes:{
+      private:{ label:"Private Car – Comprehensive (Retail)", category:"private", maxAge:12, minSI:600000,
+        excess:["Own Damage & Partial Theft – 2.5% Min 20,000","Theft with ATD – 10% Min 20,000","Theft without ATD – 20% Min 20,000","Theft with Tracking Device – 2.5% Min 20,000","Third Party Property Damage – Kshs 7,500","Young(<25)/Novice(<2yrs) Drivers – Kshs 5,000 additional each"],
+        benefits:["Windscreen/Radio free limit Kshs 50,000 (SI ≤2.5M) or 100,000 (SI >2.5M), +10% above limit","Political Violence/Terrorism optional – 0.25% Min 2,500","Excess Protector (Material Damage) optional – 0.25% SI Min 5,000","Excess Protector (Full) optional – 1% SI Min 10,000"],
+        limits:["Third Party Property Damage – up to Kshs 20,000,000","Third Party Bodily Injury – up to Kshs 3,000,000/person"],
+        bands:[
+          band(600000,1000000,0.0725,50000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+          band(1000001,1500000,0.06,50000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+          band(1500001,2500000,0.055,50000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+          band(2500001,5000000,0.0425,50000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+          band(5000001,10000000,0.03,50000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+          band(10000001,null,0.03,50000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+        ]},
+      commercial_own_goods:{ label:"Motor Commercial (Own Goods, Retail)", category:"commercial", maxAge:15, minSI:600000,
+        excess:["Own Damage & Partial Theft – 5% Min 30,000","Theft with ATD – 10% Min 30,000","Theft without ATD – 20% Min 30,000","Third Party Property Damage – Kshs 10,000","Young(<25)/Novice(<1yr) Drivers – Kshs 10,000 additional each"],
+        benefits:["Excess Protector (Full) NOT COVERED under retail terms","PLL charged at Kshs 500/passenger × permitted capacity"], limits:["Third Party Property Damage – up to Kshs 20,000,000"],
+        bands:[
+          band(600000,1000000,0.0725,75000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+          band(1000001,2500000,0.056,75000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+          band(2500001,5000000,0.0525,75000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+          band(5000001,null,0.0425,75000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+        ]},
+      commercial_private_hire:{ label:"Commercial – Private Hire (Chauffeur Driven, Retail)", category:"commercial", maxAge:12, minSI:1500000,
+        excess:["Same excess schedule as Commercial Own Goods"], benefits:["No TPO proposals accepted for this class"], limits:[],
+        bands:[
+          band(1500000,2500000,0.0575,50000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+          band(2500001,null,0.055,50000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:true}),
+        ]},
+      commercial_online_hailed:{ label:"Commercial – Private Hire Online-Hailed (Uber/Bolt, Retail)", category:"commercial", maxAge:12, minSI:0,
+        excess:["Same excess schedule as Commercial Own Goods"], benefits:[], limits:[],
+        bands:[ band(0,null,0.0825,75000,{epIncluded:false,epRate:0.0035,epMin:5000,pvtIncluded:true}) ]},
+      tpo_private:{ label:"Third Party Only (with supporting non-motor business)", category:"tpo", maxAge:null, minSI:0,
+        excess:[], benefits:[], limits:[], flatOnly:flat(12000,"Annual TPO — requires supporting non-motor business") },
+    }
+  },
+
+  britam:{
+    name:"Britam General Insurance (K) Ltd",
+    classes:{
+      private:{ label:"Private Car – Comprehensive", category:"private", maxAge:15, minSI:0,
+        excess:["Own Damage & Partial Theft – 2.5% Min 30,000 / Max 100,000","Theft with ATD – 10% Min 20,000","Theft without ATD – 20% Min 20,000","Theft with Tracking Device – 2.5% Min 20,000","Third Party Property Damage – Kshs 5,000","New & Young Drivers – Kshs 5,000 each additional"],
+        benefits:["Free: Death/Fatal Accident cover for named driver Kshs 100,000","Free: Forced ATM withdrawal cover Kshs 10,000","Windscreen/Radio Cassette free limit Kshs 50,000 (100,000 if SI>3M)"],
+        limits:["Third Party Property Damage – Kshs 20,000,000","Passenger Liability – any one person Kshs 5,000,000 / any one event Kshs 20,000,000"],
+        bands:[
+          band(0,1499999,0.04,42500,{epIncluded:false,epRate:0.0025,epMin:0,pvtIncluded:false,pvtRate:0.0025,pvtMin:0}),
+          band(1500000,2999999,0.035,42500,{epIncluded:false,epRate:0.0025,epMin:2500,pvtIncluded:false,pvtRate:0.0025,pvtMin:2500}),
+          band(3000000,null,0.03,42500),
+        ]},
+      commercial_general_cartage:{ label:"Motor Commercial – General Cartage", category:"commercial", maxAge:15, minSI:0,
+        excess:["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000","Theft with ATD – 10% Min 30,000","Theft without ATD – 20% Min 40,000","Third Party Property Damage – Kshs 10,000","New/Young Drivers – Kshs 10,000 additional"],
+        benefits:["Free: Forced ATM withdrawal Kshs 10,000","Free: Fatal PA cover for named driver Kshs 150,000","PLL optional Kshs 1,000/passenger"], limits:["Third Party Property Damage – Kshs 30,000,000"],
+        bands:[ band(0,null,0.045,100000) ]},
+      commercial_own_goods:{ label:"Motor Commercial – Own Goods", category:"commercial", maxAge:15, minSI:0,
+        excess:["Own Damage & Partial Theft – 5% Min 20,000 / Max 150,000","Theft with ATD – 10% Min 20,000","Theft without ATD – 20% Min 20,000","Third Party Property Damage – Kshs 10,000","New/Young Drivers – Kshs 10,000 additional"],
+        benefits:["Free: Forced ATM withdrawal Kshs 10,000","Free: Fatal PA cover for named driver Kshs 150,000","PLL optional Kshs 1,000/passenger"], limits:["Third Party Property Damage – Kshs 20,000,000"],
+        bands:[ band(0,null,0.04,50000,{epIncluded:false,epRate:0.0025,epMin:5000,pvtIncluded:false,pvtRate:0.0025,pvtMin:3000}) ]},
+      tpo_private:{ label:"Third Party Only – Private", category:"tpo", maxAge:null, minSI:0,
+        excess:[], benefits:[], limits:[], flatOnly:flat(15000,"Annual TPO premium") },
+      tpft_private:{ label:"Third Party, Fire & Theft – Private", category:"tpo", maxAge:null, minSI:0,
+        excess:[], benefits:[], limits:[], flatOnly:{flat:true, rateOnSI:0.04, minPrem:45000, note:"4% of sum insured, minimum Kshs 45,000"} },
+    }
+  },
+
+  directline:{
+    name:"Directline Assurance Company Ltd",
+    disclaimer:"Directline binder is a Third Party Only (TPO) scheme — no comprehensive/own-damage cover is offered. Rates shown are net of commission.",
+    classes:{
+      tpo_private:{ label:"Motor Private – TPO", category:"tpo", maxAge:null, minSI:0, excess:["Third Party Injury/Death – Kshs 10,000 each claim","Third Party Property Damage – Kshs 10,000","Young/Novice Drivers – Kshs 10,000 each claim"], benefits:[], limits:["Bodily Injury/Death – Kshs 3,000,000","Property Damage – Kshs 1,000,000","Geographical area – East Africa"], flatOnly:flat(3200,"Annual (1-month TOR = Kshs 550)") },
+      tpo_commercial:{ label:"Motor Commercial (General Cartage/Own Goods, 1–10T) – TPO", category:"tpo", maxAge:null, minSI:0, excess:["Third Party Injury/Death – Kshs 30,000","Third Party Property Damage – Kshs 30,000"], benefits:[], limits:["Bodily Injury/Death – Kshs 3,000,000","Property Damage – Kshs 1,000,000"], flatOnly:flat(3800,"Annual (1-month TOR = Kshs 800)") },
+      tpo_commercial_tractor:{ label:"Motor Commercial – Tractors – TPO", category:"tpo", maxAge:null, minSI:0, excess:[], benefits:[], limits:[], flatOnly:flat(2784,"Annual premium") },
+      tpo_commercial_tanker:{ label:"Motor Commercial – Tankers – TPO", category:"tpo", maxAge:null, minSI:0, excess:[], benefits:[], limits:[], flatOnly:flat(13783,"Annual premium") },
+      tpo_motorcycle_psv:{ label:"Motorcycle – PSV Boda – TPO", category:"tpo", maxAge:null, minSI:0, excess:["Third Party Injury/Death – Kshs 7,500","Third Party Property Damage – Kshs 7,500"], benefits:[], limits:[], flatOnly:flat(3200,"Annual (1-month = Kshs 500)") },
+      tpo_motorcycle_private:{ label:"Motorcycle – Private – TPO (1 month)", category:"tpo", maxAge:null, minSI:0, excess:[], benefits:[], limits:[], flatOnly:flat(1870,"Annual premium") },
+      tpo_psv_unmarked_4:{ label:"PSV Unmarked 4 PAX – TPO", category:"tpo", maxAge:null, minSI:0, excess:[], benefits:[], limits:[], flatOnly:flat(6899,"Annual premium") },
+      tpo_psv_taxi_4:{ label:"PSV Taxi 4 PAX – TPO", category:"tpo", maxAge:null, minSI:0, excess:[], benefits:[], limits:[], flatOnly:flat(8721,"Annual premium") },
+      tpo_psv_tsv_9:{ label:"PSV Unmarked TSV 9 PAX – TPO", category:"tpo", maxAge:null, minSI:0, excess:[], benefits:[], limits:[], flatOnly:flat(11006,"Annual premium") },
+      tpo_psv_tsv_8:{ label:"PSV Unmarked TSV 8 PAX – TPO", category:"tpo", maxAge:null, minSI:0, excess:[], benefits:[], limits:[], flatOnly:flat(10512,"Annual premium") },
+      tpo_tuktuk_commercial:{ label:"Tuk Tuk – Commercial – TPO", category:"tpo", maxAge:null, minSI:0, excess:[], benefits:[], limits:[], flatOnly:flat(2784,"Annual premium") },
+      tpo_psv_tuktuk:{ label:"PSV Tuk Tuk – TPO", category:"tpo", maxAge:null, minSI:0, excess:[], benefits:[], limits:[], flatOnly:flat(4000,"Annual premium") },
+    }
+  },
+};
+
+const DEFAULT_INSURERS_JSON = JSON.stringify(INSURERS); // snapshot for "Reset to Original Rates"
+
+// ---------------------------------------------------------------------------
+// DATABASE LAYER — talks to the Express/PostgreSQL API in server.js, which is
+// shared across everyone who opens this tool through that server.
+const DB_AVAILABLE = true; // the API endpoints below degrade gracefully if unreachable
+const API_BASE = "/api";
+let DB_STATUS = "checking"; // checking | connected | error | unavailable
+
+async function dbLoadRates(){
+  try{
+    const res = await fetch(API_BASE+"/rates");
+    if(res.status===404){ DB_STATUS = "connected"; return false; } // reachable, just empty so far
+    if(!res.ok){ DB_STATUS = "error"; return false; }
+    const data = await res.json();
+    Object.keys(INSURERS).forEach(k=>delete INSURERS[k]);
+    Object.assign(INSURERS, data);
+    DB_STATUS = "connected";
+    return true;
+  } catch(err){
+    console.error("Database load failed", err);
+    DB_STATUS = "unavailable";
+    return false;
+  }
+}
+
+async function dbSaveRates(){
+  try{
+    const res = await fetch(API_BASE+"/rates", {
+      method:"PUT",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(INSURERS)
+    });
+    DB_STATUS = res.ok ? "connected" : "error";
+    return res.ok;
+  } catch(err){
+    console.error("Database save failed", err);
+    DB_STATUS = "unavailable";
+    return false;
+  }
+}
+
+async function dbSaveQuote(record){
+  try{
+    const res = await fetch(API_BASE+"/quotes/"+encodeURIComponent(record.id), {
+      method:"PUT",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(record)
+    });
+    if(res.ok) DB_STATUS = "connected"; else if(DB_STATUS!=="unavailable") DB_STATUS = "error";
+    return res.ok;
+  } catch(err){
+    console.error("Database quote save failed", err);
+    DB_STATUS = "unavailable";
+    return false;
+  }
+}
+
+async function dbDeleteQuote(id){
+  try{
+    const res = await fetch(API_BASE+"/quotes/"+encodeURIComponent(id), {method:"DELETE"});
+    return res.ok;
+  } catch(err){
+    console.error("Database quote delete failed", err);
+    return false;
+  }
+}
+
+async function dbLoadAllQuotes(){
+  try{
+    const res = await fetch(API_BASE+"/quotes");
+    if(!res.ok) return [];
+    const records = await res.json();
+    records.sort((a,b)=>(b.ts||0)-(a.ts||0));
+    return records;
+  } catch(err){
+    console.error("Database quote list failed", err);
+    DB_STATUS = "unavailable";
+    return [];
+  }
+}
+
+function renderDbStatus(){
+  const els = document.querySelectorAll(".db-status");
+  let html;
+  if(DB_STATUS==="connected"){
+    html = `<span style="color:var(--ok);">🗄 Database connected</span> — rates and saved quotations are shared with everyone using this tool.`;
+  } else if(DB_STATUS==="error"){
+    html = `<span style="color:var(--imoth-red);">⚠ Database error</span> — your last change may not have saved centrally. Export a JSON backup to be safe.`;
+  } else {
+    html = `<span style="color:var(--imoth-red);">⚠ Can't reach the database server</span> — make sure the app is running via "npm start" (not opened as a local file), and that the server can reach the database. Use Export/Import (JSON) to keep your changes meanwhile.`;
+  }
+  els.forEach(el=>el.innerHTML = html);
+}
+
+const CATEGORY_LABELS = {
+  private:"Private Car", commercial:"Commercial (Own Goods / Gen. Cartage / Hybrid)", institutional:"Institutional / School Bus",
+  psv:"PSV / Chauffeur Driven", tuktuk:"Tuk Tuk", motorcycle:"Motorcycle", asset:"Asset (New Units)", special:"Special Type (Farm/Construction)", tpo:"Third Party Only"
+};
+
+// ---------------------------------------------------------------------------
+function money(n){ return "Kshs " + Math.round(n).toLocaleString("en-KE"); }
+function num2(n){ return Math.round(n).toLocaleString("en-KE"); }
+
+function findBand(bands, si){
+  for(const b of bands){
+    if(si>=b.minSI && (b.maxSI===null || si<=b.maxSI)) return b;
+  }
+  // fall back to nearest band if outside declared ranges
+  return bands[bands.length-1];
+}
+
+// Market rule: private motor vehicles over 15 years old are not offered
+// Excess Protector (Own Damage) or PVT cover by any of these insurers,
+// regardless of what the normal Sum-Insured band would otherwise include.
+const PRIVATE_AGE_LIMIT_FOR_EP_PVT = 15;
+function effectiveBand(cls, band, age){
+  if(cls.category==="private" && age!=null && !isNaN(age) && age>PRIVATE_AGE_LIMIT_FOR_EP_PVT){
+    return Object.assign({}, band, {
+      epIncluded:false, pvtIncluded:false,
+      epNotOffered:true, pvtNotOffered:true,
+      ageRuleApplied:true
+    });
+  }
+  return band;
+}
+
+function populateInsurers(){
+  const sel = document.getElementById("insurerSel");
+  sel.innerHTML = "";
+  Object.keys(INSURERS).forEach(k=>{
+    const o=document.createElement("option"); o.value=k; o.textContent=INSURERS[k].name; sel.appendChild(o);
+  });
+  onInsurerChange();
+}
+
+function onInsurerChange(){
+  const insKey = document.getElementById("insurerSel").value;
+  const ins = INSURERS[insKey];
+  const csel = document.getElementById("classSel");
+  csel.innerHTML="";
+  Object.keys(ins.classes).forEach(k=>{
+    const o=document.createElement("option"); o.value=k; o.textContent=ins.classes[k].label; csel.appendChild(o);
+  });
+  onClassChange();
+}
+
+function currentClass(){
+  const insKey = document.getElementById("insurerSel").value;
+  const clsKey = document.getElementById("classSel").value;
+  return {insKey, ins:INSURERS[insKey], clsKey, cls:INSURERS[insKey].classes[clsKey]};
+}
+
+function onClassChange(){
+  const {ins, cls} = currentClass();
+  const siWrap = document.getElementById("siWrap");
+  const hint = document.getElementById("classHint");
+  const opts = document.getElementById("optionsWrap");
+  const ageWarn = document.getElementById("ageWarn");
+  opts.innerHTML="";
+
+  if(cls.flatOnly){
+    siWrap.style.display = cls.flatOnly.rateOnSI ? "block" : "none";
+    hint.textContent = "Flat-rate / Third-Party-Only class — " + (cls.flatOnly.note||"");
+  } else {
+    siWrap.style.display="block";
+    hint.textContent = "Min. Sum Insured: " + money(cls.minSI) + (cls.maxAge? " · Max vehicle age: "+cls.maxAge+" yrs":"");
+  }
+
+  // age warning
+  const age = parseFloat(document.getElementById("vehAge").value);
+  if(cls.maxAge && !isNaN(age) && age>cls.maxAge){
+    ageWarn.style.display="block";
+    ageWarn.textContent = "⚠ Vehicle age ("+age+" yrs) exceeds this class's maximum of "+cls.maxAge+" years. Insurer approval / substitution will be required.";
+  } else { ageWarn.style.display="none"; }
+
+  // dynamic optional add-ons
+  let html="";
+  const si = parseFloat(document.getElementById("sumInsured").value)||0;
+
+  // Cover-basis banner (EP / PVT inclusive status) shown up front, before any toggles
+  if(!cls.flatOnly){
+    const rawBand = findBand(cls.bands, si||cls.minSI);
+    const band = effectiveBand(cls, rawBand, age);
+    html += `<div class="optbox"><div class="ot">Cover Basis at this Sum Insured</div>
+      <div class="hint" style="margin-top:0;">${coverBasisLine("Excess Protector (Own Damage)", band.epIncluded, band.epNotOffered)}<br/>${coverBasisLine("PVT", band.pvtIncluded, band.pvtNotOffered)}</div></div>`;
+    if(band.ageRuleApplied){
+      html += `<div class="warn">⚠ Vehicle is over ${PRIVATE_AGE_LIMIT_FOR_EP_PVT} years old — Excess Protector and PVT are not offered on private vehicles beyond this age, even if the standard rate for this Sum Insured would normally include them.</div>`;
+    }
+
+    if(!band.epIncluded && !band.epNotOffered){
+      html += optToggle("optEP","Add Excess Protector (Own Damage) cover","Rate "+(band.epRate*100).toFixed(2)+"% of SI, Min "+money(band.epMin));
+    }
+    if(!band.pvtIncluded && !band.pvtNotOffered){
+      html += optToggle("optPVT","Add PVT Cover","Rate "+(band.pvtRate*100).toFixed(2)+"% of SI, Min "+money(band.pvtMin)+" — this is the insurer's separate 'PVT' loading, distinct from Passenger Legal Liability (PLL).");
+    }
+    if(cls.hasLRToggle){
+      html += `<div class="optbox"><div class="ot">Loss Ratio Band</div>
+        <label style="margin:0;"><input type="radio" name="lrBand" value="good" checked> 3-yr Loss Ratio below 60%</label>
+        <label style="margin:6px 0 0;"><input type="radio" name="lrBand" value="bad"> 3-yr Loss Ratio above 60%</label></div>`;
+    }
+  }
+  if(cls.pllOptions){
+    const optRows = cls.pllOptions.map(o=>`<option value="${o.key}">${o.label} — ${o.rate>0? money(o.rate)+"/person" : "Free"}</option>`).join("");
+    html += `<div class="optbox"><div class="ot">Passenger Legal Liability (PLL)</div>
+      <label style="margin:0;">Passenger type</label>
+      <select id="pllOptionKey" style="margin-top:6px;">${optRows}</select>
+      <label style="margin-top:10px;">Number of seats/passengers to cover</label>
+      <input type="number" id="pllSeats" min="0" value="0" style="margin-top:6px;">
+      <div class="hint">This class has different PLL rates depending on who's being carried — pick the passenger type above, separate from any PVT loading.</div></div>`;
+  } else if(cls.pllPerSeat){
+    html += `<div class="optbox"><div class="ot">Passenger Legal Liability (PLL)</div>
+      <label style="margin:0;">Number of seats/passengers to cover</label>
+      <input type="number" id="pllSeats" min="0" value="0" style="margin-top:6px;">
+      <div class="hint">PLL is charged at ${money(cls.pllPerSeat)} per person for this class — separate from any PVT loading above.</div></div>`;
+  }
+  if(cls.category==="private" || cls.category==="commercial"){
+    html += optToggle("optPVTerror","Add Political Violence & Terrorism extension (where not already inclusive)","0.25% of SI, Min Kshs 2,500 — skip if insurer confirms this is already inclusive");
+  }
+  if(ins.note){
+    html += `<div class="warn">ℹ ${ins.note}</div>`;
+  }
+
+  opts.innerHTML = html;
+}
+
+function coverBasisLine(name, included, notOffered){
+  if(notOffered) return "<b>"+name+":</b> Not offered for this class";
+  if(included) return "<b>"+name+":</b> Included in the rate ✓";
+  return "<b>"+name+":</b> NOT included — available as an optional extra below";
+}
+
+function optToggle(id,label,sub){
+  return `<div class="chk"><input type="checkbox" id="${id}"><div><div>${label}</div><div class="hint">${sub}</div></div></div>`;
+}
+
+function computePremium(ins, cls, si, opts){
+  let lines = []; // {label, amount}
+  let subtotal = 0;
+
+  if(cls.flatOnly){
+    let amt;
+    if(cls.flatOnly.rateOnSI){
+      amt = Math.max(si*cls.flatOnly.rateOnSI, cls.flatOnly.minPrem);
+    } else {
+      amt = cls.flatOnly.premium;
+    }
+    lines.push({label:cls.label+" premium", amount:amt});
+    subtotal += amt;
+  } else {
+    const useBands = (cls.hasLRToggle && opts.lrBand==="bad") ? cls.bandsAlt : cls.bands;
+    const rawBand = findBand(useBands, si);
+    const b = effectiveBand(cls, rawBand, opts.age);
+    const base = Math.max(si*b.rate, b.minPrem);
+    lines.push({label:"Basic Premium @ "+(b.rate*100).toFixed(2)+"% of SI (Min "+num2(b.minPrem)+")", amount:base});
+    subtotal += base;
+
+    if(!b.epIncluded && !b.epNotOffered && opts.ep){
+      const ep = Math.max(si*b.epRate, b.epMin);
+      lines.push({label:"Excess Protector (Own Damage) @ "+(b.epRate*100).toFixed(2)+"%", amount:ep});
+      subtotal += ep;
+    }
+    if(!b.pvtIncluded && !b.pvtNotOffered && opts.pvt){
+      const p = Math.max(si*b.pvtRate, b.pvtMin);
+      lines.push({label:"PVT Cover @ "+(b.pvtRate*100).toFixed(2)+"%", amount:p});
+      subtotal += p;
+    }
+    if(opts.pvTerror){
+      const pv = Math.max(si*0.0025, 2500);
+      lines.push({label:"Political Violence & Terrorism extension", amount:pv});
+      subtotal += pv;
+    }
+  }
+  if(cls.pllOptions && opts.pllSeats>0){
+    const opt = cls.pllOptions.find(o=>o.key===opts.pllOptionKey) || cls.pllOptions[0];
+    const pll = opt.rate*opts.pllSeats;
+    lines.push({label:"Passenger Legal Liability ("+opts.pllSeats+" seats, "+opt.label+" @ "+num2(opt.rate)+")", amount:pll});
+    subtotal += pll;
+  } else if(cls.pllPerSeat && opts.pllSeats>0){
+    const pll = cls.pllPerSeat*opts.pllSeats;
+    lines.push({label:"Passenger Legal Liability ("+opts.pllSeats+" seats @ "+num2(cls.pllPerSeat)+")", amount:pll});
+    subtotal += pll;
+  }
+
+  const levies = subtotal*LEVY_RATE;
+  const total = subtotal + levies + STAMP_DUTY;
+  const bandUsed = cls.flatOnly? null : effectiveBand(cls, (cls.hasLRToggle && opts.lrBand==="bad") ? findBand(cls.bandsAlt, si) : findBand(cls.bands, si), opts.age);
+  return {lines, subtotal, levies, stampDuty:STAMP_DUTY, total, bandUsed, optsUsed:opts};
+}
+
+function generateQuote(){
+  const {ins, insKey, cls} = currentClass();
+  const si = parseFloat(document.getElementById("sumInsured").value)||0;
+  if(!cls.flatOnly && si<=0){
+    alert("Please enter a Sum Insured to generate this quote.");
+    return;
+  }
+  const opts = {
+    ep: document.getElementById("optEP")?.checked,
+    pvt: document.getElementById("optPVT")?.checked,
+    pvTerror: document.getElementById("optPVTerror")?.checked,
+    lrBand: document.querySelector('input[name="lrBand"]:checked')?.value,
+    pllSeats: parseFloat(document.getElementById("pllSeats")?.value)||0,
+    pllOptionKey: document.getElementById("pllOptionKey")?.value,
+    age: parseFloat(document.getElementById("vehAge")?.value),
+  };
+  const amountPaid = parseFloat(document.getElementById("amountPaid")?.value)||0;
+  const result = computePremium(ins, cls, si, opts);
+  renderSheet(ins, cls, si, result, opts, amountPaid);
+  document.getElementById("quotePlaceholder").style.display="none";
+  document.getElementById("quoteWrap").style.display="block";
+}
+
+let CURRENT_QUOTE = null; // metadata for the quote currently shown in #sheet
+
+function renderSheet(ins, cls, si, result, opts, amountPaid){
+  const client = document.getElementById("clientName").value || "—";
+  const reg = document.getElementById("regNo").value || "TO BE ADVISED";
+  const dateStr = new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric"});
+  amountPaid = amountPaid || 0;
+  const balance = result.total - amountPaid;
+
+  let coverBasisRow = "";
+  let rateAppliedRow = "";
+  if(result.bandUsed){
+    const b = result.bandUsed;
+    coverBasisRow = `<tr><td colspan="6">${coverBasisLine("Excess Protector (Own Damage)", b.epIncluded, b.epNotOffered)} &nbsp;&nbsp;|&nbsp;&nbsp; ${coverBasisLine("PVT", b.pvtIncluded, b.pvtNotOffered)}${b.ageRuleApplied? ' &nbsp;<i>(vehicle over '+PRIVATE_AGE_LIMIT_FOR_EP_PVT+' yrs — EP/PVT not offered)</i>':''}</td></tr>`;
+    let parts = ["Basic Rate: <b>"+(b.rate*100).toFixed(2)+"%</b> of SI (Min "+money(b.minPrem)+")"];
+    if(!b.epIncluded && !b.epNotOffered && opts.ep) parts.push("Excess Protector: <b>"+(b.epRate*100).toFixed(2)+"%</b> (Min "+money(b.epMin)+")");
+    else if(b.epIncluded) parts.push("Excess Protector: included in basic rate");
+    if(!b.pvtIncluded && !b.pvtNotOffered && opts.pvt) parts.push("PVT: <b>"+(b.pvtRate*100).toFixed(2)+"%</b> (Min "+money(b.pvtMin)+")");
+    else if(b.pvtIncluded) parts.push("PVT: included in basic rate");
+    if(cls.pllOptions && opts.pllSeats>0){
+      const opt = cls.pllOptions.find(o=>o.key===opts.pllOptionKey) || cls.pllOptions[0];
+      parts.push("PLL ("+opt.label+"): <b>"+money(opt.rate)+"</b>/person");
+    } else if(cls.pllPerSeat && opts.pllSeats>0) parts.push("PLL: <b>"+money(cls.pllPerSeat)+"</b>/person");
+    if(opts.pvTerror) parts.push("Political Violence &amp; Terrorism: <b>0.25%</b>");
+    rateAppliedRow = `<tr><td colspan="6"><b>Rate(s) Applied:</b> ${parts.join(" &nbsp;|&nbsp; ")}</td></tr>`;
+  } else if(cls.flatOnly){
+    coverBasisRow = `<tr><td colspan="6"><b>Cover Basis:</b> Third Party Only — Excess Protector / PVT / Own Damage not applicable</td></tr>`;
+    const f = cls.flatOnly;
+    const rateTxt = f.rateOnSI!=null? ("<b>"+(f.rateOnSI*100).toFixed(2)+"%</b> of SI (Min "+money(f.minPrem)+")") : ("Flat annual premium of <b>"+money(f.premium)+"</b>");
+    rateAppliedRow = `<tr><td colspan="6"><b>Rate(s) Applied:</b> ${rateTxt}</td></tr>`;
+  }
+
+  let rowsHtml = `<tr class="section"><td colspan="2">CLASS</td><td colspan="4">${cls.label}</td></tr>
+    <tr><td colspan="2">Interests Insured</td><td colspan="2">${reg}</td><td colspan="2">Comprehensive on Vehicle</td></tr>
+    ${coverBasisRow}
+    ${rateAppliedRow}
+    <tr><th>Item</th><th></th><th class="num">Sum Insured (Kshs)</th><th></th><th class="num">Premium (Kshs)</th><th>Notes</th></tr>`;
+
+  result.lines.forEach((l,i)=>{
+    rowsHtml += `<tr><td colspan="2">${i===0? cls.label : l.label}</td><td class="num">${i===0? num2(si||0):""}</td><td></td><td class="num">${num2(l.amount)}</td><td>${i===0? "":""}</td></tr>`;
+  });
+  rowsHtml += `<tr><td colspan="4">Sub-total</td><td class="num">${num2(result.subtotal)}</td><td></td></tr>`;
+  rowsHtml += `<tr><td colspan="4">Levies (PHCF 0.25% + Training Levy 0.20%)</td><td class="num">${num2(result.levies)}</td><td></td></tr>`;
+  rowsHtml += `<tr><td colspan="4">Stamp Duty</td><td class="num">${num2(result.stampDuty)}</td><td></td></tr>`;
+  rowsHtml += `<tr class="total"><td colspan="4">TOTAL PREMIUM</td><td class="num">${num2(result.total)}</td><td></td></tr>`;
+  rowsHtml += `<tr><td colspan="4">Amount Paid</td><td class="num">${num2(amountPaid)}</td><td></td></tr>`;
+  rowsHtml += `<tr class="total"><td colspan="4">${balance>0? "BALANCE DUE":(balance<0? "OVERPAYMENT":"BALANCE — PAID IN FULL")}</td><td class="num" style="color:${balance>0?'var(--imoth-red)':(balance<0?'var(--ok)':'var(--ok)')};">${num2(Math.abs(balance))}</td><td></td></tr>`;
+
+  const limitsHtml = (cls.limits&&cls.limits.length)? cls.limits.map(x=>`<li>${x}</li>`).join(""):"<li>Per insurer's standard policy wording</li>";
+  let benefitItems = [...(cls.excess||[]), ...(cls.benefits||[])];
+  if(result.bandUsed && result.bandUsed.ageRuleApplied){
+    benefitItems = benefitItems.filter(x=>!/excess protector|pvt/i.test(x));
+    benefitItems.push("Vehicle exceeds 15 years — Excess Protector & PVT are excluded regardless of any inclusive wording elsewhere in this schedule");
+  }
+  const excessHtml = benefitItems.map(x=>`<li>${x}</li>`).join("") || "<li>Per insurer's standard policy wording</li>";
+
+  const apaFlag = ins.disclaimer? `<div class="apa-flag">⚠ ${ins.disclaimer}</div>` : "";
+
+  const html = `
+    <div class="sheet-head">
+      <img src="LOGO_SRC" alt="Imoth logo"/>
+      <div class="sh-mid">
+        <h2>Imoth Insurance Brokers Limited</h2>
+        <p>P.O. Box 23280 – 00100, Nairobi &nbsp;|&nbsp; Tel: 0759 642 797 &nbsp;|&nbsp; insurance@imoth.co.ke</p>
+      </div>
+      <div class="sh-right">
+        <div class="insurer">${ins.name.toUpperCase()}</div>
+        <div class="reg">${reg}</div>
+        <div class="date">Quote Date: ${dateStr}</div>
+      </div>
+    </div>
+    ${apaFlag}
+    <table class="qtable">
+      <tr><td colspan="2"><b>Client</b>: ${client}</td><td colspan="2"><b>Class</b>: ${cls.label}</td><td colspan="2"><b>Insurer</b>: ${ins.name}</td></tr>
+      ${rowsHtml}
+    </table>
+    <div class="twocol">
+      <div><h3>Limits of Cover</h3><ul>${limitsHtml}</ul></div>
+      <div><h3>Excess &amp; Benefits / Remarks</h3><ul>${excessHtml}</ul></div>
+    </div>
+    <div class="footnote">
+      <b>** Premiums quoted are inclusive of levies and stamp duty.</b><br/>
+      ** Valid for 30 days from the date of this quotation.<br/>
+      ** Subject to the terms and conditions of the insurer's standard policy wording and satisfactory underwriting/loss-ratio review.<br/>
+      ** Final premium confirmed on receipt of full KYC (Proposal Form, Logbook, Driving Licence, KRA PIN, National ID) and, where applicable, a current independent valuation report.
+    </div>
+    <div class="pay no-print">
+      <span>Payment: Paybill 4108121, Account No: Vehicle Registration Number</span>
+      <span>Wabera Street, Salama House, Suite 305, Nairobi</span>
+    </div>
+  `;
+  document.getElementById("sheet").innerHTML = html.replaceAll("LOGO_SRC", LOGO_DATA_URI);
+
+  CURRENT_QUOTE = {
+    client, reg, insurerName: ins.name, className: cls.label, si, total: result.total,
+    amountPaid, balance, dateStr, ts: Date.now()
+  };
+}
+
+// ---------------------------------------------------------------------------
+// PDF EXPORT
+function pdfFilename(meta){
+  const safe = s => (s||"").toString().replace(/[^a-z0-9]+/gi,"_").replace(/^_+|_+$/g,"");
+  return `Imoth_Quote_${safe(meta.insurerName)}_${safe(meta.reg)}_${safe(meta.dateStr)}.pdf`;
+}
+
+async function downloadPDF(){
+  if(!CURRENT_QUOTE){ alert("Generate a quote first."); return; }
+  const btn = document.getElementById("downloadPdfBtn");
+  const original = btn.textContent;
+  btn.textContent = "Preparing PDF…"; btn.disabled = true;
+  try{
+    const el = document.getElementById("sheet");
+    const canvas = await html2canvas(el, {scale:2, backgroundColor:"#ffffff", useCORS:true});
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("p","mm","a4");
+    const pageW = 210, pageH = 297, margin = 10;
+    const imgW = pageW - margin*2;
+    const imgH = canvas.height * imgW / canvas.width;
+    const imgData = canvas.toDataURL("image/png");
+    let heightLeft = imgH;
+    let position = margin;
+    pdf.addImage(imgData,"PNG",margin,position,imgW,imgH);
+    heightLeft -= (pageH - margin*2);
+    while(heightLeft > 0){
+      position = margin - (imgH - heightLeft);
+      pdf.addPage();
+      pdf.addImage(imgData,"PNG",margin,position,imgW,imgH);
+      heightLeft -= (pageH - margin*2);
+    }
+    pdf.save(pdfFilename(CURRENT_QUOTE));
+  } catch(err){
+    console.error(err);
+    alert("Could not generate the PDF. If you're offline, the PDF library (loaded from a CDN) may be unreachable — try Print instead.");
+  } finally {
+    btn.textContent = original; btn.disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SAVED QUOTATIONS — backed by the shared database when available, otherwise
+// kept in memory only for the current browser session.
+let HISTORY = [];
+
+async function saveToHistory(){
+  if(!CURRENT_QUOTE){ alert("Generate a quote first."); return; }
+  const record = Object.assign({}, CURRENT_QUOTE, { id: "q"+Date.now(), snapshotHtml: document.getElementById("sheet").innerHTML });
+  HISTORY.unshift(record);
+  renderHistory();
+  const btn = event && event.target;
+  const ok = await dbSaveQuote(record);
+  if(btn){
+    const orig = btn.textContent;
+    btn.textContent = DB_AVAILABLE ? (ok? "✓ Saved to database" : "⚠ Saved locally only") : "✓ Saved (session only)";
+    setTimeout(()=>btn.textContent=orig, 1800);
+  }
+  renderDbStatus();
+}
+
+async function refreshHistoryFromDb(){
+  if(!DB_AVAILABLE){ renderDbStatus(); return; }
+  const records = await dbLoadAllQuotes();
+  HISTORY = records;
+  renderHistory();
+  renderDbStatus();
+}
+
+function renderHistory(){
+  const countEl = document.getElementById("histCount");
+  const emptyEl = document.getElementById("historyEmpty");
+  const tableEl = document.getElementById("historyTable");
+  countEl.style.display = HISTORY.length? "inline-block":"none";
+  countEl.textContent = HISTORY.length;
+  if(HISTORY.length===0){ emptyEl.style.display="block"; tableEl.style.display="none"; return; }
+  emptyEl.style.display="none"; tableEl.style.display="table";
+  let html = `<tr><th>Date</th><th>Client</th><th>Reg No.</th><th>Insurer</th><th>Class</th><th class="num">Total (Kshs)</th><th class="num">Balance (Kshs)</th><th>Actions</th></tr>`;
+  HISTORY.forEach(r=>{
+    const bal = r.balance!=null? r.balance : r.total;
+    html += `<tr>
+      <td>${new Date(r.ts).toLocaleString("en-GB")}</td>
+      <td>${r.client}</td><td>${r.reg}</td><td>${r.insurerName}</td><td>${r.className}</td>
+      <td class="num">${num2(r.total)}</td>
+      <td class="num" style="color:${bal>0?'var(--imoth-red)':'var(--ok)'};">${bal>0? num2(bal): (bal<0? 'Overpaid '+num2(-bal) : 'Paid')}</td>
+      <td style="white-space:nowrap;"><button class="secondary" style="padding:6px 10px;font-size:12px;" onclick="viewHistoryItem('${r.id}')">View</button>
+          <button class="secondary" style="padding:6px 10px;font-size:12px;margin-left:6px;" onclick="downloadHistoryItem('${r.id}')">PDF</button>
+          <button class="secondary" style="padding:6px 10px;font-size:12px;margin-left:6px;color:var(--imoth-red);border-color:var(--imoth-red);" onclick="deleteHistoryItem('${r.id}')">Delete</button></td>
+    </tr>`;
+  });
+  tableEl.innerHTML = html;
+}
+
+function findHistory(id){ return HISTORY.find(r=>r.id===id); }
+
+function viewHistoryItem(id){
+  const r = findHistory(id); if(!r) return;
+  document.getElementById("sheet").innerHTML = r.snapshotHtml;
+  CURRENT_QUOTE = r;
+  document.getElementById("quotePlaceholder").style.display="none";
+  document.getElementById("quoteWrap").style.display="block";
+  showTab("quote");
+}
+
+async function downloadHistoryItem(id){
+  const r = findHistory(id); if(!r) return;
+  viewHistoryItem(id);
+  await new Promise(res=>setTimeout(res,150));
+  await downloadPDF();
+}
+
+async function deleteHistoryItem(id){
+  const r = findHistory(id); if(!r) return;
+  if(!confirm('Delete the quotation for '+r.client+' ('+r.reg+')? This removes it from the shared database for everyone.')) return;
+  HISTORY = HISTORY.filter(x=>x.id!==id);
+  renderHistory();
+  await dbDeleteQuote(id);
+}
+
+// ---------------------------------------------------------------------------
+// COMPARE TAB
+function populateCompareCategories(){
+  const set = new Set();
+  Object.values(INSURERS).forEach(ins=>Object.values(ins.classes).forEach(c=>{ if(!c.flatOnly) set.add(c.category); }));
+  const sel = document.getElementById("cmpCategory");
+  sel.innerHTML="";
+  [...set].forEach(cat=>{
+    const o=document.createElement("option"); o.value=cat; o.textContent=CATEGORY_LABELS[cat]||cat; sel.appendChild(o);
+  });
+  renderCompare();
+}
+
+function renderCompare(){
+  const cat = document.getElementById("cmpCategory").value;
+  const si = parseFloat(document.getElementById("cmpSI").value)||0;
+  const rows = [];
+  Object.entries(INSURERS).forEach(([key,ins])=>{
+    Object.values(ins.classes).forEach(cls=>{
+      if(cls.flatOnly || cls.category!==cat) return;
+      if(si < cls.minSI) return;
+      if(cls.maxSI && si > cls.maxSI) return;
+      const b = findBand(cls.bands, si);
+      const base = Math.max(si*b.rate, b.minPrem);
+      let addl = 0, notes=[];
+      if(!b.epIncluded){ addl += Math.max(si*b.epRate,b.epMin); notes.push("+EP"); }
+      if(!b.pvtIncluded){ addl += Math.max(si*b.pvtRate,b.pvtMin); notes.push("+PVT"); }
+      const subtotal = base+addl;
+      const total = subtotal + subtotal*LEVY_RATE + STAMP_DUTY;
+      rows.push({insurer:ins.name, cls:cls.label, rate:b.rate, minPrem:b.minPrem, base, notes:notes.join(" "), total, maxAge:cls.maxAge});
+    });
+  });
+  rows.sort((a,b)=>a.total-b.total);
+
+  let html = `<tr><th>Insurer</th><th>Class</th><th class="num">Rate</th><th class="num">Base Premium</th><th class="num">Est. Total (incl. levies)</th><th>Max Age</th></tr>`;
+  if(rows.length===0){
+    html += `<tr><td colspan="6" style="text-align:center;color:#888;">No insurer offers this category at the entered Sum Insured (check minimum SI requirements).</td></tr>`;
+  } else {
+    rows.forEach((r,i)=>{
+      html += `<tr class="${i===0?'best':''}"><td>${r.insurer}${i===0?'<span class="pill">Lowest</span>':''}</td><td>${r.cls}</td><td class="num">${(r.rate*100).toFixed(2)}%</td><td class="num">${num2(r.base)}${r.notes?" "+r.notes:""}</td><td class="num">${num2(r.total)}</td><td>${r.maxAge?r.maxAge+' yrs':'—'}</td></tr>`;
+    });
+  }
+  document.getElementById("cmpTable").innerHTML = html;
+}
+
+function showTab(tab){
+  document.getElementById("tabQuote").style.display = tab==="quote"?"block":"none";
+  document.getElementById("tabCompare").style.display = tab==="compare"?"block":"none";
+  document.getElementById("tabHistory").style.display = tab==="history"?"block":"none";
+  document.getElementById("tabAdmin").style.display = tab==="admin"?"block":"none";
+  document.getElementById("tabBtnQuote").classList.toggle("active", tab==="quote");
+  document.getElementById("tabBtnCompare").classList.toggle("active", tab==="compare");
+  document.getElementById("tabBtnHistory").classList.toggle("active", tab==="history");
+  document.getElementById("tabBtnAdmin").classList.toggle("active", tab==="admin");
+  if(tab==="admin") renderAdmin();
+}
+
+// ---------------------------------------------------------------------------
+// RATE ADMIN / MANAGEMENT
+function admId(insKey,clsKey,bandIdx,field){
+  return `adm__${insKey}__${clsKey}__${bandIdx}__${field}`;
+}
+
+function populateAdminInsurerFilter(){
+  const sel = document.getElementById("admInsurerFilter");
+  const current = sel.value;
+  sel.innerHTML = '<option value="all">All Insurers</option>';
+  Object.entries(INSURERS).forEach(([k,ins])=>{
+    const o=document.createElement("option"); o.value=k; o.textContent=ins.name; sel.appendChild(o);
+  });
+  if(current) sel.value = current;
+}
+
+function renderAdmin(){
+  populateAdminInsurerFilter();
+  const filterVal = document.getElementById("admInsurerFilter").value || "all";
+
+  // Show/hide the "Add Class" box depending on whether a single insurer is selected
+  const addClassBox = document.getElementById("addClassBox");
+  if(filterVal!=="all" && INSURERS[filterVal]){
+    addClassBox.style.display = "block";
+    document.getElementById("addClassInsurerName").textContent = INSURERS[filterVal].name;
+  } else {
+    addClassBox.style.display = "none";
+  }
+
+  let rows = "";
+  Object.entries(INSURERS).forEach(([insKey, ins])=>{
+    if(filterVal!=="all" && filterVal!==insKey) return;
+    const classEntries = Object.entries(ins.classes);
+    if(classEntries.length===0){
+      rows += `<tr><td>${ins.name} <span style="color:var(--imoth-red);font-size:10.5px;">(no classes yet)</span></td><td colspan="8" style="color:var(--muted);">Use "Add a Class of Business" above to add rates for this company.</td>
+        <td><button class="secondary" style="padding:4px 8px;font-size:11px;color:var(--imoth-red);border-color:var(--imoth-red);" onclick="removeInsurer('${insKey}')">🗑 remove co.</button></td></tr>`;
+      return;
+    }
+    classEntries.forEach(([clsKey, cls])=>{
+      if(cls.flatOnly){
+        const f = cls.flatOnly;
+        const rmBtn = `<button class="secondary" style="padding:4px 8px;font-size:11px;" onclick="removeClass('${insKey}','${clsKey}')">🗑 class</button>`;
+        if(f.rateOnSI!=null){
+          rows += `<tr>
+            <td>${ins.name}</td><td>${cls.label}</td>
+            <td colspan="2" style="color:var(--muted);">Flat % of SI</td>
+            <td><input type="number" step="0.01" style="width:64px;" id="${admId(insKey,clsKey,'flat','rateOnSI')}" value="${(f.rateOnSI*100).toFixed(2)}">%</td>
+            <td><input type="number" style="width:85px;" id="${admId(insKey,clsKey,'flat','minPrem')}" value="${f.minPrem}"></td>
+            <td colspan="2" style="color:var(--muted);">n/a (TPO)</td>
+            <td>${cls.maxAge??"—"}</td>
+            <td>${rmBtn}</td>
+          </tr>`;
+        } else {
+          rows += `<tr>
+            <td>${ins.name}</td><td>${cls.label}</td>
+            <td colspan="2" style="color:var(--muted);">Flat annual premium</td>
+            <td style="color:var(--muted);">—</td>
+            <td><input type="number" style="width:85px;" id="${admId(insKey,clsKey,'flat','premium')}" value="${f.premium}"></td>
+            <td colspan="2" style="color:var(--muted);">n/a (TPO)</td>
+            <td>${cls.maxAge??"—"}</td>
+            <td>${rmBtn}</td>
+          </tr>`;
+        }
+        return;
+      }
+      cls.bands.forEach((b,i)=>{
+        const isLast = i===cls.bands.length-1;
+        let actionBtns = "";
+        if(i===0) actionBtns += `<button class="secondary" style="padding:4px 8px;font-size:11px;" onclick="removeClass('${insKey}','${clsKey}')">🗑 class</button> `;
+        if(cls.bands.length>1) actionBtns += `<button class="secondary" style="padding:4px 8px;font-size:11px;" onclick="removeBand('${insKey}','${clsKey}',${i})">🗑 band</button> `;
+        if(isLast) actionBtns += `<button class="secondary" style="padding:4px 8px;font-size:11px;" onclick="addBandToClass('${insKey}','${clsKey}')">+ band</button>`;
+        rows += `<tr>
+          <td>${ins.name}</td><td>${cls.label}${cls.bands.length>1? " <span style='color:var(--muted);'>(band "+(i+1)+")</span>":""}</td>
+          <td><input type="number" style="width:80px;" id="${admId(insKey,clsKey,i,'minSI')}" value="${b.minSI}"></td>
+          <td><input type="number" style="width:80px;" id="${admId(insKey,clsKey,i,'maxSI')}" value="${b.maxSI==null?'':b.maxSI}" placeholder="∞"></td>
+          <td><input type="number" step="0.01" style="width:60px;" id="${admId(insKey,clsKey,i,'rate')}" value="${(b.rate*100).toFixed(2)}">%</td>
+          <td><input type="number" style="width:80px;" id="${admId(insKey,clsKey,i,'minPrem')}" value="${b.minPrem}"></td>
+          <td>
+            <label style="font-size:10.5px;white-space:nowrap;"><input type="checkbox" id="${admId(insKey,clsKey,i,'epIncluded')}" ${b.epIncluded?"checked":""}> incl.</label>
+            <input type="number" step="0.01" style="width:48px;" id="${admId(insKey,clsKey,i,'epRate')}" value="${(b.epRate*100).toFixed(2)}">% /
+            <input type="number" style="width:60px;" id="${admId(insKey,clsKey,i,'epMin')}" value="${b.epMin}">
+          </td>
+          <td>
+            <label style="font-size:10.5px;white-space:nowrap;"><input type="checkbox" id="${admId(insKey,clsKey,i,'pvtIncluded')}" ${b.pvtIncluded?"checked":""}> incl.</label>
+            <input type="number" step="0.01" style="width:48px;" id="${admId(insKey,clsKey,i,'pvtRate')}" value="${(b.pvtRate*100).toFixed(2)}">% /
+            <input type="number" style="width:60px;" id="${admId(insKey,clsKey,i,'pvtMin')}" value="${b.pvtMin}">
+          </td>
+          <td>${i===0? `<input type="number" style="width:50px;" id="${admId(insKey,clsKey,i,'maxAgeField')}" value="${cls.maxAge??''}">` : `<span style="color:var(--muted);">${cls.maxAge??'—'}</span>`}</td>
+          <td style="white-space:nowrap;">${actionBtns}</td>
+        </tr>`;
+      });
+    });
+  });
+  document.getElementById("adminTable").innerHTML =
+    `<tr><th>Insurer</th><th>Class</th><th>Min SI</th><th>Max SI</th><th>Rate</th><th>Min Premium</th><th>Excess Protector (rate / min)</th><th>PVT (rate / min)</th><th>Max Age</th><th>Actions</th></tr>` + rows;
+}
+
+// ---- Add / remove insurers, classes and bands ----
+function slugify(s){
+  return (s||"").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"") || ("co"+Date.now());
+}
+function uniqueKey(obj, base){
+  let key = base, n=1;
+  while(obj[key]){ key = base+"_"+(++n); }
+  return key;
+}
+
+async function addInsurer(){
+  const nameInput = document.getElementById("newInsurerName");
+  const name = nameInput.value.trim();
+  if(!name){ alert("Enter the insurance company's name first."); return; }
+  const key = uniqueKey(INSURERS, slugify(name));
+  INSURERS[key] = { name, classes:{}, custom:true };
+  nameInput.value = "";
+  populateInsurers();
+  populateCompareCategories();
+  populateAdminInsurerFilter();
+  document.getElementById("admInsurerFilter").value = key;
+  renderAdmin();
+  await dbSaveRates();
+  renderDbStatus();
+  alert('"'+name+'" has been added. It is now selected in the filter above — use "Add a Class of Business" to give it its rates.');
+}
+
+async function removeInsurer(insKey){
+  const ins = INSURERS[insKey];
+  if(!ins) return;
+  if(!confirm('Remove "'+ins.name+'" and all of its rates? This cannot be undone unless you have an exported backup.')) return;
+  delete INSURERS[insKey];
+  document.getElementById("admInsurerFilter").value = "all";
+  populateInsurers();
+  populateCompareCategories();
+  renderAdmin();
+  await dbSaveRates();
+  renderDbStatus();
+}
+
+function toggleNewClassType(){
+  const t = document.getElementById("newClassType").value;
+  document.getElementById("newClassStandardFields").style.display = t==="standard"? "block":"none";
+  document.getElementById("newClassFlatFields").style.display = t==="flat"? "block":"none";
+}
+
+async function addClass(){
+  const insKey = document.getElementById("admInsurerFilter").value;
+  if(insKey==="all" || !INSURERS[insKey]){ alert("Select a specific insurance company in the filter above first."); return; }
+  const label = document.getElementById("newClassLabel").value.trim();
+  if(!label){ alert("Enter a class label, e.g. 'Motor Private – Comprehensive'."); return; }
+  const category = document.getElementById("newClassCategory").value;
+  const type = document.getElementById("newClassType").value;
+  const maxAgeVal = document.getElementById("newClassMaxAge").value;
+  const maxAge = maxAgeVal===""? null : parseFloat(maxAgeVal);
+  const pllVal = document.getElementById("newClassPLL").value;
+  const pllPerSeat = pllVal===""? undefined : parseFloat(pllVal);
+
+  const clsKey = uniqueKey(INSURERS[insKey].classes, slugify(label));
+  let newClass;
+
+  if(type==="flat"){
+    const premium = parseFloat(document.getElementById("newClassFlatPremium").value)||0;
+    newClass = { label, category, maxAge, minSI:0, excess:[], benefits:[], limits:[], flatOnly: flat(premium, "Custom flat premium") };
+  } else {
+    const minSI = parseFloat(document.getElementById("newClassMinSI").value)||0;
+    const maxSIraw = document.getElementById("newClassMaxSI").value;
+    const maxSI = maxSIraw===""? null : parseFloat(maxSIraw);
+    const rate = (parseFloat(document.getElementById("newClassRate").value)||0)/100;
+    const minPrem = parseFloat(document.getElementById("newClassMinPrem").value)||0;
+    const epIncluded = document.getElementById("newClassEPIncluded").checked;
+    const epRate = (parseFloat(document.getElementById("newClassEPRate").value)||0)/100;
+    const epMin = parseFloat(document.getElementById("newClassEPMin").value)||0;
+    const pvtIncluded = document.getElementById("newClassPVTIncluded").checked;
+    const pvtRate = (parseFloat(document.getElementById("newClassPVTRate").value)||0)/100;
+    const pvtMin = parseFloat(document.getElementById("newClassPVTMin").value)||0;
+    newClass = {
+      label, category, maxAge, minSI,
+      excess:[], benefits:[], limits:[],
+      bands: [ band(minSI, maxSI, rate, minPrem, {epIncluded, epRate, epMin, pvtIncluded, pvtRate, pvtMin}) ]
+    };
+  }
+  if(pllPerSeat && pllPerSeat>0) newClass.pllPerSeat = pllPerSeat;
+
+  INSURERS[insKey].classes[clsKey] = newClass;
+
+  document.getElementById("newClassLabel").value = "";
+  document.getElementById("newClassMaxAge").value = "";
+  document.getElementById("newClassFlatPremium").value = "";
+  document.getElementById("newClassPLL").value = "";
+  document.getElementById("newClassMaxSI").value = "";
+  document.getElementById("newClassEPRate").value = "";
+  document.getElementById("newClassEPMin").value = "";
+  document.getElementById("newClassPVTRate").value = "";
+  document.getElementById("newClassPVTMin").value = "";
+
+  populateInsurers();
+  populateCompareCategories();
+  renderAdmin();
+  await dbSaveRates();
+  renderDbStatus();
+  alert('Class "'+label+'" added to '+INSURERS[insKey].name+'.');
+}
+
+async function addBandToClass(insKey, clsKey){
+  const cls = INSURERS[insKey]?.classes?.[clsKey];
+  if(!cls || cls.flatOnly) return;
+  const last = cls.bands[cls.bands.length-1];
+  const newMinSI = last.maxSI!=null? last.maxSI+1 : last.minSI+1;
+  if(last.maxSI==null) last.maxSI = newMinSI - 1; // close off the previous open-ended band
+  cls.bands.push(band(newMinSI, null, last.rate, last.minPrem, {
+    epIncluded:last.epIncluded, epRate:last.epRate, epMin:last.epMin,
+    pvtIncluded:last.pvtIncluded, pvtRate:last.pvtRate, pvtMin:last.pvtMin
+  }));
+  renderAdmin();
+  await dbSaveRates();
+  renderDbStatus();
+}
+
+async function removeClass(insKey, clsKey){
+  const cls = INSURERS[insKey]?.classes?.[clsKey];
+  if(!cls) return;
+  if(!confirm('Remove the class "'+cls.label+'"?')) return;
+  delete INSURERS[insKey].classes[clsKey];
+  populateInsurers();
+  populateCompareCategories();
+  renderAdmin();
+  await dbSaveRates();
+  renderDbStatus();
+}
+
+async function removeBand(insKey, clsKey, idx){
+  const cls = INSURERS[insKey]?.classes?.[clsKey];
+  if(!cls) return;
+  if(cls.bands.length<=1){ alert("A class needs at least one rate band — remove the whole class instead if it's no longer needed."); return; }
+  cls.bands.splice(idx,1);
+  renderAdmin();
+  await dbSaveRates();
+  renderDbStatus();
+}
+
+async function saveAdminChanges(){
+  Object.entries(INSURERS).forEach(([insKey, ins])=>{
+    Object.entries(ins.classes).forEach(([clsKey, cls])=>{
+      if(cls.flatOnly){
+        const f = cls.flatOnly;
+        if(f.rateOnSI!=null){
+          const r = document.getElementById(admId(insKey,clsKey,'flat','rateOnSI'));
+          const m = document.getElementById(admId(insKey,clsKey,'flat','minPrem'));
+          if(r && r.value!=="") f.rateOnSI = parseFloat(r.value)/100;
+          if(m && m.value!=="") f.minPrem = parseFloat(m.value);
+        } else {
+          const p = document.getElementById(admId(insKey,clsKey,'flat','premium'));
+          if(p && p.value!=="") f.premium = parseFloat(p.value);
+        }
+        return;
+      }
+      cls.bands.forEach((b,i)=>{
+        const g = (field)=>document.getElementById(admId(insKey,clsKey,i,field));
+        const set = (field, target, isPercent, isCheckbox)=>{
+          const el = g(field);
+          if(!el) return;
+          if(isCheckbox){ b[target]=el.checked; return; }
+          if(el.value==="" ){ if(field==="maxSI") b[target]=null; return; }
+          b[target] = isPercent? parseFloat(el.value)/100 : parseFloat(el.value);
+        };
+        set("minSI","minSI",false,false);
+        set("maxSI","maxSI",false,false);
+        set("rate","rate",true,false);
+        set("minPrem","minPrem",false,false);
+        set("epIncluded","epIncluded",false,true);
+        set("epRate","epRate",true,false);
+        set("epMin","epMin",false,false);
+        set("pvtIncluded","pvtIncluded",false,true);
+        set("pvtRate","pvtRate",true,false);
+        set("pvtMin","pvtMin",false,false);
+        const ageEl = g("maxAgeField");
+        if(ageEl) cls.maxAge = ageEl.value===""? null : parseFloat(ageEl.value);
+      });
+    });
+  });
+  populateInsurers();
+  populateCompareCategories();
+  renderAdmin();
+  const ok = await dbSaveRates();
+  renderDbStatus();
+  if(DB_AVAILABLE){
+    alert(ok? "Rate changes saved to the shared database — everyone using this tool will see them." : "Rate changes applied here, but saving to the database failed. Export Rates (JSON) as a backup and try again.");
+  } else {
+    alert("Rate changes saved for this browser session (no database available here). Click 'Export Rates (JSON)' to keep a permanent backup you can re-import later.");
+  }
+}
+
+function exportRates(){
+  const blob = new Blob([JSON.stringify(INSURERS, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "imoth_rates_" + new Date().toISOString().slice(0,10) + ".json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importRatesFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    try{
+      const data = JSON.parse(e.target.result);
+      if(typeof data !== "object" || !data) throw new Error("bad shape");
+      Object.keys(INSURERS).forEach(k=>delete INSURERS[k]);
+      Object.assign(INSURERS, data);
+      renderAdmin(); populateInsurers(); populateCompareCategories();
+      const ok = await dbSaveRates();
+      renderDbStatus();
+      alert(DB_AVAILABLE? (ok? "Rates imported and saved to the shared database." : "Rates imported here, but saving to the database failed.") : "Rates imported successfully for this session.");
+    } catch(err){
+      alert("Could not read that file — make sure it's a rates JSON file previously exported from this tool.");
+    }
+  };
+  reader.readAsText(file);
+  evt.target.value = "";
+}
+
+async function resetRates(){
+  if(!confirm("Reset ALL rates back to the original defaults this tool shipped with? Any unsaved edits will be lost — for everyone, if a database is connected.")) return;
+  Object.keys(INSURERS).forEach(k=>delete INSURERS[k]);
+  Object.assign(INSURERS, JSON.parse(DEFAULT_INSURERS_JSON));
+  renderAdmin(); populateInsurers(); populateCompareCategories();
+  await dbSaveRates();
+  renderDbStatus();
+}
+
+// ---------------------------------------------------------------------------
+window.onload = async function(){
+  if(DB_AVAILABLE){
+    await dbLoadRates();
+    HISTORY = await dbLoadAllQuotes();
+  }
+  populateInsurers();
+  populateCompareCategories();
+  renderHistory();
+  populateAdminInsurerFilter();
+  renderDbStatus();
+};
+
+</script>
+</body>
+</html>
