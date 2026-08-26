@@ -143,7 +143,6 @@
     <div class="titles">
       <h1>Imoth Insurance Brokers Limited</h1>
       <p>Online Motor Insurance Quotation — Insurance | Health | Pension</p>
-      <p class="db-status" style="margin-top:4px;font-size:11px;"></p>
     </div>
     <div class="badge">2026 / 2027 RATES</div>
   </div>
@@ -219,13 +218,11 @@
   <!-- ================= HISTORY TAB ================= -->
   <div id="tabHistory" style="display:none;">
     <div class="panel">
-      <h2>Saved Quotations</h2>
-      <div class="hint db-status" style="margin-bottom:6px;font-size:12px;"></div>
+      <h2>Saved Quotations (this session)</h2>
       <div class="hint" style="margin-bottom:14px;">
-        Quotations you save here go into the shared database (when available) so any teammate using this tool can see and re-download them. Click "🔄 Refresh" if a colleague may have added quotes since you opened this page.
+        Quotations you save appear here for quick re-download while this browser tab stays open. This list is kept in memory only — it is <b>not</b> written to disk or the cloud, so it resets if you refresh or close the page. Download the PDF for a permanent copy.
       </div>
-      <button class="secondary" style="margin-bottom:14px;" onclick="refreshHistoryFromDb()">🔄 Refresh</button>
-      <div id="historyEmpty" style="text-align:center;color:var(--muted);padding:30px 0;">No quotations saved yet.</div>
+      <div id="historyEmpty" style="text-align:center;color:var(--muted);padding:30px 0;">No quotations saved yet in this session.</div>
       <div style="overflow-x:auto;">
         <table class="cmp" id="historyTable" style="display:none;"></table>
       </div>
@@ -236,7 +233,6 @@
   <div id="tabAdmin" style="display:none;">
     <div class="panel">
       <h2>Manage Rates — All Insurers</h2>
-      <div class="hint db-status" style="margin-bottom:6px;font-size:12px;"></div>
       <div class="hint" style="margin-bottom:14px;">
         Every rate band used by the quotation and comparison engine, in one editable table. Edits apply immediately to this browser session (new quotes will use the updated figures straight away). <b>Nothing here is saved automatically to a server</b> — use <b>Export Rates (JSON)</b> below to download a backup file, and <b>Import Rates (JSON)</b> next time you open this tool to restore it. "Reset to Original Rates" reverts everything back to the rates this tool shipped with.
       </div>
@@ -677,99 +673,6 @@ const INSURERS = {
 
 const DEFAULT_INSURERS_JSON = JSON.stringify(INSURERS); // snapshot for "Reset to Original Rates"
 
-// ---------------------------------------------------------------------------
-// DATABASE LAYER — talks to the Express/PostgreSQL API in server.js, which is
-// shared across everyone who opens this tool through that server.
-const DB_AVAILABLE = true; // the API endpoints below degrade gracefully if unreachable
-const API_BASE = "/api";
-let DB_STATUS = "checking"; // checking | connected | error | unavailable
-
-async function dbLoadRates(){
-  try{
-    const res = await fetch(API_BASE+"/rates");
-    if(res.status===404){ DB_STATUS = "connected"; return false; } // reachable, just empty so far
-    if(!res.ok){ DB_STATUS = "error"; return false; }
-    const data = await res.json();
-    Object.keys(INSURERS).forEach(k=>delete INSURERS[k]);
-    Object.assign(INSURERS, data);
-    DB_STATUS = "connected";
-    return true;
-  } catch(err){
-    console.error("Database load failed", err);
-    DB_STATUS = "unavailable";
-    return false;
-  }
-}
-
-async function dbSaveRates(){
-  try{
-    const res = await fetch(API_BASE+"/rates", {
-      method:"PUT",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(INSURERS)
-    });
-    DB_STATUS = res.ok ? "connected" : "error";
-    return res.ok;
-  } catch(err){
-    console.error("Database save failed", err);
-    DB_STATUS = "unavailable";
-    return false;
-  }
-}
-
-async function dbSaveQuote(record){
-  try{
-    const res = await fetch(API_BASE+"/quotes/"+encodeURIComponent(record.id), {
-      method:"PUT",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(record)
-    });
-    if(res.ok) DB_STATUS = "connected"; else if(DB_STATUS!=="unavailable") DB_STATUS = "error";
-    return res.ok;
-  } catch(err){
-    console.error("Database quote save failed", err);
-    DB_STATUS = "unavailable";
-    return false;
-  }
-}
-
-async function dbDeleteQuote(id){
-  try{
-    const res = await fetch(API_BASE+"/quotes/"+encodeURIComponent(id), {method:"DELETE"});
-    return res.ok;
-  } catch(err){
-    console.error("Database quote delete failed", err);
-    return false;
-  }
-}
-
-async function dbLoadAllQuotes(){
-  try{
-    const res = await fetch(API_BASE+"/quotes");
-    if(!res.ok) return [];
-    const records = await res.json();
-    records.sort((a,b)=>(b.ts||0)-(a.ts||0));
-    return records;
-  } catch(err){
-    console.error("Database quote list failed", err);
-    DB_STATUS = "unavailable";
-    return [];
-  }
-}
-
-function renderDbStatus(){
-  const els = document.querySelectorAll(".db-status");
-  let html;
-  if(DB_STATUS==="connected"){
-    html = `<span style="color:var(--ok);">🗄 Database connected</span> — rates and saved quotations are shared with everyone using this tool.`;
-  } else if(DB_STATUS==="error"){
-    html = `<span style="color:var(--imoth-red);">⚠ Database error</span> — your last change may not have saved centrally. Export a JSON backup to be safe.`;
-  } else {
-    html = `<span style="color:var(--imoth-red);">⚠ Can't reach the database server</span> — make sure the app is running via "npm start" (not opened as a local file), and that the server can reach the database. Use Export/Import (JSON) to keep your changes meanwhile.`;
-  }
-  els.forEach(el=>el.innerHTML = html);
-}
-
 const CATEGORY_LABELS = {
   private:"Private Car", commercial:"Commercial (Own Goods / Gen. Cartage / Hybrid)", institutional:"Institutional / School Bus",
   psv:"PSV / Chauffeur Driven", tuktuk:"Tuk Tuk", motorcycle:"Motorcycle", asset:"Asset (New Units)", special:"Special Type (Farm/Construction)", tpo:"Third Party Only"
@@ -1128,31 +1031,16 @@ async function downloadPDF(){
 }
 
 // ---------------------------------------------------------------------------
-// SAVED QUOTATIONS — backed by the shared database when available, otherwise
-// kept in memory only for the current browser session.
+// SESSION HISTORY (in-memory only — cleared on page refresh, never written to disk)
 let HISTORY = [];
 
-async function saveToHistory(){
+function saveToHistory(){
   if(!CURRENT_QUOTE){ alert("Generate a quote first."); return; }
   const record = Object.assign({}, CURRENT_QUOTE, { id: "q"+Date.now(), snapshotHtml: document.getElementById("sheet").innerHTML });
   HISTORY.unshift(record);
   renderHistory();
   const btn = event && event.target;
-  const ok = await dbSaveQuote(record);
-  if(btn){
-    const orig = btn.textContent;
-    btn.textContent = DB_AVAILABLE ? (ok? "✓ Saved to database" : "⚠ Saved locally only") : "✓ Saved (session only)";
-    setTimeout(()=>btn.textContent=orig, 1800);
-  }
-  renderDbStatus();
-}
-
-async function refreshHistoryFromDb(){
-  if(!DB_AVAILABLE){ renderDbStatus(); return; }
-  const records = await dbLoadAllQuotes();
-  HISTORY = records;
-  renderHistory();
-  renderDbStatus();
+  if(btn){ const orig=btn.textContent; btn.textContent="✓ Saved"; setTimeout(()=>btn.textContent=orig,1200); }
 }
 
 function renderHistory(){
@@ -1171,9 +1059,8 @@ function renderHistory(){
       <td>${r.client}</td><td>${r.reg}</td><td>${r.insurerName}</td><td>${r.className}</td>
       <td class="num">${num2(r.total)}</td>
       <td class="num" style="color:${bal>0?'var(--imoth-red)':'var(--ok)'};">${bal>0? num2(bal): (bal<0? 'Overpaid '+num2(-bal) : 'Paid')}</td>
-      <td style="white-space:nowrap;"><button class="secondary" style="padding:6px 10px;font-size:12px;" onclick="viewHistoryItem('${r.id}')">View</button>
-          <button class="secondary" style="padding:6px 10px;font-size:12px;margin-left:6px;" onclick="downloadHistoryItem('${r.id}')">PDF</button>
-          <button class="secondary" style="padding:6px 10px;font-size:12px;margin-left:6px;color:var(--imoth-red);border-color:var(--imoth-red);" onclick="deleteHistoryItem('${r.id}')">Delete</button></td>
+      <td><button class="secondary" style="padding:6px 10px;font-size:12px;" onclick="viewHistoryItem('${r.id}')">View</button>
+          <button class="secondary" style="padding:6px 10px;font-size:12px;margin-left:6px;" onclick="downloadHistoryItem('${r.id}')">PDF</button></td>
     </tr>`;
   });
   tableEl.innerHTML = html;
@@ -1195,14 +1082,6 @@ async function downloadHistoryItem(id){
   viewHistoryItem(id);
   await new Promise(res=>setTimeout(res,150));
   await downloadPDF();
-}
-
-async function deleteHistoryItem(id){
-  const r = findHistory(id); if(!r) return;
-  if(!confirm('Delete the quotation for '+r.client+' ('+r.reg+')? This removes it from the shared database for everyone.')) return;
-  HISTORY = HISTORY.filter(x=>x.id!==id);
-  renderHistory();
-  await dbDeleteQuote(id);
 }
 
 // ---------------------------------------------------------------------------
@@ -1369,7 +1248,7 @@ function uniqueKey(obj, base){
   return key;
 }
 
-async function addInsurer(){
+function addInsurer(){
   const nameInput = document.getElementById("newInsurerName");
   const name = nameInput.value.trim();
   if(!name){ alert("Enter the insurance company's name first."); return; }
@@ -1381,12 +1260,10 @@ async function addInsurer(){
   populateAdminInsurerFilter();
   document.getElementById("admInsurerFilter").value = key;
   renderAdmin();
-  await dbSaveRates();
-  renderDbStatus();
   alert('"'+name+'" has been added. It is now selected in the filter above — use "Add a Class of Business" to give it its rates.');
 }
 
-async function removeInsurer(insKey){
+function removeInsurer(insKey){
   const ins = INSURERS[insKey];
   if(!ins) return;
   if(!confirm('Remove "'+ins.name+'" and all of its rates? This cannot be undone unless you have an exported backup.')) return;
@@ -1395,8 +1272,6 @@ async function removeInsurer(insKey){
   populateInsurers();
   populateCompareCategories();
   renderAdmin();
-  await dbSaveRates();
-  renderDbStatus();
 }
 
 function toggleNewClassType(){
@@ -1405,7 +1280,7 @@ function toggleNewClassType(){
   document.getElementById("newClassFlatFields").style.display = t==="flat"? "block":"none";
 }
 
-async function addClass(){
+function addClass(){
   const insKey = document.getElementById("admInsurerFilter").value;
   if(insKey==="all" || !INSURERS[insKey]){ alert("Select a specific insurance company in the filter above first."); return; }
   const label = document.getElementById("newClassLabel").value.trim();
@@ -1458,12 +1333,10 @@ async function addClass(){
   populateInsurers();
   populateCompareCategories();
   renderAdmin();
-  await dbSaveRates();
-  renderDbStatus();
   alert('Class "'+label+'" added to '+INSURERS[insKey].name+'.');
 }
 
-async function addBandToClass(insKey, clsKey){
+function addBandToClass(insKey, clsKey){
   const cls = INSURERS[insKey]?.classes?.[clsKey];
   if(!cls || cls.flatOnly) return;
   const last = cls.bands[cls.bands.length-1];
@@ -1474,11 +1347,9 @@ async function addBandToClass(insKey, clsKey){
     pvtIncluded:last.pvtIncluded, pvtRate:last.pvtRate, pvtMin:last.pvtMin
   }));
   renderAdmin();
-  await dbSaveRates();
-  renderDbStatus();
 }
 
-async function removeClass(insKey, clsKey){
+function removeClass(insKey, clsKey){
   const cls = INSURERS[insKey]?.classes?.[clsKey];
   if(!cls) return;
   if(!confirm('Remove the class "'+cls.label+'"?')) return;
@@ -1486,21 +1357,17 @@ async function removeClass(insKey, clsKey){
   populateInsurers();
   populateCompareCategories();
   renderAdmin();
-  await dbSaveRates();
-  renderDbStatus();
 }
 
-async function removeBand(insKey, clsKey, idx){
+function removeBand(insKey, clsKey, idx){
   const cls = INSURERS[insKey]?.classes?.[clsKey];
   if(!cls) return;
   if(cls.bands.length<=1){ alert("A class needs at least one rate band — remove the whole class instead if it's no longer needed."); return; }
   cls.bands.splice(idx,1);
   renderAdmin();
-  await dbSaveRates();
-  renderDbStatus();
 }
 
-async function saveAdminChanges(){
+function saveAdminChanges(){
   Object.entries(INSURERS).forEach(([insKey, ins])=>{
     Object.entries(ins.classes).forEach(([clsKey, cls])=>{
       if(cls.flatOnly){
@@ -1543,13 +1410,7 @@ async function saveAdminChanges(){
   populateInsurers();
   populateCompareCategories();
   renderAdmin();
-  const ok = await dbSaveRates();
-  renderDbStatus();
-  if(DB_AVAILABLE){
-    alert(ok? "Rate changes saved to the shared database — everyone using this tool will see them." : "Rate changes applied here, but saving to the database failed. Export Rates (JSON) as a backup and try again.");
-  } else {
-    alert("Rate changes saved for this browser session (no database available here). Click 'Export Rates (JSON)' to keep a permanent backup you can re-import later.");
-  }
+  alert("Rate changes saved for this browser session. Click 'Export Rates (JSON)' to keep a permanent backup you can re-import later.");
 }
 
 function exportRates(){
@@ -1566,16 +1427,14 @@ function importRatesFile(evt){
   const file = evt.target.files[0];
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = async function(e){
+  reader.onload = function(e){
     try{
       const data = JSON.parse(e.target.result);
       if(typeof data !== "object" || !data) throw new Error("bad shape");
       Object.keys(INSURERS).forEach(k=>delete INSURERS[k]);
       Object.assign(INSURERS, data);
       renderAdmin(); populateInsurers(); populateCompareCategories();
-      const ok = await dbSaveRates();
-      renderDbStatus();
-      alert(DB_AVAILABLE? (ok? "Rates imported and saved to the shared database." : "Rates imported here, but saving to the database failed.") : "Rates imported successfully for this session.");
+      alert("Rates imported successfully for this session.");
     } catch(err){
       alert("Could not read that file — make sure it's a rates JSON file previously exported from this tool.");
     }
@@ -1584,26 +1443,19 @@ function importRatesFile(evt){
   evt.target.value = "";
 }
 
-async function resetRates(){
-  if(!confirm("Reset ALL rates back to the original defaults this tool shipped with? Any unsaved edits will be lost — for everyone, if a database is connected.")) return;
+function resetRates(){
+  if(!confirm("Reset ALL rates back to the original defaults this tool shipped with? Any unsaved edits will be lost.")) return;
   Object.keys(INSURERS).forEach(k=>delete INSURERS[k]);
   Object.assign(INSURERS, JSON.parse(DEFAULT_INSURERS_JSON));
   renderAdmin(); populateInsurers(); populateCompareCategories();
-  await dbSaveRates();
-  renderDbStatus();
 }
 
 // ---------------------------------------------------------------------------
-window.onload = async function(){
-  if(DB_AVAILABLE){
-    await dbLoadRates();
-    HISTORY = await dbLoadAllQuotes();
-  }
+window.onload = function(){
   populateInsurers();
   populateCompareCategories();
   renderHistory();
   populateAdminInsurerFilter();
-  renderDbStatus();
 };
 
 </script>
