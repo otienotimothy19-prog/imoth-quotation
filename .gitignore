@@ -1,3 +1,16 @@
 node_modules/
 .env
 *.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Frontend build output
+frontend/dist/
+
+# Local document storage (dev only — production should use a real storage backend)
+backend/storage/documents/*
+!backend/storage/documents/.gitkeep
