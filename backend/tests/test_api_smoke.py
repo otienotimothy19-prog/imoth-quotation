@@ -59,12 +59,37 @@ def test_compare_generate_accept_flow(unique_reg):
     assert pdf_resp.status_code == 200
     assert pdf_resp.headers["content-type"] == "application/pdf"
 
-    accept1 = client.post(f"/api/quotes/{qid}/accept", json={})
-    assert accept1.status_code == 200
+    # Acceptance must be blocked until all required documents are uploaded
+    # and the accuracy statement is confirmed.
+    blocked = client.post(f"/api/quotes/{qid}/accept", json={"acceptance_confirmed": True})
+    assert blocked.status_code == 400
+    assert "Upload the vehicle logbook" in blocked.json()["detail"]
+
+    blocked_confirm = client.post(f"/api/quotes/{qid}/accept", json={"acceptance_confirmed": False})
+    assert blocked_confirm.status_code == 400
+
+    for doc_type in ("LOGBOOK", "NATIONAL_ID", "KRA_PIN"):
+        upload_resp = client.post(
+            f"/api/quotes/{qid}/documents/{doc_type}",
+            files={"file": (f"{doc_type.lower()}.pdf", b"%PDF-1.4 test document", "application/pdf")},
+        )
+        assert upload_resp.status_code == 200, upload_resp.text
+
+    status_resp = client.get(f"/api/quotes/{qid}/documents/status")
+    assert status_resp.status_code == 200
+    status_body = status_resp.json()
+    assert status_body["all_uploaded"] is True
+    assert status_body["uploaded_count"] == 3
+
+    still_blocked = client.post(f"/api/quotes/{qid}/accept", json={"acceptance_confirmed": False})
+    assert still_blocked.status_code == 400
+
+    accept1 = client.post(f"/api/quotes/{qid}/accept", json={"acceptance_confirmed": True})
+    assert accept1.status_code == 200, accept1.text
     rn1 = accept1.json()
     assert rn1["risk_note_number"].startswith("RN-")
 
-    accept2 = client.post(f"/api/quotes/{qid}/accept", json={})
+    accept2 = client.post(f"/api/quotes/{qid}/accept", json={"acceptance_confirmed": True})
     assert accept2.status_code == 200
     rn2 = accept2.json()
     assert rn2["id"] == rn1["id"], "accept must be idempotent -- no duplicate risk note"

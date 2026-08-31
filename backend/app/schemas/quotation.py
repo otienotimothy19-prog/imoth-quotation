@@ -110,6 +110,7 @@ class QuotationOut(BaseModel):
 
 class AcceptQuotationRequest(BaseModel):
     cover_start_date: datetime | None = None
+    acceptance_confirmed: bool = False
 
 
 class RejectQuotationRequest(BaseModel):

@@ -4,7 +4,6 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
@@ -21,6 +20,7 @@ from app.api.routers import (
     auth,
     client_documents,
     client_quotations,
+    client_uploads,
 )
 
 logging.basicConfig(level=logging.INFO if not settings.DEBUG else logging.DEBUG)
@@ -67,11 +67,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
-app.mount(settings.STORAGE_PUBLIC_BASE_URL, StaticFiles(directory=settings.STORAGE_LOCAL_PATH), name="files")
-
 app.include_router(auth.router)
 app.include_router(client_quotations.router)
 app.include_router(client_documents.router)
+app.include_router(client_uploads.router)
 app.include_router(admin_dashboard.router)
 app.include_router(admin_quotations.router)
 app.include_router(admin_risk_notes.router)

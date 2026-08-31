@@ -138,6 +138,7 @@ def accept(request: Request, quotation_id: uuid.UUID, payload: AcceptQuotationRe
             db,
             quotation_id=quotation_id,
             cover_start_date=payload.cover_start_date,
+            acceptance_confirmed=payload.acceptance_confirmed,
             actor_label=quotation.client.email or quotation.client.phone,
             actor_id=None,
         )

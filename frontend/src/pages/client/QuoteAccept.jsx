@@ -53,7 +53,8 @@ export default function QuoteAccept() {
         </div>
         <h2 style={{ fontSize: 20, color: "var(--imoth-blue)" }}>Quotation Accepted</h2>
         <p className="hint" style={{ marginTop: 6 }}>
-          Cover confirmed with {quote.insurer_name} for {quote.vehicle_registration}.
+          Quotation accepted and documents submitted successfully. Our team will review your documents and advise
+          you on the next step.
         </p>
 
         <div className="row2" style={{ textAlign: "left", marginTop: 24 }}>

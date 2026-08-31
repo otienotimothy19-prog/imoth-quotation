@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, dateFmt, errorMessage, money } from "../../api/client";
+import DocumentUploadSection from "../../components/DocumentUploadSection";
 import StepIndicator from "../../components/StepIndicator";
 
 const STATUS_BADGE = {
@@ -24,6 +25,8 @@ export default function QuoteDetail() {
   const [emailStatus, setEmailStatus] = useState("");
   const [rejectBox, setRejectBox] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [docsAllUploaded, setDocsAllUploaded] = useState(false);
+  const [acceptanceConfirmed, setAcceptanceConfirmed] = useState(false);
 
   async function load() {
     try {
@@ -44,7 +47,7 @@ export default function QuoteDetail() {
     setBusy(true);
     setError("");
     try {
-      await api.post(`/api/quotes/${id}/accept`, {});
+      await api.post(`/api/quotes/${id}/accept`, { acceptance_confirmed: acceptanceConfirmed });
       navigate(`/quote/${id}/accept`);
     } catch (err) {
       setError(errorMessage(err, "Could not accept this quotation."));
@@ -193,26 +196,57 @@ export default function QuoteDetail() {
 
         {canDecide && (
           <div style={{ borderTop: "1px solid var(--panel)", marginTop: 20, paddingTop: 18 }}>
-            <h3 style={{ fontSize: 13, marginBottom: 10 }}>Ready to proceed?</h3>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button className="btn btn-primary" disabled={busy} onClick={handleAccept}>
-                {busy ? <span className="spinner" /> : "✓ Accept Quotation"}
-              </button>
-              <button className="btn btn-danger" disabled={busy} onClick={() => setRejectBox((v) => !v)}>
-                ✕ Reject Quotation
-              </button>
-            </div>
-            {rejectBox && (
-              <div style={{ marginTop: 12 }}>
-                <label className="first">Reason (optional)</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input type="text" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="e.g. found a better rate" />
-                  <button className="btn btn-danger" disabled={busy} onClick={handleReject}>
-                    Confirm Reject
-                  </button>
-                </div>
+            <DocumentUploadSection
+              quotationId={id}
+              disabled={busy}
+              onStatusChange={(s) => setDocsAllUploaded(s.all_uploaded)}
+            />
+
+            <div style={{ borderTop: "1px solid var(--panel)", marginTop: 20, paddingTop: 18 }}>
+              <h3 style={{ fontSize: 13, marginBottom: 10 }}>Ready to proceed?</h3>
+
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, marginBottom: 14 }}>
+                <input
+                  type="checkbox"
+                  checked={acceptanceConfirmed}
+                  onChange={(e) => setAcceptanceConfirmed(e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span>
+                  I confirm that the information and documents provided are accurate and that I am authorised to
+                  request this insurance cover.
+                </span>
+              </label>
+
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  className="btn btn-primary"
+                  disabled={busy || !docsAllUploaded || !acceptanceConfirmed}
+                  onClick={handleAccept}
+                >
+                  {busy ? <span className="spinner" /> : "✓ Accept Quotation"}
+                </button>
+                <button className="btn btn-danger" disabled={busy} onClick={() => setRejectBox((v) => !v)}>
+                  ✕ Reject Quotation
+                </button>
               </div>
-            )}
+              {!docsAllUploaded && (
+                <p className="hint" style={{ marginTop: 10 }}>
+                  Upload the vehicle logbook, ID copy and KRA PIN certificate to continue.
+                </p>
+              )}
+              {rejectBox && (
+                <div style={{ marginTop: 12 }}>
+                  <label className="first">Reason (optional)</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input type="text" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="e.g. found a better rate" />
+                    <button className="btn btn-danger" disabled={busy} onClick={handleReject}>
+                      Confirm Reject
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
