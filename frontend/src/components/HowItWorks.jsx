@@ -1,23 +1,23 @@
 const STEPS = [
   {
     n: "01",
-    title: "Tell us about yourself",
-    desc: "Provide basic client and contact details.",
+    title: "Your Details",
+    desc: "Client and vehicle information.",
   },
   {
     n: "02",
-    title: "Add your vehicle",
-    desc: "Enter the vehicle and usage information.",
+    title: "Choose Cover",
+    desc: "Cover details, comparison and selection.",
   },
   {
     n: "03",
-    title: "Compare suitable options",
-    desc: "Review eligible insurer quotations and premium breakdowns.",
+    title: "Review & Upload",
+    desc: "Quotation review and required documents.",
   },
   {
     n: "04",
-    title: "Receive your quotation",
-    desc: "Review, accept and download available documents.",
+    title: "Confirm",
+    desc: "Declaration and quotation acceptance.",
   },
 ];
 

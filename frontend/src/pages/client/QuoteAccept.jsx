@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, dateFmt, errorMessage, money } from "../../api/client";
-import StepIndicator from "../../components/StepIndicator";
+import QuoteShell from "../../components/wizard/QuoteShell";
 
 export default function QuoteAccept() {
   const { id } = useParams();
@@ -30,11 +30,8 @@ export default function QuoteAccept() {
   }
 
   return (
-    <div>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <StepIndicator current={7} />
-      </div>
-      <div className="card" style={{ textAlign: "center", padding: "36px 24px" }}>
+    <QuoteShell currentIndex={3} heading="Confirm and Accept Your Quotation" subtitle="Your quotation has been accepted.">
+      <div style={{ textAlign: "center", padding: "20px 0 8px" }}>
         <div
           style={{
             width: 56,
@@ -51,28 +48,27 @@ export default function QuoteAccept() {
         >
           ✓
         </div>
-        <h2 style={{ fontSize: 20, color: "var(--imoth-blue)" }}>Quotation Accepted</h2>
-        <p className="hint" style={{ marginTop: 6 }}>
-          Quotation accepted and documents submitted successfully. Our team will review your documents and advise
-          you on the next step.
+        <p className="hint" style={{ maxWidth: "48ch", margin: "0 auto" }}>
+          Quotation accepted and documents submitted successfully. Our team will review your documents and advise you
+          on the next step.
         </p>
 
-        <div className="row2" style={{ textAlign: "left", marginTop: 24 }}>
-          <div>
+        <div className="quote-summary-grid" style={{ textAlign: "left", marginTop: 24 }}>
+          <div className="quote-summary-item">
             <div className="hint">Quotation Number</div>
-            <div style={{ fontWeight: 700 }}>{quote.quotation_number}</div>
+            <div className="quote-summary-value">{quote.quotation_number}</div>
           </div>
-          <div>
+          <div className="quote-summary-item">
+            <div className="hint">Insurer</div>
+            <div className="quote-summary-value">{quote.insurer_name}</div>
+          </div>
+          <div className="quote-summary-item">
             <div className="hint">Total Premium</div>
-            <div style={{ fontWeight: 700 }}>{money(quote.total_premium)}</div>
+            <div className="quote-summary-value">{money(quote.total_premium)}</div>
           </div>
-          <div>
+          <div className="quote-summary-item">
             <div className="hint">Accepted On</div>
-            <div style={{ fontWeight: 700 }}>{dateFmt(quote.accepted_at)}</div>
-          </div>
-          <div>
-            <div className="hint">Status</div>
-            <div style={{ fontWeight: 700 }}>Risk Note Issued</div>
+            <div className="quote-summary-value">{dateFmt(quote.accepted_at)}</div>
           </div>
         </div>
 
@@ -82,6 +78,6 @@ export default function QuoteAccept() {
           </Link>
         </div>
       </div>
-    </div>
+    </QuoteShell>
   );
 }

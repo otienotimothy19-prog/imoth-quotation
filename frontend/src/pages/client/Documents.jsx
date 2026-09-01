@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import StepIndicator from "../../components/StepIndicator";
 
 const STATUS_BADGE = {
   GENERATED: "badge-blue",
@@ -60,10 +59,6 @@ export default function Documents() {
 
   return (
     <div>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <StepIndicator current={7} />
-      </div>
-
       <div className="card">
         <h2 style={{ fontSize: 16 }}>Your Documents</h2>
         <p className="hint" style={{ marginBottom: 16 }}>

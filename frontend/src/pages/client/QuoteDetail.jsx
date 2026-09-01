@@ -2,17 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, dateFmt, errorMessage, money } from "../../api/client";
 import DocumentUploadSection from "../../components/DocumentUploadSection";
-import StepIndicator from "../../components/StepIndicator";
-
-const STATUS_BADGE = {
-  DRAFT: "badge-gray",
-  GENERATED: "badge-blue",
-  SENT: "badge-blue",
-  ACCEPTED: "badge-green",
-  REJECTED: "badge-red",
-  EXPIRED: "badge-amber",
-  CANCELLED: "badge-gray",
-};
+import QuoteShell from "../../components/wizard/QuoteShell";
 
 export default function QuoteDetail() {
   const { id } = useParams();
@@ -25,6 +15,7 @@ export default function QuoteDetail() {
   const [emailStatus, setEmailStatus] = useState("");
   const [rejectBox, setRejectBox] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [phase, setPhase] = useState("review"); // "review" (step 3) | "confirm" (step 4)
   const [docsAllUploaded, setDocsAllUploaded] = useState(false);
   const [acceptanceConfirmed, setAcceptanceConfirmed] = useState(false);
 
@@ -33,6 +24,9 @@ export default function QuoteDetail() {
       const res = await api.get(`/api/quotes/${id}`);
       setQuote(res.data);
       setEmailTo(res.data.client_email || "");
+      if (res.data.status === "ACCEPTED") {
+        navigate(`/quote/${id}/accept`, { replace: true });
+      }
     } catch (err) {
       setError(errorMessage(err, "Quotation not found."));
     }
@@ -89,100 +83,93 @@ export default function QuoteDetail() {
   if (error) return <div className="alert alert-error">{error}</div>;
   if (!quote) return <div className="card">Loading quotation…</div>;
 
-  const canDecide = ["GENERATED", "SENT"].includes(quote.status);
-
-  return (
-    <div>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <StepIndicator current={quote.status === "ACCEPTED" ? 6 : 5} />
+  const summary = (
+    <div className="quote-summary-grid">
+      <div className="quote-summary-item">
+        <div className="hint">Customer</div>
+        <div className="quote-summary-value">{quote.client_name}</div>
       </div>
+      <div className="quote-summary-item">
+        <div className="hint">Vehicle Registration</div>
+        <div className="quote-summary-value">{quote.vehicle_registration}</div>
+      </div>
+      <div className="quote-summary-item">
+        <div className="hint">Vehicle Class</div>
+        <div className="quote-summary-value">{quote.vehicle_class_label}</div>
+      </div>
+      <div className="quote-summary-item">
+        <div className="hint">Insurer</div>
+        <div className="quote-summary-value">{quote.insurer_name}</div>
+      </div>
+      <div className="quote-summary-item">
+        <div className="hint">Cover Type</div>
+        <div className="quote-summary-value">{quote.cover_type === "comprehensive" ? "Comprehensive" : "Third Party Only"}</div>
+      </div>
+      <div className="quote-summary-item">
+        <div className="hint">Total Premium</div>
+        <div className="quote-summary-value">{money(quote.total_premium)}</div>
+      </div>
+    </div>
+  );
 
-      <div className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
-          <div>
-            <h2 style={{ fontSize: 18, color: "var(--imoth-blue)" }}>Quotation {quote.quotation_number}</h2>
-            <p className="hint" style={{ margin: "4px 0 0" }}>
-              {quote.client_name} · {quote.vehicle_registration} · {quote.insurer_name}
-            </p>
-          </div>
-          <span className={`badge ${STATUS_BADGE[quote.status] || "badge-gray"}`}>{quote.status}</span>
-        </div>
+  const breakdown = (
+    <table style={{ marginBottom: 20 }}>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th className="num">Amount (Kshs)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {quote.items.map((it, i) => (
+          <tr key={i}>
+            <td>{it.label}</td>
+            <td className="num">{money(it.amount)}</td>
+          </tr>
+        ))}
+        <tr>
+          <td>Sub-total</td>
+          <td className="num">{money(quote.subtotal)}</td>
+        </tr>
+        <tr>
+          <td>Levies</td>
+          <td className="num">{money(quote.levies)}</td>
+        </tr>
+        <tr>
+          <td>Stamp Duty</td>
+          <td className="num">{money(quote.stamp_duty)}</td>
+        </tr>
+        <tr style={{ fontWeight: 800 }}>
+          <td>TOTAL PREMIUM</td>
+          <td className="num">{money(quote.total_premium)}</td>
+        </tr>
+      </tbody>
+    </table>
+  );
 
-        <table style={{ marginTop: 18 }}>
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th className="num">Amount (Kshs)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quote.items.map((it, i) => (
-              <tr key={i}>
-                <td>{it.label}</td>
-                <td className="num">{money(it.amount)}</td>
-              </tr>
-            ))}
-            <tr>
-              <td>Sub-total</td>
-              <td className="num">{money(quote.subtotal)}</td>
-            </tr>
-            <tr>
-              <td>Levies</td>
-              <td className="num">{money(quote.levies)}</td>
-            </tr>
-            <tr>
-              <td>Stamp Duty</td>
-              <td className="num">{money(quote.stamp_duty)}</td>
-            </tr>
-            <tr style={{ fontWeight: 800 }}>
-              <td>TOTAL PREMIUM</td>
-              <td className="num">{money(quote.total_premium)}</td>
-            </tr>
-          </tbody>
-        </table>
+  if (phase === "review") {
+    return (
+      <QuoteShellForQuote quote={quote} currentIndex={2}>
+        {error && <div className="alert alert-error">{error}</div>}
+        {summary}
+        {breakdown}
 
-        <div className="row2" style={{ marginTop: 18 }}>
-          <div>
-            <h3 style={{ fontSize: 12.5 }}>Limits of Cover</h3>
-            <ul style={{ fontSize: 12.5, paddingLeft: 18, margin: 0, color: "#333" }}>
-              {(quote.limits.length ? quote.limits : ["Per insurer's standard policy wording"]).map((l, i) => (
-                <li key={i}>{l}</li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h3 style={{ fontSize: 12.5 }}>Excess &amp; Benefits</h3>
-            <ul style={{ fontSize: 12.5, paddingLeft: 18, margin: 0, color: "#333" }}>
-              {(quote.excess.concat(quote.benefits).length ? quote.excess.concat(quote.benefits) : ["Per insurer's standard policy wording"]).map(
-                (l, i) => (
-                  <li key={i}>{l}</li>
-                )
-              )}
-            </ul>
-          </div>
-        </div>
-
-        <p className="hint" style={{ marginTop: 16 }}>
+        <p className="hint" style={{ marginTop: -8, marginBottom: 20 }}>
           Valid until {dateFmt(quote.expires_at)}. Subject to the insurer's standard policy wording and satisfactory
           underwriting review.
         </p>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
           <a className="btn btn-secondary" href={`/api/quotes/${id}/pdf`} target="_blank" rel="noreferrer">
             ⬇ Download PDF
           </a>
           <button className="btn btn-secondary" onClick={() => setEmailBox((v) => !v)}>
             ✉ Email Quotation
           </button>
-          {quote.status === "ACCEPTED" && (
-            <button className="btn btn-secondary" onClick={() => navigate(`/documents/${id}`)}>
-              View Documents →
-            </button>
-          )}
         </div>
 
         {emailBox && (
-          <div className="alert alert-info" style={{ marginTop: 12 }}>
+          <div className="alert alert-info" style={{ marginBottom: 24 }}>
             <label className="first">Send to</label>
             <div style={{ display: "flex", gap: 8 }}>
               <input type="email" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="client@email.com" />
@@ -194,68 +181,98 @@ export default function QuoteDetail() {
           </div>
         )}
 
-        {canDecide && (
-          <div style={{ borderTop: "1px solid var(--panel)", marginTop: 20, paddingTop: 18 }}>
-            <DocumentUploadSection
-              quotationId={id}
-              disabled={busy}
-              onStatusChange={(s) => setDocsAllUploaded(s.all_uploaded)}
-            />
+        <DocumentUploadSection quotationId={id} disabled={busy} onStatusChange={(s) => setDocsAllUploaded(s.all_uploaded)} />
 
-            <div style={{ borderTop: "1px solid var(--panel)", marginTop: 20, paddingTop: 18 }}>
-              <h3 style={{ fontSize: 13, marginBottom: 10 }}>Ready to proceed?</h3>
+        <div className="quote-footer-nav">
+          <button className="btn btn-secondary" onClick={() => navigate("/quote")}>
+            ← Back
+          </button>
+          <button className="btn btn-primary" disabled={!docsAllUploaded} onClick={() => setPhase("confirm")}>
+            Save &amp; Continue →
+          </button>
+        </div>
+        {!docsAllUploaded && (
+          <p className="hint" style={{ marginTop: 10, textAlign: "right" }}>
+            Upload the vehicle logbook, ID copy and KRA PIN certificate to continue.
+          </p>
+        )}
 
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, marginBottom: 14 }}>
-                <input
-                  type="checkbox"
-                  checked={acceptanceConfirmed}
-                  onChange={(e) => setAcceptanceConfirmed(e.target.checked)}
-                  style={{ marginTop: 2 }}
-                />
-                <span>
-                  I confirm that the information and documents provided are accurate and that I am authorised to
-                  request this insurance cover.
-                </span>
-              </label>
-
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button
-                  className="btn btn-primary"
-                  disabled={busy || !docsAllUploaded || !acceptanceConfirmed}
-                  onClick={handleAccept}
-                >
-                  {busy ? <span className="spinner" /> : "✓ Accept Quotation"}
-                </button>
-                <button className="btn btn-danger" disabled={busy} onClick={() => setRejectBox((v) => !v)}>
-                  ✕ Reject Quotation
-                </button>
-              </div>
-              {!docsAllUploaded && (
-                <p className="hint" style={{ marginTop: 10 }}>
-                  Upload the vehicle logbook, ID copy and KRA PIN certificate to continue.
-                </p>
-              )}
-              {rejectBox && (
-                <div style={{ marginTop: 12 }}>
-                  <label className="first">Reason (optional)</label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input type="text" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="e.g. found a better rate" />
-                    <button className="btn btn-danger" disabled={busy} onClick={handleReject}>
-                      Confirm Reject
-                    </button>
-                  </div>
-                </div>
-              )}
+        {rejectBox && (
+          <div style={{ marginTop: 20, borderTop: "1px solid var(--panel)", paddingTop: 16 }}>
+            <label className="first">Reason for rejecting (optional)</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="text" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="e.g. found a better rate" />
+              <button className="btn btn-danger" disabled={busy} onClick={handleReject}>
+                Confirm Reject
+              </button>
             </div>
           </div>
         )}
+        <div style={{ textAlign: "right", marginTop: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setRejectBox((v) => !v)}>
+            Not interested in this quote?
+          </button>
+        </div>
+      </QuoteShellForQuote>
+    );
+  }
 
-        {quote.status === "REJECTED" && (
-          <div className="alert alert-error" style={{ marginTop: 16 }}>
-            This quotation was rejected. Start a new quote if you'd like to try different cover options.
-          </div>
-        )}
+  // phase === "confirm"
+  return (
+    <QuoteShellForQuote quote={quote} currentIndex={3} onBackToReview={() => setPhase("review")}>
+      {error && <div className="alert alert-error">{error}</div>}
+      {summary}
+      {breakdown}
+
+      <p className="hint" style={{ marginTop: -8, marginBottom: 20 }}>Required documents: all 3 of 3 uploaded.</p>
+
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, marginBottom: 14 }}>
+        <input
+          type="checkbox"
+          checked={acceptanceConfirmed}
+          onChange={(e) => setAcceptanceConfirmed(e.target.checked)}
+          style={{ marginTop: 2 }}
+        />
+        <span>
+          I confirm that the information and documents provided are accurate and that I am authorised to request this
+          insurance cover.
+        </span>
+      </label>
+
+      <div className="quote-footer-nav">
+        <button className="btn btn-secondary" onClick={() => setPhase("review")}>
+          ← Back
+        </button>
+        <button className="btn btn-primary" disabled={busy || !acceptanceConfirmed} onClick={handleAccept}>
+          {busy ? <span className="spinner" /> : "Accept Quotation"}
+        </button>
       </div>
-    </div>
+      {!acceptanceConfirmed && (
+        <p className="hint" style={{ marginTop: 10, textAlign: "right" }}>
+          Please confirm the declaration above to accept your quotation.
+        </p>
+      )}
+    </QuoteShellForQuote>
+  );
+}
+
+// Small wrapper so both phases share the exact same heading/step wiring
+// without duplicating the QuoteShell import and prop plumbing above.
+function QuoteShellForQuote({ quote, currentIndex, children, onBackToReview }) {
+  const heading = currentIndex === 2 ? "Review Your Quote and Upload Documents" : "Confirm and Accept Your Quotation";
+  const subtitle =
+    currentIndex === 2
+      ? `Quotation ${quote.quotation_number} — check the details below and upload your documents.`
+      : "One last check before we submit your acceptance.";
+  return (
+    <QuoteShell
+      currentIndex={currentIndex}
+      heading={heading}
+      subtitle={subtitle}
+      onNavigate={onBackToReview ? (i) => i === 2 && onBackToReview() : undefined}
+      canNavigateTo={(i) => i === 2}
+    >
+      {children}
+    </QuoteShell>
   );
 }

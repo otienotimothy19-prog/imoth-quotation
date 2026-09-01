@@ -69,8 +69,15 @@ export default function DocumentUploadCard({
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => !disabled && !uploading && inputRef.current?.click()}
+          onKeyDown={(e) => {
+            if ((e.key === "Enter" || e.key === " ") && !disabled && !uploading) {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
           role="button"
           tabIndex={0}
+          aria-label={`Upload ${label}`}
         >
           <input
             ref={inputRef}
