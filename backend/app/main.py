@@ -43,6 +43,18 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def restore_api_prefix(request: Request, call_next):
+    # DigitalOcean App Platform's ingress rule for this service matches on
+    # the "/api" path prefix but forwards the request with that prefix
+    # stripped, while every route in this app is registered *with* the
+    # "/api" prefix (and local dev / tests always send it intact). Put it
+    # back when it's missing so the same route table works in both cases.
+    if not request.scope["path"].startswith("/api"):
+        request.scope["path"] = "/api" + request.scope["path"]
+    return await call_next(request)
+
+
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(status_code=429, content={"detail": "Too many requests. Please try again shortly."})
