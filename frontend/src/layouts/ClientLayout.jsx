@@ -1,4 +1,4 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import imothLogo from "../assets/imoth-logo.jpg";
 
 const WHATSAPP_URL = "https://wa.me/254759642797";
@@ -13,6 +13,9 @@ function WhatsAppIcon(props) {
 }
 
 export default function ClientLayout() {
+  const location = useLocation();
+  const hasSidebarWhatsApp = location.pathname.startsWith("/quote");
+
   return (
     <div>
       <nav className="site-nav" aria-label="Primary">
@@ -81,7 +84,7 @@ export default function ClientLayout() {
       </footer>
 
       <a
-        className="whatsapp-float"
+        className={`whatsapp-float${hasSidebarWhatsApp ? " whatsapp-float-hide-desktop" : ""}`}
         href={WHATSAPP_URL}
         target="_blank"
         rel="noopener noreferrer"

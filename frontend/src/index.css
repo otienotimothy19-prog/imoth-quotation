@@ -1107,3 +1107,542 @@ table tr:nth-child(even) td {
   gap: 6px;
   flex-shrink: 0;
 }
+
+/* ==================================================================
+   Quote wizard: vertical 4-step layout (Your Details / Choose Cover /
+   Review & Upload / Confirm)
+   ================================================================== */
+
+.quote-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.quote-shell-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 22px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .quote-shell-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Desktop sidebar ---- */
+.quote-sidebar {
+  display: block;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+  position: sticky;
+  top: 88px;
+}
+
+@media (max-width: 900px) {
+  .quote-sidebar {
+    display: none;
+  }
+}
+
+.quote-sidebar-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--imoth-navy);
+  margin: 0 0 10px;
+}
+
+.quote-sidebar-progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.quote-sidebar-progress-row strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.v-steps {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+}
+
+.v-step {
+  display: flex;
+  gap: 12px;
+  position: relative;
+}
+
+.v-step-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.v-step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 800;
+  flex-shrink: 0;
+  border: 2px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+}
+
+.v-step-line {
+  width: 2px;
+  flex: 1;
+  min-height: 28px;
+  background: var(--line);
+  margin: 2px 0;
+}
+
+.v-step-done .v-step-circle {
+  background: var(--imoth-navy);
+  border-color: var(--imoth-navy);
+  color: #fff;
+}
+
+.v-step-done .v-step-line {
+  background: var(--imoth-navy);
+}
+
+.v-step-current .v-step-circle {
+  background: var(--imoth-accent-blue);
+  border-color: var(--imoth-accent-blue);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16);
+}
+
+.v-step-error .v-step-circle {
+  background: #fff;
+  border-color: var(--imoth-red);
+  color: var(--imoth-red);
+}
+
+.v-step-body {
+  padding-bottom: 26px;
+  flex: 1;
+  min-width: 0;
+}
+
+.v-step:last-child .v-step-body {
+  padding-bottom: 2px;
+}
+
+.v-step-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 3px 0 0;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: default;
+  font-family: inherit;
+}
+
+.v-step-current .v-step-label {
+  color: var(--imoth-navy);
+  font-weight: 800;
+}
+
+.v-step-done .v-step-label {
+  color: var(--ink);
+}
+
+.v-step-current-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--imoth-accent-blue);
+  background: #e8f0fe;
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-top: 5px;
+}
+
+.v-step-error-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--imoth-red-hover);
+  margin-top: 4px;
+}
+
+.v-step-clickable {
+  cursor: pointer;
+}
+
+.v-step-clickable:hover .v-step-label {
+  color: var(--imoth-accent-blue);
+}
+
+.quote-sidebar-help {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--panel);
+}
+
+.quote-sidebar-help p {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.quote-sidebar-whatsapp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0b6d61;
+  text-decoration: none;
+}
+
+.quote-sidebar-whatsapp:hover {
+  text-decoration: underline;
+}
+
+/* ---- Mobile compact progress + drawer ---- */
+.quote-mobile-progress {
+  display: none;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .quote-mobile-progress {
+    display: block;
+  }
+}
+
+.quote-mobile-progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.quote-mobile-progress-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--imoth-navy);
+}
+
+.quote-mobile-progress-step {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.quote-mobile-steps-toggle {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--imoth-navy);
+  padding: 6px 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.quote-mobile-progress-bar {
+  margin-top: 10px;
+}
+
+.quote-mobile-drawer {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--panel);
+}
+
+/* ---- Right content panel ---- */
+.quote-content {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+  max-width: 760px;
+}
+
+@media (max-width: 640px) {
+  .quote-content {
+    padding: 18px;
+  }
+}
+
+.quote-content-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--imoth-accent-blue);
+  text-transform: uppercase;
+  margin: 0 0 6px;
+}
+
+.quote-content-heading {
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--imoth-navy);
+  margin: 0 0 6px;
+}
+
+.quote-content-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 24px;
+  max-width: 60ch;
+}
+
+.quote-footer-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--panel);
+}
+
+.quote-footer-nav.quote-footer-nav-end {
+  justify-content: flex-end;
+}
+
+@media (max-width: 520px) {
+  .quote-footer-nav {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .quote-footer-nav .btn {
+    width: 100%;
+  }
+}
+
+/* ---- Form sections within the wizard ---- */
+.wizard-form label {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.wizard-form .field-group {
+  margin-bottom: 20px;
+}
+
+.wizard-form input[type="text"],
+.wizard-form input[type="number"],
+.wizard-form input[type="email"],
+.wizard-form input[type="tel"],
+.wizard-form input[type="date"],
+.wizard-form select {
+  min-height: 54px;
+  border-radius: 12px;
+  padding: 14px 15px;
+  font-size: 14.5px;
+}
+
+.wizard-form .row2 {
+  gap: 16px;
+}
+
+.wizard-section-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--imoth-navy);
+  margin: 0 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wizard-section + .wizard-section {
+  margin-top: 30px;
+  padding-top: 26px;
+  border-top: 1px solid var(--panel);
+}
+
+.optional-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ---- Cover-type selection cards ---- */
+.option-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 520px) {
+  .option-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.option-card {
+  text-align: left;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.option-card:hover {
+  border-color: var(--imoth-accent-blue);
+}
+
+.option-card-selected {
+  border-color: var(--imoth-accent-blue);
+  background: #f4f8ff;
+  box-shadow: 0 0 0 1px var(--imoth-accent-blue);
+}
+
+.option-card-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.option-card-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ---- Insurer comparison cards (Choose Cover step) ---- */
+.insurer-card {
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.insurer-card-selected {
+  border-color: var(--imoth-navy);
+  box-shadow: 0 0 0 1px var(--imoth-navy);
+  background: #f7f9fe;
+}
+
+.insurer-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.insurer-card-name {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--imoth-navy);
+}
+
+.insurer-card-meta {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.insurer-card-premium {
+  text-align: right;
+}
+
+.insurer-card-premium-amount {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.insurer-card-premium-label {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.insurer-card-details {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.insurer-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+/* ---- Quotation summary card (Review & Confirm steps) ---- */
+.quote-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 20px;
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 520px) {
+  .quote-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quote-summary-item .hint {
+  margin: 0 0 2px;
+}
+
+.quote-summary-value {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Quote wizard pages already offer a WhatsApp action inside the sidebar,
+   so avoid a duplicate floating button competing for attention on desktop
+   (kept on mobile, where the sidebar isn't shown). */
+@media (min-width: 901px) {
+  .whatsapp-float-hide-desktop {
+    display: none;
+  }
+}
