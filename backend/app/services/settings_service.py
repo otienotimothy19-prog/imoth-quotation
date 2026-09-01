@@ -33,6 +33,8 @@ DEFAULT_SETTINGS: dict = {
         "Subject to the terms and conditions of the insurer's standard policy wording and satisfactory underwriting/loss-ratio review.",
         "Final premium confirmed on receipt of full KYC (Proposal Form, Logbook, Driving Licence, KRA PIN, National ID) and, where applicable, a current independent valuation report.",
     ],
+    "documents.allowed_mime_types": ["application/pdf", "image/jpeg", "image/png"],
+    "documents.max_file_size_mb": 5,
     "risk_note.conditions": [
         "This Risk Note confirms cover has been bound with the insurer named, subject to receipt of full premium and KYC documentation.",
         "Cover is subject to the insurer's standard policy wording, terms, conditions and exclusions.",

@@ -49,6 +49,7 @@ class Quotation(UUIDPKMixin, TimestampMixin, Base):
     source: Mapped[QuotationSource] = mapped_column(
         Enum(QuotationSource, name="quotation_source"), default=QuotationSource.CLIENT_PORTAL, nullable=False
     )
+    acceptance_statement_accepted: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     pdf_document_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("documents.id"), nullable=True

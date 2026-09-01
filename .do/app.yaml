@@ -1,0 +1,105 @@
+# DigitalOcean App Platform spec for this repo.
+#
+# Why this file exists: the repo is a monorepo with no root-level
+# package.json / Dockerfile -- everything buildable lives under
+# backend/ (FastAPI, Python buildpack) and frontend/ (Vite, Node
+# buildpack + static site) as two separate components. Without an
+# explicit source_dir per component, App Platform's buildpack detection
+# has nothing to build at the repo root and the build job fails with a
+# generic non-zero exit.
+#
+# Both components share one app/domain with path-based routing
+# (/api -> backend, everything else -> the built frontend), so the
+# frontend can call the API with a relative "/api" base URL and there
+# is no cross-origin request to configure.
+#
+# How to apply:
+#   1. In the DO dashboard: Apps -> your app -> Settings -> App Spec ->
+#      Edit, paste this file's contents, save. DO will prompt for any
+#      SECRET-type env values that are not already set.
+#   2. Or via doctl: doctl apps update <app-id> --spec .do/app.yaml
+#
+# Update owner/repo below if this app is deployed from a fork.
+
+name: imoth-quotation
+# Set this to match your existing app's current region (Settings -> the
+# region shown at the top of the app in the DO dashboard). Left unverified
+# here rather than guessed, since an invalid region slug would fail to
+# import.
+region: REPLACE_WITH_YOUR_APP_REGION
+
+services:
+  - name: backend
+    github:
+      repo: otienotimothy19-prog/imoth-quotation
+      branch: main
+      deploy_on_push: true
+    source_dir: backend
+    environment_slug: python
+    build_command: pip install -r requirements.txt
+    run_command: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8080
+    http_port: 8080
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    instance_count: 1
+    routes:
+      - path: /api
+    envs:
+      - key: ENVIRONMENT
+        value: "production"
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        type: SECRET
+        scope: RUN_TIME
+      - key: SECRET_KEY
+        type: SECRET
+        scope: RUN_TIME
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "480"
+      - key: CORS_ORIGINS
+        value: "${APP_URL}"
+      - key: STORAGE_BACKEND
+        value: "local"
+      - key: STORAGE_LOCAL_PATH
+        value: "./storage/documents"
+      - key: SMTP_HOST
+        value: ""
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        value: ""
+      - key: SMTP_PASSWORD
+        type: SECRET
+        scope: RUN_TIME
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: SMTP_FROM_EMAIL
+        value: "noreply@imoth.co.ke"
+      - key: SMTP_FROM_NAME
+        value: "Imoth Insurance Brokers"
+      - key: QUOTATION_VALIDITY_DAYS
+        value: "30"
+      - key: LEVY_RATE
+        value: "0.0045"
+      - key: STAMP_DUTY
+        value: "40.0"
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        value: "admin@imoth.co.ke"
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        type: SECRET
+        scope: RUN_TIME
+
+static_sites:
+  - name: frontend
+    github:
+      repo: otienotimothy19-prog/imoth-quotation
+      branch: main
+      deploy_on_push: true
+    source_dir: frontend
+    build_command: npm ci && npm run build
+    output_dir: dist
+    routes:
+      - path: /
+    envs:
+      - key: VITE_API_BASE_URL
+        value: ""

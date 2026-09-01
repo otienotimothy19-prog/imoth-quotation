@@ -10,7 +10,7 @@ from app.models.insurer_rate import Insurer, MotorClass, RateVersion
 from app.models.quotation import Quotation, QuotationItem, QuotationSnapshot
 from app.models.risk_note import RiskNote, RiskNoteStatusHistory
 from app.schemas.quotation import ClientIn, QuoteOptionsIn, VehicleIn
-from app.services import audit_service, document_service, numbering_service, pdf_service
+from app.services import audit_service, client_document_service, document_service, numbering_service, pdf_service
 from app.services.pricing_engine import compute_premium, is_eligible
 from app.services.rate_config import motor_class_to_dict
 from app.services.settings_service import get_setting
@@ -292,6 +292,7 @@ def accept_quotation(
     *,
     quotation_id: uuid.UUID,
     cover_start_date: datetime | None,
+    acceptance_confirmed: bool,
     actor_label: str,
     actor_id: uuid.UUID | None,
 ) -> RiskNote:
@@ -312,6 +313,16 @@ def accept_quotation(
             "Only a GENERATED or SENT quotation may be accepted."
         )
 
+    if not acceptance_confirmed:
+        raise QuoteServiceError(
+            "Please confirm that the information and documents provided are accurate before accepting."
+        )
+
+    if not client_document_service.required_documents_complete(db, quotation.id):
+        raise QuoteServiceError(
+            "Upload the vehicle logbook, ID copy and KRA PIN certificate to continue."
+        )
+
     now = datetime.now(timezone.utc)
     if quotation.expires_at and now > quotation.expires_at:
         quotation.status = QuotationStatus.EXPIRED
@@ -321,6 +332,7 @@ def accept_quotation(
     quotation.accepted_at = now
     quotation.status = QuotationStatus.ACCEPTED
     quotation.locked = True
+    quotation.acceptance_statement_accepted = True
 
     cover_start = cover_start_date or now
     cover_end = cover_start + timedelta(days=365)

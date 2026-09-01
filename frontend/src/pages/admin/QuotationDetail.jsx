@@ -7,6 +7,7 @@ export default function QuotationDetail() {
   const [q, setQ] = useState(null);
   const [emails, setEmails] = useState([]);
   const [audit, setAudit] = useState([]);
+  const [documents, setDocuments] = useState(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("details");
   const [emailTo, setEmailTo] = useState("");
@@ -15,18 +16,35 @@ export default function QuotationDetail() {
 
   async function load() {
     try {
-      const [d, e, a] = await Promise.all([
+      const [d, e, a, docs] = await Promise.all([
         api.get(`/api/admin/quotations/${id}`),
         api.get(`/api/admin/quotations/${id}/emails`),
         api.get(`/api/admin/quotations/${id}/audit`),
+        api.get(`/api/admin/quotations/${id}/documents`),
       ]);
       setQ(d.data);
       setEmailTo(d.data.client.email || "");
       setEmails(e.data);
       setAudit(a.data);
+      setDocuments(docs.data);
     } catch (err) {
       setError(errorMessage(err));
     }
+  }
+
+  async function verifyDocument(uploadId, verification_status) {
+    await api.post(`/api/admin/quotations/${id}/documents/${uploadId}/verify`, { verification_status });
+    load();
+  }
+
+  async function downloadDocument(uploadId, filename) {
+    const res = await api.get(`/api/admin/quotations/${id}/documents/${uploadId}/download`, { responseType: "blob" });
+    const url = window.URL.createObjectURL(res.data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
   }
 
   useEffect(() => {
@@ -67,7 +85,7 @@ export default function QuotationDetail() {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {["details", "emails", "audit"].map((t) => (
+        {["details", "documents", "emails", "audit"].map((t) => (
           <button key={t} className={tab === t ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"} onClick={() => setTab(t)}>
             {t[0].toUpperCase() + t.slice(1)}
           </button>
@@ -121,6 +139,76 @@ export default function QuotationDetail() {
               {status && <div className="hint" style={{ marginTop: 6 }}>{status}</div>}
             </div>
           </div>
+        </div>
+      )}
+
+      {tab === "documents" && documents && (
+        <div className="card">
+          <p className="hint" style={{ marginBottom: 12 }}>
+            {documents.uploaded_count} of {documents.required_count} required documents uploaded
+            {documents.all_uploaded ? " — complete." : "."}
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Filename</th>
+                <th>Status</th>
+                <th>Verification</th>
+                <th>Uploaded At</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {documents.documents.map((d) => (
+                <tr key={d.id} style={d.status !== "ACTIVE" ? { opacity: 0.55 } : undefined}>
+                  <td>{d.label}</td>
+                  <td>{d.original_filename}</td>
+                  <td>
+                    <span className={`badge ${d.status === "ACTIVE" ? "badge-green" : "badge-gray"}`}>{d.status}</span>
+                  </td>
+                  <td>
+                    <span
+                      className={`badge ${
+                        d.verification_status === "VERIFIED"
+                          ? "badge-green"
+                          : d.verification_status === "REJECTED"
+                          ? "badge-red"
+                          : "badge-amber"
+                      }`}
+                    >
+                      {d.verification_status}
+                    </span>
+                  </td>
+                  <td>{dateTimeFmt(d.uploaded_at)}</td>
+                  <td>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => downloadDocument(d.id, d.original_filename)}>
+                        Download
+                      </button>
+                      {d.status === "ACTIVE" && d.verification_status !== "VERIFIED" && (
+                        <button className="btn btn-secondary btn-sm" onClick={() => verifyDocument(d.id, "VERIFIED")}>
+                          Verify
+                        </button>
+                      )}
+                      {d.status === "ACTIVE" && d.verification_status !== "REJECTED" && (
+                        <button className="btn btn-danger btn-sm" onClick={() => verifyDocument(d.id, "REJECTED")}>
+                          Reject
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {documents.documents.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: "center", color: "var(--muted)" }}>
+                    No documents uploaded yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 

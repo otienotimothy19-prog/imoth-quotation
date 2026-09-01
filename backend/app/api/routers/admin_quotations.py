@@ -6,8 +6,11 @@ from fastapi.responses import Response
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
+from pydantic import BaseModel
+
 from app.api.deps import get_client_ip, require_admin
 from app.database import get_db
+from app.models.client_document import ClientDocumentUpload, ClientUploadStatus, VerificationStatus
 from app.models.client_vehicle import Client, Vehicle
 from app.models.documents_email_audit import AuditLog, Document, EmailLog
 from app.models.enums import ActorType, QuotationStatus
@@ -15,7 +18,8 @@ from app.models.insurer_rate import Insurer
 from app.models.quotation import Quotation
 from app.models.user import User
 from app.schemas.quotation import EmailSendRequest
-from app.services import audit_service, email_service, storage_service
+from app.services import audit_service, client_document_service, email_service, storage_service
+from app.services.client_document_service import DOCUMENT_LABELS
 
 router = APIRouter(prefix="/api/admin/quotations", tags=["admin-quotations"])
 
@@ -209,6 +213,89 @@ def retry_email(email_log_id: uuid.UUID, db: Session = Depends(get_db), user: Us
     email_service.retry_email(db, log)
     db.commit()
     return {"status": log.status.value, "error": log.error_message}
+
+
+def _document_admin_out(upload: ClientDocumentUpload) -> dict:
+    return {
+        "id": str(upload.id),
+        "document_type": upload.document_type.value,
+        "label": DOCUMENT_LABELS[upload.document_type]["label"],
+        "original_filename": upload.original_filename,
+        "mime_type": upload.mime_type,
+        "file_size_bytes": upload.file_size_bytes,
+        "status": upload.status.value,
+        "uploaded_at": upload.uploaded_at,
+        "verification_status": upload.verification_status.value,
+        "verified_by": str(upload.verified_by) if upload.verified_by else None,
+        "verified_at": upload.verified_at,
+    }
+
+
+@router.get("/{quotation_id}/documents")
+def list_client_documents(quotation_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    quotation = _get_full(db, quotation_id)
+    uploads = (
+        db.query(ClientDocumentUpload)
+        .filter(ClientDocumentUpload.quotation_id == quotation.id)
+        .order_by(ClientDocumentUpload.uploaded_at.desc())
+        .all()
+    )
+    active = [u for u in uploads if u.status == ClientUploadStatus.ACTIVE]
+    return {
+        "required_count": len(DOCUMENT_LABELS),
+        "uploaded_count": len(active),
+        "all_uploaded": client_document_service.required_documents_complete(db, quotation.id),
+        "documents": [_document_admin_out(u) for u in uploads],
+    }
+
+
+@router.get("/{quotation_id}/documents/{document_upload_id}/download")
+def download_client_document(
+    quotation_id: uuid.UUID,
+    document_upload_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    upload = db.get(ClientDocumentUpload, document_upload_id)
+    if upload is None or upload.quotation_id != quotation_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    content = storage_service.read_bytes(upload.storage_path)
+
+    audit_service.record(
+        db, actor_type=ActorType.ADMIN, actor_label=user.email, actor_id=user.id,
+        action="client_document_downloaded", entity_type="client_document_upload", entity_id=str(upload.id),
+    )
+    db.commit()
+    return Response(
+        content=content,
+        media_type=upload.mime_type,
+        headers={"Content-Disposition": f'inline; filename="{upload.original_filename}"'},
+    )
+
+
+class VerifyDocumentRequest(BaseModel):
+    verification_status: VerificationStatus
+
+
+@router.post("/{quotation_id}/documents/{document_upload_id}/verify")
+def verify_client_document(
+    quotation_id: uuid.UUID,
+    document_upload_id: uuid.UUID,
+    payload: VerifyDocumentRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    upload = db.get(ClientDocumentUpload, document_upload_id)
+    if upload is None or upload.quotation_id != quotation_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    if payload.verification_status == VerificationStatus.PENDING:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verification status must be VERIFIED or REJECTED")
+
+    upload = client_document_service.verify_document(
+        db, upload=upload, new_status=payload.verification_status, verifier_id=user.id, actor_label=user.email,
+    )
+    return _document_admin_out(upload)
 
 
 @router.get("/{quotation_id}/audit")
