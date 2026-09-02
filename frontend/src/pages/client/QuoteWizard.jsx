@@ -46,6 +46,7 @@ export default function QuoteWizard() {
   const [coverType, setCoverType] = useState("comprehensive");
   const [category, setCategory] = useState("private");
   const [sumInsured, setSumInsured] = useState("");
+  const [numPassengers, setNumPassengers] = useState("");
   const [options, setOptions] = useState([]);
   const [ineligibleOptions, setIneligibleOptions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -89,6 +90,9 @@ export default function QuoteWizard() {
     if (coverType === "comprehensive" && (!sumInsured || Number(sumInsured) <= 0)) {
       return "Please enter the Sum Insured.";
     }
+    if (coverType === "comprehensive" && category === "psv" && (!numPassengers || Number(numPassengers) <= 0)) {
+      return "Please enter the number of passengers.";
+    }
     return "";
   }
 
@@ -109,6 +113,17 @@ export default function QuoteWizard() {
     };
   }
 
+  // Passenger Legal Liability: PSV classes charge per passenger (Kshs
+  // 500/passenger where the selected insurer's class offers it). Sent as
+  // options.pll_seats -- the backend looks up each motor class's own
+  // documented per-seat rate, so this never hard-codes the 500 figure.
+  function cleanOptions() {
+    if (coverType === "comprehensive" && category === "psv" && numPassengers) {
+      return { pll_seats: Number(numPassengers) };
+    }
+    return {};
+  }
+
   async function goToCompare() {
     setError("");
     const effectiveCategory = coverType === "third_party_only" ? "tpo" : category;
@@ -120,6 +135,7 @@ export default function QuoteWizard() {
         vehicle: cleanVehicle(),
         category: effectiveCategory,
         sum_insured: si,
+        options: cleanOptions(),
       });
       setOptions(res.data.options);
       setIneligibleOptions(res.data.ineligible_options || []);
@@ -143,6 +159,7 @@ export default function QuoteWizard() {
         insurer_id: opt.insurer_id,
         motor_class_id: opt.motor_class_id,
         sum_insured: si,
+        options: cleanOptions(),
         amount_paid: 0,
       });
       navigate(`/quote/${res.data.id}`);
@@ -358,6 +375,21 @@ export default function QuoteWizard() {
               />
               <div className="hint">Your vehicle's current market value.</div>
             </div>
+          </div>
+        )}
+
+        {coverType === "comprehensive" && category === "psv" && (
+          <div className="field-group">
+            <label>Number of Passengers</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={numPassengers}
+              onChange={(e) => setNumPassengers(e.target.value)}
+              placeholder="e.g. 14"
+            />
+            <div className="hint">Passenger Legal Liability is charged per passenger (Kshs 500/passenger where applicable) and is added to the premium.</div>
           </div>
         )}
 
