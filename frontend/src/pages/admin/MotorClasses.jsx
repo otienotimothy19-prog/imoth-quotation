@@ -11,6 +11,8 @@ export default function MotorClasses() {
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ code: "", label: "", category: "private", max_age: "", min_si: 0, max_si: "" });
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
 
   async function loadInsurers() {
     const res = await api.get("/api/admin/insurers");
@@ -37,6 +39,39 @@ export default function MotorClasses() {
   async function toggleActive(cls) {
     await api.patch(`/api/admin/motor-classes/${cls.id}`, { active: !cls.active });
     loadClasses();
+  }
+
+  function startEdit(cls) {
+    setEditingId(cls.id);
+    setEditForm({
+      label: cls.label,
+      category: cls.category,
+      max_age: cls.max_age ?? "",
+      min_si: cls.min_si ?? 0,
+      max_si: cls.max_si ?? "",
+    });
+    setError("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditForm(null);
+  }
+
+  async function saveEdit(clsId) {
+    try {
+      await api.patch(`/api/admin/motor-classes/${clsId}`, {
+        label: editForm.label,
+        category: editForm.category,
+        max_age: editForm.max_age === "" ? null : Number(editForm.max_age),
+        min_si: Number(editForm.min_si) || 0,
+        max_si: editForm.max_si === "" ? null : Number(editForm.max_si),
+      });
+      cancelEdit();
+      loadClasses();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   }
 
   async function createClass() {
@@ -143,28 +178,93 @@ export default function MotorClasses() {
               </tr>
             </thead>
             <tbody>
-              {classes.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.insurer_name}</td>
-                  <td>{c.label}</td>
-                  <td>{c.category}</td>
-                  <td>{c.max_age ?? "—"}</td>
-                  <td>{c.flat_only ? "Flat rate" : Number(c.min_si).toLocaleString()}</td>
-                  <td>
-                    <span className={`badge ${c.active ? "badge-green" : "badge-gray"}`}>{c.active ? "Active" : "Disabled"}</span>
-                  </td>
-                  <td style={{ display: "flex", gap: 6 }}>
-                    {!c.flat_only && (
-                      <Link className="btn btn-secondary btn-sm" to={`/admin/rates?motor_class_id=${c.id}`}>
-                        Rates
-                      </Link>
-                    )}
-                    <button className="btn btn-ghost btn-sm" onClick={() => toggleActive(c)}>
-                      {c.active ? "Disable" : "Activate"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {classes.map((c) =>
+                editingId === c.id ? (
+                  <tr key={c.id}>
+                    <td>{c.insurer_name}</td>
+                    <td>
+                      <input type="text" value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} style={{ minWidth: 220 }} />
+                    </td>
+                    <td>
+                      <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}>
+                        {CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        value={editForm.max_age}
+                        placeholder="no limit"
+                        onChange={(e) => setEditForm({ ...editForm, max_age: e.target.value })}
+                        style={{ width: 90 }}
+                      />
+                    </td>
+                    <td style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <input
+                        type="number"
+                        value={editForm.min_si}
+                        onChange={(e) => setEditForm({ ...editForm, min_si: e.target.value })}
+                        style={{ width: 100 }}
+                        title="Min Sum Insured"
+                      />
+                      <input
+                        type="number"
+                        value={editForm.max_si}
+                        placeholder="open"
+                        onChange={(e) => setEditForm({ ...editForm, max_si: e.target.value })}
+                        style={{ width: 100 }}
+                        title="Max Sum Insured (blank = open)"
+                      />
+                    </td>
+                    <td>
+                      <span className={`badge ${c.active ? "badge-green" : "badge-gray"}`}>{c.active ? "Active" : "Disabled"}</span>
+                    </td>
+                    <td style={{ display: "flex", gap: 6 }}>
+                      <button className="btn btn-primary btn-sm" onClick={() => saveEdit(c.id)}>
+                        Save
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={cancelEdit}>
+                        Cancel
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={c.id}>
+                    <td>{c.insurer_name}</td>
+                    <td>
+                      {c.label}
+                      {!c.active && <span className="hint" style={{ marginLeft: 6 }}>(inactive)</span>}
+                    </td>
+                    <td>{c.category}</td>
+                    <td>{c.max_age ?? "—"}</td>
+                    <td>
+                      {c.flat_only
+                        ? "Flat rate"
+                        : `${Number(c.min_si).toLocaleString()}${c.max_si ? " – " + Number(c.max_si).toLocaleString() : "+"}`}
+                    </td>
+                    <td>
+                      <span className={`badge ${c.active ? "badge-green" : "badge-gray"}`}>{c.active ? "Active" : "Disabled"}</span>
+                    </td>
+                    <td style={{ display: "flex", gap: 6 }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => startEdit(c)}>
+                        Edit
+                      </button>
+                      {!c.flat_only && (
+                        <Link className="btn btn-secondary btn-sm" to={`/admin/rates?motor_class_id=${c.id}`}>
+                          Rates
+                        </Link>
+                      )}
+                      <button className="btn btn-ghost btn-sm" onClick={() => toggleActive(c)}>
+                        {c.active ? "Disable" : "Activate"}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              )}
               {classes.length === 0 && (
                 <tr>
                   <td colSpan={7} style={{ textAlign: "center", color: "var(--muted)" }}>
