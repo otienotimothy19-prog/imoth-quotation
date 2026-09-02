@@ -145,9 +145,16 @@ export default function Rates() {
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.label}
+                  {c.active === false ? " (Inactive — not offered to clients)" : ""}
                 </option>
               ))}
             </select>
+            {classId && classes.find((c) => c.id === classId)?.active === false && (
+              <div className="alert alert-error" style={{ marginTop: 10 }}>
+                This class is inactive. Editing its rates has no effect on client quotes — it has been superseded or
+                deactivated. Look for the active replacement class in this dropdown instead.
+              </div>
+            )}
           </div>
         </div>
       </div>
