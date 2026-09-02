@@ -7,6 +7,21 @@ client-side calculation engine (extracted verbatim from
 every insurer/class, a spread of Sum Insured values, vehicle ages, and
 optional add-on combinations.
 
+**2025/2026 rate-card correction note:** vectors for `monarch:private`,
+`monarch:private_400_499`, `monarch:private_400plus`, `britam:private`,
+`britam:commercial_general_cartage`, `britam:commercial_own_goods`,
+`pioneer:school_bus` and `pioneer:special_type` were removed from this
+fixture. Those classes were corrected against newer, authoritative
+insurer rate cards/binder terms (Monarch revised rates 2025, Britam
+approved binder terms 2026, the supplied 2025 comprehensive rating card)
+that differ from the legacy HTML tool this fixture was generated from, so
+they no longer have a meaningful "legacy parity" expectation -- some class
+codes were also renamed or split (`private_400plus` merged into
+`private_400_499`; `special_type` split into `special_farm_warehouses` /
+`special_construction`). Their correctness is covered instead by
+`tests/test_rate_corrections_2026.py`, which asserts the documented
+rate-card figures directly.
+
 To regenerate after auditing a newer legacy HTML export:
 
 1. Strip the base64 logo and extract the `<script>` body up to (and

@@ -77,11 +77,16 @@ class RateBand(UUIDPKMixin, TimestampMixin, Base):
     ep_not_offered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ep_rate: Mapped[float] = mapped_column(Numeric(8, 5), default=0, nullable=False)
     ep_min: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    # Charged automatically as a separate line whenever true, regardless of
+    # customer opt-in -- e.g. Britam private car bands where EP is mandatory
+    # per the binder terms rather than a customer-selected add-on.
+    ep_mandatory: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     pvt_included: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     pvt_not_offered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     pvt_rate: Mapped[float] = mapped_column(Numeric(8, 5), default=0, nullable=False)
     pvt_min: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    pvt_mandatory: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     effective_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expiry_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

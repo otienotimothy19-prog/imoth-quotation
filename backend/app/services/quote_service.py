@@ -11,7 +11,7 @@ from app.models.quotation import Quotation, QuotationItem, QuotationSnapshot
 from app.models.risk_note import RiskNote, RiskNoteStatusHistory
 from app.schemas.quotation import ClientIn, QuoteOptionsIn, VehicleIn
 from app.services import audit_service, client_document_service, document_service, numbering_service, pdf_service
-from app.services.pricing_engine import compute_premium, is_eligible
+from app.services.pricing_engine import compute_premium, eligibility_reason, is_eligible
 from app.services.rate_config import motor_class_to_dict
 from app.services.settings_service import get_setting
 from app.services.vehicle_age import calculate_vehicle_age
@@ -43,7 +43,13 @@ def _company_settings(db: Session) -> dict:
     }
 
 
-def list_eligible_options(db: Session, *, category: str, sum_insured: float, options: QuoteOptionsIn, year_of_manufacture: int) -> list[dict]:
+def list_eligible_options(
+    db: Session, *, category: str, sum_insured: float, options: QuoteOptionsIn, year_of_manufacture: int
+) -> tuple[list[dict], list[dict]]:
+    """Returns (eligible_options, ineligible_options). Each ineligible entry
+    carries a clear human-readable reason (e.g. vehicle age beyond the
+    class's maximum) so the caller can explain why an insurer/class was
+    excluded instead of it simply disappearing."""
     # Vehicle age is always calculated server-side from year_of_manufacture --
     # never accepted from the caller -- so it can't be manipulated to change
     # which insurers/rates are shown as eligible.
@@ -64,9 +70,23 @@ def list_eligible_options(db: Session, *, category: str, sum_insured: float, opt
     )
 
     results = []
+    ineligible = []
     for mc in motor_classes:
         class_dict = motor_class_to_dict(mc)
-        if not is_eligible(class_dict, sum_insured, age):
+        reason = eligibility_reason(class_dict, sum_insured, age)
+        if reason is not None:
+            ineligible.append(
+                {
+                    "insurer_id": mc.insurer.id,
+                    "insurer_code": mc.insurer.code,
+                    "insurer_name": mc.insurer.name,
+                    "motor_class_id": mc.id,
+                    "motor_class_code": mc.code,
+                    "motor_class_label": mc.label,
+                    "max_age": mc.max_age,
+                    "reason": reason,
+                }
+            )
             continue
         engine_opts = _options_to_engine_dict(options, age)
         result = compute_premium(class_dict, sum_insured, engine_opts, levy_rate, stamp_duty)
@@ -89,7 +109,7 @@ def list_eligible_options(db: Session, *, category: str, sum_insured: float, opt
         )
 
     results.sort(key=lambda r: r["total_premium"])
-    return results
+    return results, ineligible
 
 
 def get_or_create_client(db: Session, client_in: ClientIn) -> Client:

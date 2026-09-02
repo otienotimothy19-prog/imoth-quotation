@@ -68,11 +68,23 @@ class CompareOption(BaseModel):
     total_premium: float
 
 
+class IneligibleOption(BaseModel):
+    insurer_id: uuid.UUID
+    insurer_code: str
+    insurer_name: str
+    motor_class_id: uuid.UUID
+    motor_class_code: str
+    motor_class_label: str
+    max_age: int | None
+    reason: str
+
+
 class CompareResponse(BaseModel):
     category: str
     sum_insured: float
     calculated_age_years: int
     options: list[CompareOption]
+    ineligible_options: list[IneligibleOption] = []
 
 
 class GenerateQuotationRequest(BaseModel):

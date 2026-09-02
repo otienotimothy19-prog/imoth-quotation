@@ -27,6 +27,12 @@ def band(min_si, max_si, rate, min_premium, **opts):
         "pvt_min": 0,
         "ep_not_offered": False,
         "pvt_not_offered": False,
+        # ep_mandatory / pvt_mandatory: charged automatically as a separate
+        # line item regardless of customer opt-in (distinct from
+        # ep_included/pvt_included, which bakes the charge into the base
+        # rate with no separate line at all).
+        "ep_mandatory": False,
+        "pvt_mandatory": False,
     }
     b.update(opts)
     return b
@@ -66,10 +72,22 @@ INSURERS = {
                 "limits": ["Comprehensive on vehicle, standard commercial limits apply"],
                 "bands": [band(500000, 4999999, 0.045, 50000)],
             },
-            "special_type": {
-                "label": "Special Type (Farm & Warehouses / Construction)", "category": "special", "max_age": 20, "min_si": 500000,
-                "excess": ["As per Pioneer commercial excess schedule"], "benefits": ["Owner-operated plant/farm risks"], "limits": ["Comprehensive on vehicle"],
-                "bands": [band(500000, None, 0.03, 10000, ep_included=False, ep_rate=0.005, ep_min=5000, pvt_included=False, pvt_rate=0.0025, pvt_min=2500)],
+            # Farm & Warehouses and Construction are separate products per
+            # the 2025 rating-card correction -- previously incorrectly
+            # combined into a single "special_type" class (now deactivated
+            # by migration). PVT is free up to KSh 5,000,000 on both, per
+            # the supplied rating card; the additional PVT percentage above
+            # KSh 5,000,000 was not stated in the source and is therefore
+            # not implemented -- see the completion report.
+            "special_farm_warehouses": {
+                "label": "Special Type – Farm & Warehouses", "category": "special", "max_age": 15, "min_si": 500000,
+                "excess": ["As per Pioneer commercial excess schedule"], "benefits": ["Owner-operated plant/farm risks", "PVT free up to Kshs 5,000,000 (additional rate above this threshold not yet on file)"], "limits": ["Comprehensive on vehicle"],
+                "bands": [band(500000, None, 0.025, 37500, ep_included=False, ep_rate=0.005, ep_min=5000, pvt_included=True)],
+            },
+            "special_construction": {
+                "label": "Special Type – Construction", "category": "special", "max_age": 15, "min_si": 500000,
+                "excess": ["As per Pioneer commercial excess schedule"], "benefits": ["PVT free up to Kshs 5,000,000 (additional rate above this threshold not yet on file)"], "limits": ["Comprehensive on vehicle"],
+                "bands": [band(500000, None, 0.03, 37500, ep_included=False, ep_rate=0.005, ep_min=5000, pvt_included=True)],
             },
             "asset": {
                 "label": "Asset Cover (Max 3 years, new units)", "category": "asset", "max_age": 3, "min_si": 500000,
@@ -95,14 +113,14 @@ INSURERS = {
             "school_bus": {
                 "label": "School Bus / Van", "category": "institutional", "max_age": 15, "min_si": 500000,
                 "excess": ["Standard Pioneer commercial excess schedule applies"],
-                "benefits": ["Excess Protector & PVT included in rate", "PLL free for the school's own students; Kshs 250/seat for affiliated group hire; Kshs 500/head for non-affiliated hire"],
+                "benefits": ["Excess Protector & PVT included in rate (PVT free up to Kshs 5,000,000; additional rate above this threshold not yet on file)", "PLL free for the school's own students; Kshs 250/seat for affiliated group hire; Kshs 500/head for non-affiliated hire"],
                 "limits": ["Comprehensive on vehicle"],
                 "pll_options": [
                     {"key": "student", "label": "Own students (free)", "rate": 0},
                     {"key": "affiliated", "label": "Affiliated group hire", "rate": 250},
                     {"key": "nonaffiliated", "label": "Non-affiliated / general hire", "rate": 500},
                 ],
-                "bands": [band(500000, None, 0.03, 50000)],
+                "bands": [band(500000, None, 0.035, 37500)],
             },
             "motorcycle_corporate": {
                 "label": "Motorcycle – Corporate & Delivery", "category": "motorcycle", "max_age": None, "min_si": 0,
@@ -153,19 +171,22 @@ INSURERS = {
                 "label": "Private Car – Comprehensive", "category": "private", "max_age": 15, "min_si": 500000,
                 "excess": ["Excess Protector 0.25% Min 3,000"], "benefits": ["Windscreen & Radio limits per policy schedule"], "limits": ["Standard Monarch private car limits"],
                 "bands": [
-                    band(500000, 2500000, 0.035, 25000, ep_included=False, ep_rate=0.0025, ep_min=3000, pvt_included=False, pvt_rate=0.0025, pvt_min=2500),
-                    band(2500001, None, 0.03, 25000, ep_included=False, ep_rate=0.0025, ep_min=3000, pvt_included=False, pvt_rate=0.0025, pvt_min=2500),
+                    band(500000, 2500000, 0.035, 20000, ep_included=False, ep_rate=0.0025, ep_min=3000, pvt_included=False, pvt_rate=0.0025, pvt_min=2500),
+                    band(2500001, None, 0.03, 20000, ep_included=False, ep_rate=0.0025, ep_min=3000, pvt_included=False, pvt_rate=0.0025, pvt_min=2500),
                 ],
             },
+            # Monarch's dedicated older-vehicle private-car product: max age 20
+            # (vs the standard 15-year product above), for vehicles valued at
+            # KSh 400,000 and above. Only one documented band is available
+            # (400,000-499,999) -- since no further-band figures above
+            # 499,999 were supplied, that band's rate/min-premium/EP/PVT
+            # terms are applied uniformly to the whole KSh 400,000-and-above
+            # range this product covers, rather than inventing additional
+            # bands. See the completion report for this documented gap.
             "private_400_499": {
-                "label": "Private Car (Max age 20yrs, SI 400K–499,999)", "category": "private", "max_age": 20, "min_si": 400000, "max_si": 499999,
+                "label": "Private Car (Max Age 20yrs, SI 400,000 and above)", "category": "private", "max_age": 20, "min_si": 400000,
                 "excess": ["No Excess Protector available"], "benefits": [], "limits": [],
-                "bands": [band(400000, 499999, 0.06, 30000, ep_included=True, pvt_included=False, pvt_rate=0.0025, pvt_min=2500)],
-            },
-            "private_400plus": {
-                "label": "Private Car (Max age 20yrs, SI 400K and above)", "category": "private", "max_age": 20, "min_si": 400000,
-                "excess": ["No Excess Protector available"], "benefits": [], "limits": [],
-                "bands": [band(400000, None, 0.06, 30000, ep_included=True, pvt_included=True)],
+                "bands": [band(400000, None, 0.06, 30000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_rate=0.0025, pvt_min=2500)],
             },
             "commercial_own_goods": {
                 "label": "Commercial Own Goods", "category": "commercial", "max_age": 20, "min_si": 500000,
@@ -291,7 +312,7 @@ INSURERS = {
 
     "definite": {
         "name": "Definite Assurance Company Ltd",
-        "note": "PSV / Chauffeur Driven rates for Definite were not included in the rate cards supplied — send that page and it can be added here.",
+        "note": "Definite binder terms 2026.",
         "classes": {
             "private": {
                 "label": "Motor Private – Comprehensive", "category": "private", "max_age": 15, "min_si": 500000,
@@ -308,8 +329,57 @@ INSURERS = {
             },
             "commercial_institutional": {
                 "label": "Motor Commercial – Institutional", "category": "institutional", "max_age": 15, "min_si": 500000,
-                "excess": [], "benefits": ["Excess Protector & PVT inclusive"], "limits": [],
+                "excess": [], "benefits": ["Excess Protector & PVT inclusive"], "limits": ["Passenger Legal Liability – Kshs 250/passenger"],
+                "pll_per_seat": 250,
                 "bands": [band(500000, None, 0.0325, 35000)],
+            },
+            "psv_chauffeur_taxi": {
+                "label": "PSV Chauffeur Driven / Taxi", "category": "psv", "max_age": 15, "min_si": 500000,
+                "excess": [], "benefits": ["PVT inclusive of rate", "No Excess Protector offered for this class"], "limits": ["Passenger Legal Liability – Kshs 500/passenger"],
+                "pll_per_seat": 500,
+                "bands": [band(500000, None, 0.055, 40000, ep_included=False, ep_not_offered=True, pvt_included=True)],
+            },
+            # Definite's binder terms do not state Excess Protector or PVT
+            # cover for tuk-tuk, tours/TSV, motorcycle, matatu or bus classes
+            # -- rather than invent unstated cover, these are stored as not
+            # offered on this product. See the completion report.
+            "tuktuk_commercial": {
+                "label": "Tuk Tuk – Commercial", "category": "tuktuk", "max_age": 10, "min_si": 250000,
+                "excess": [], "benefits": [], "limits": [],
+                "bands": [band(250000, None, 0.04, 15000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True)],
+            },
+            "tuktuk_psv": {
+                "label": "Tuk Tuk – PSV", "category": "tuktuk", "max_age": 10, "min_si": 250000,
+                "excess": [], "benefits": [], "limits": ["Passenger Legal Liability – Kshs 500/passenger"],
+                "pll_per_seat": 500,
+                "bands": [band(250000, None, 0.04, 20000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True)],
+            },
+            "private_hire_tours_tsv": {
+                "label": "Private Hire – Tours (TSV)", "category": "psv", "max_age": 15, "min_si": 750000,
+                "excess": [], "benefits": [], "limits": ["Passenger Legal Liability – Kshs 500/passenger"],
+                "pll_per_seat": 500,
+                "bands": [band(750000, None, 0.045, 40000, ep_included=False, ep_rate=0.005, ep_min=5000, pvt_included=False, pvt_not_offered=True)],
+            },
+            "motorcycle_private": {
+                "label": "Motorcycle – Private", "category": "motorcycle", "max_age": None, "min_si": 150000,
+                "excess": [], "benefits": [], "limits": [],
+                "bands": [band(150000, None, 0.03, 5000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True)],
+            },
+            "motorcycle_psv": {
+                "label": "Motorcycle – PSV (Boda Boda)", "category": "motorcycle", "max_age": 5, "min_si": 150000,
+                "excess": [], "benefits": [], "limits": ["Passenger Legal Liability – Kshs 500/person"],
+                "pll_per_seat": 500,
+                "bands": [band(150000, None, 0.04, 7000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True)],
+            },
+            "psv_matatu": {
+                "label": "PSV Matatu (7–35 Passengers)", "category": "psv", "max_age": 15, "min_si": 750000,
+                "excess": [], "benefits": [], "limits": [],
+                "bands": [band(750000, None, 0.04, 30000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True)],
+            },
+            "psv_bus": {
+                "label": "PSV Bus (36+ Passengers)", "category": "psv", "max_age": 15, "min_si": 750000,
+                "excess": [], "benefits": [], "limits": [],
+                "bands": [band(750000, None, 0.045, 30000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True)],
             },
         },
     },
@@ -373,22 +443,29 @@ INSURERS = {
                 "benefits": ["Free: Death/Fatal Accident cover for named driver Kshs 100,000", "Free: Forced ATM withdrawal cover Kshs 10,000", "Windscreen/Radio Cassette free limit Kshs 50,000 (100,000 if SI>3M)"],
                 "limits": ["Third Party Property Damage – Kshs 20,000,000", "Passenger Liability – any one person Kshs 5,000,000 / any one event Kshs 20,000,000"],
                 "bands": [
-                    band(0, 1499999, 0.04, 42500, ep_included=False, ep_rate=0.0025, ep_min=0, pvt_included=False, pvt_rate=0.0025, pvt_min=0),
-                    band(1500000, 2999999, 0.035, 42500, ep_included=False, ep_rate=0.0025, ep_min=2500, pvt_included=False, pvt_rate=0.0025, pvt_min=2500),
+                    # EP/PVT are mandatory for Britam private car (per the
+                    # binder terms), so they are always charged as a
+                    # separate line via ep_mandatory/pvt_mandatory rather
+                    # than depending on customer opt-in. The below-1.5M band
+                    # has no documented EP/PVT minimum premium -- stored as
+                    # 0 (no floor) rather than an invented figure; see the
+                    # completion report.
+                    band(0, 1499999, 0.04, 42500, ep_included=False, ep_rate=0.005, ep_min=0, ep_mandatory=True, pvt_included=False, pvt_rate=0.0025, pvt_min=0, pvt_mandatory=True),
+                    band(1500000, 2999999, 0.035, 42500, ep_included=False, ep_rate=0.005, ep_min=2500, ep_mandatory=True, pvt_included=False, pvt_rate=0.0025, pvt_min=2500, pvt_mandatory=True),
                     band(3000000, None, 0.03, 42500),
                 ],
             },
             "commercial_general_cartage": {
                 "label": "Motor Commercial – General Cartage", "category": "commercial", "max_age": 15, "min_si": 0,
                 "excess": ["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000", "Theft with ATD – 10% Min 30,000", "Theft without ATD – 20% Min 40,000", "Third Party Property Damage – Kshs 10,000", "New/Young Drivers – Kshs 10,000 additional"],
-                "benefits": ["Free: Forced ATM withdrawal Kshs 10,000", "Free: Fatal PA cover for named driver Kshs 150,000", "PLL optional Kshs 1,000/passenger"], "limits": ["Third Party Property Damage – Kshs 30,000,000"],
-                "bands": [band(0, None, 0.045, 100000)],
+                "benefits": ["Free: Forced ATM withdrawal Kshs 10,000", "Free: Fatal PA cover for named driver Kshs 150,000", "PLL optional Kshs 1,000/passenger", "EP and PVT are mandatory and always included in the premium (combined standard rate 5.5% before minimum-premium effects)"], "limits": ["Third Party Property Damage – Kshs 30,000,000"],
+                "bands": [band(0, None, 0.05, 75000, ep_included=False, ep_rate=0.0025, ep_min=5000, ep_mandatory=True, pvt_included=False, pvt_rate=0.0025, pvt_min=3000, pvt_mandatory=True)],
             },
             "commercial_own_goods": {
                 "label": "Motor Commercial – Own Goods", "category": "commercial", "max_age": 15, "min_si": 0,
                 "excess": ["Own Damage & Partial Theft – 5% Min 20,000 / Max 150,000", "Theft with ATD – 10% Min 20,000", "Theft without ATD – 20% Min 20,000", "Third Party Property Damage – Kshs 10,000", "New/Young Drivers – Kshs 10,000 additional"],
-                "benefits": ["Free: Forced ATM withdrawal Kshs 10,000", "Free: Fatal PA cover for named driver Kshs 150,000", "PLL optional Kshs 1,000/passenger"], "limits": ["Third Party Property Damage – Kshs 20,000,000"],
-                "bands": [band(0, None, 0.04, 50000, ep_included=False, ep_rate=0.0025, ep_min=5000, pvt_included=False, pvt_rate=0.0025, pvt_min=3000)],
+                "benefits": ["Free: Forced ATM withdrawal Kshs 10,000", "Free: Fatal PA cover for named driver Kshs 150,000", "PLL optional Kshs 1,000/passenger", "EP and PVT are mandatory and always included in the premium"], "limits": ["Third Party Property Damage – Kshs 20,000,000"],
+                "bands": [band(0, None, 0.04, 50000, ep_included=False, ep_rate=0.0025, ep_min=5000, ep_mandatory=True, pvt_included=False, pvt_rate=0.0025, pvt_min=3000, pvt_mandatory=True)],
             },
             "tpo_private": {
                 "label": "Third Party Only – Private", "category": "tpo", "max_age": None, "min_si": 0,
@@ -419,6 +496,40 @@ INSURERS = {
             "tpo_psv_tsv_8": {"label": "PSV Unmarked TSV 8 PAX – TPO", "category": "tpo", "max_age": None, "min_si": 0, "excess": [], "benefits": [], "limits": [], "flat_only": flat(10512, "Annual premium")},
             "tpo_tuktuk_commercial": {"label": "Tuk Tuk – Commercial – TPO", "category": "tpo", "max_age": None, "min_si": 0, "excess": [], "benefits": [], "limits": [], "flat_only": flat(2784, "Annual premium")},
             "tpo_psv_tuktuk": {"label": "PSV Tuk Tuk – TPO", "category": "tpo", "max_age": None, "min_si": 0, "excess": [], "benefits": [], "limits": [], "flat_only": flat(4000, "Annual premium")},
+        },
+    },
+
+    "star_discover": {
+        "name": "Star Discover",
+        "note": (
+            "Star Discover's binder also documents Commercial Own Goods, Commercial "
+            "General Cartage, Institutional/School Buses, Special Types, Corporate "
+            "Motorcycles and Private TPO products, but no rate percentages, minimum "
+            "premiums, minimum values or maximum ages were supplied for them -- these "
+            "motor classes have not been created here to avoid inventing figures. "
+            "Send the relevant rate pages to add them."
+        ),
+        "classes": {
+            "private": {
+                "label": "Private Car – Comprehensive", "category": "private", "max_age": 15, "min_si": 500000,
+                "excess": [], "benefits": [], "limits": [],
+                # Only the 500,000-1,499,999 band restates EP/PVT terms in
+                # the source; the higher bands are silent on EP/PVT, so they
+                # are stored as not offered rather than assumed to carry the
+                # first band's terms forward. See the completion report.
+                "bands": [
+                    band(500000, 1499999, 0.04, 37500, ep_included=False, ep_rate=0.0025, ep_min=2500, pvt_included=False, pvt_rate=0.0025, pvt_min=2500),
+                    band(1500000, 2499999, 0.035, 37500, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True),
+                    band(2500000, 3499999, 0.0325, 37500, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True),
+                    band(3500000, None, 0.03, 37500, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True),
+                ],
+            },
+            "private_selected_models": {
+                "label": "Private Car – Selected Models (Probox, Succeed, Wish, Vitz, Isis, Sienta)",
+                "category": "private", "max_age": None, "min_si": 0,
+                "excess": [], "benefits": ["Declaration form mandatory"], "limits": [],
+                "bands": [band(0, None, 0.045, 45000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True)],
+            },
         },
     },
 }

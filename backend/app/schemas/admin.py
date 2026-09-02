@@ -86,10 +86,12 @@ class RateBandIn(BaseModel):
     ep_not_offered: bool = False
     ep_rate: float = 0
     ep_min: float = 0
+    ep_mandatory: bool = False
     pvt_included: bool = True
     pvt_not_offered: bool = False
     pvt_rate: float = 0
     pvt_min: float = 0
+    pvt_mandatory: bool = False
 
 
 class RateBandsUpdate(BaseModel):
