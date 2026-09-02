@@ -15,13 +15,26 @@ const CATEGORIES = [
 ];
 
 const emptyClient = { full_name: "", id_or_passport: "", phone: "", email: "" };
-const emptyVehicle = { registration_no: "", make: "", model: "", year_of_manufacture: "", age_years: "" };
+const emptyVehicle = { registration_no: "", make: "", model: "", year_of_manufacture: "" };
+
+const MIN_MANUFACTURE_YEAR = 1960;
+const CURRENT_YEAR = new Date().getFullYear();
 
 // Light-touch Kenyan phone check -- accepts 07xx/01xx local format or +254/254
 // prefixed, without being so strict it rejects a legitimately entered number.
 function isValidKenyanPhone(value) {
   const digits = value.replace(/[\s-]/g, "");
   return /^(?:\+?254|0)[17]\d{8}$/.test(digits);
+}
+
+// Calendar-year age: current year minus year of manufacture. This is a
+// calendar-year difference, not an exact month/day age -- and it's for
+// display only. The backend independently recalculates and enforces this
+// from year_of_manufacture; nothing derived here is trusted for pricing.
+function calculateVehicleAge(yearOfManufacture) {
+  const year = Number(yearOfManufacture);
+  if (!yearOfManufacture || !Number.isInteger(year)) return null;
+  return CURRENT_YEAR - year;
 }
 
 export default function QuoteWizard() {
@@ -38,6 +51,8 @@ export default function QuoteWizard() {
   const [error, setError] = useState("");
   const [selecting, setSelecting] = useState(null);
 
+  const calculatedAge = calculateVehicleAge(vehicle.year_of_manufacture);
+
   function validateDetails() {
     const errs = {};
     if (!client.full_name.trim() || client.full_name.trim().length < 2) {
@@ -53,6 +68,18 @@ export default function QuoteWizard() {
     }
     if (!vehicle.registration_no.trim()) {
       errs.registration_no = "Please enter the vehicle registration number.";
+    }
+    if (!vehicle.year_of_manufacture) {
+      errs.year_of_manufacture = "Please enter the year of manufacture.";
+    } else {
+      const year = Number(vehicle.year_of_manufacture);
+      if (!Number.isInteger(year)) {
+        errs.year_of_manufacture = `Enter a year between ${MIN_MANUFACTURE_YEAR} and ${CURRENT_YEAR}.`;
+      } else if (year > CURRENT_YEAR) {
+        errs.year_of_manufacture = `Year of manufacture cannot be later than ${CURRENT_YEAR}.`;
+      } else if (year < MIN_MANUFACTURE_YEAR) {
+        errs.year_of_manufacture = `Enter a year between ${MIN_MANUFACTURE_YEAR} and ${CURRENT_YEAR}.`;
+      }
     }
     return errs;
   }
@@ -77,8 +104,7 @@ export default function QuoteWizard() {
       registration_no: vehicle.registration_no.trim(),
       make: vehicle.make.trim() || null,
       model: vehicle.model.trim() || null,
-      year_of_manufacture: vehicle.year_of_manufacture ? Number(vehicle.year_of_manufacture) : null,
-      age_years: vehicle.age_years !== "" ? Number(vehicle.age_years) : null,
+      year_of_manufacture: Number(vehicle.year_of_manufacture),
     };
   }
 
@@ -218,27 +244,32 @@ export default function QuoteWizard() {
 
             <div className="row2">
               <div className="field-group">
-                <div className="field-label-row">
-                  <label>Year of Manufacture</label>
-                  <span className="optional-badge">Optional</span>
-                </div>
+                <label className="first">Year of Manufacture</label>
                 <input
                   type="number"
                   value={vehicle.year_of_manufacture}
-                  onChange={(e) => setVehicle({ ...vehicle, year_of_manufacture: e.target.value })}
-                  placeholder="e.g. 2019"
+                  onChange={(e) => {
+                    setVehicle({ ...vehicle, year_of_manufacture: e.target.value });
+                    // A new manufacture year invalidates any comparison
+                    // already run against the previous age, and any stale
+                    // error message for a value that's since been edited.
+                    setOptions([]);
+                    setFieldErrors((prev) => ({ ...prev, year_of_manufacture: undefined }));
+                  }}
+                  placeholder={`e.g. ${CURRENT_YEAR - 5}`}
+                  min={MIN_MANUFACTURE_YEAR}
+                  max={CURRENT_YEAR}
+                  step={1}
+                  aria-invalid={!!fieldErrors.year_of_manufacture}
                 />
+                {fieldErrors.year_of_manufacture && <div className="error-text">{fieldErrors.year_of_manufacture}</div>}
               </div>
               <div className="field-group">
-                <label>Vehicle Age (years)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={vehicle.age_years}
-                  onChange={(e) => setVehicle({ ...vehicle, age_years: e.target.value })}
-                  placeholder="e.g. 5"
-                />
-                <div className="hint">Affects eligibility and some optional covers.</div>
+                <label>Calculated Vehicle Age</label>
+                <div className="calculated-field" aria-live="polite">
+                  {calculatedAge === null ? "Calculated automatically" : `${calculatedAge} year${calculatedAge === 1 ? "" : "s"}`}
+                </div>
+                <div className="hint">Automatically calculated from the year of manufacture and used to show eligible rates.</div>
               </div>
             </div>
           </section>
@@ -366,12 +397,6 @@ export default function QuoteWizard() {
                     <div className="insurer-card-meta">
                       {opt.motor_class_label} · {opt.cover_type === "comprehensive" ? "Comprehensive" : "Third Party Only"}
                     </div>
-                    {opt.age_warning && (
-                      <div className="hint" style={{ color: "var(--warn)", marginTop: 6 }}>
-                        Vehicle age exceeds this insurer's max ({opt.max_age} yrs) — subject to underwriting review before
-                        eligibility is confirmed.
-                      </div>
-                    )}
                   </div>
                   <div className="insurer-card-premium">
                     <div className="insurer-card-premium-amount">{money(opt.total_premium)}</div>

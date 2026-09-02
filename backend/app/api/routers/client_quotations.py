@@ -26,6 +26,7 @@ from app.services.quote_service import (
     list_eligible_options,
     reject_quotation,
 )
+from app.services.vehicle_age import calculate_vehicle_age
 
 router = APIRouter(prefix="/api/quotes", tags=["client-quotations"])
 
@@ -53,6 +54,8 @@ def _quotation_to_out(q) -> QuotationOut:
         excess=snapshot_data.get("excess", []),
         benefits=snapshot_data.get("benefits", []),
         limits=snapshot_data.get("limits", []),
+        year_of_manufacture=snapshot_data.get("year_of_manufacture"),
+        calculated_age_years=snapshot_data.get("calculated_age_years"),
         generated_at=q.generated_at,
         accepted_at=q.accepted_at,
         rejected_at=q.rejected_at,
@@ -71,14 +74,19 @@ def compare_insurers(request: Request, payload: CompareRequest, db: Session = De
         category=payload.category,
         sum_insured=payload.sum_insured,
         options=payload.options,
-        age=payload.vehicle.age_years,
+        year_of_manufacture=payload.vehicle.year_of_manufacture,
     )
     if not options:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No insurer currently offers this vehicle class at the given Sum Insured. Try adjusting the Sum Insured or vehicle class.",
+            detail="No insurer currently offers this vehicle class at the given Sum Insured and vehicle age. Try adjusting the Sum Insured or vehicle class.",
         )
-    return CompareResponse(category=payload.category, sum_insured=payload.sum_insured, options=options)
+    return CompareResponse(
+        category=payload.category,
+        sum_insured=payload.sum_insured,
+        calculated_age_years=calculate_vehicle_age(payload.vehicle.year_of_manufacture),
+        options=options,
+    )
 
 
 @router.post("/generate", response_model=QuotationOut)

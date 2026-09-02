@@ -14,6 +14,7 @@ from app.services import audit_service, client_document_service, document_servic
 from app.services.pricing_engine import compute_premium, is_eligible
 from app.services.rate_config import motor_class_to_dict
 from app.services.settings_service import get_setting
+from app.services.vehicle_age import calculate_vehicle_age
 
 
 class QuoteServiceError(Exception):
@@ -42,7 +43,11 @@ def _company_settings(db: Session) -> dict:
     }
 
 
-def list_eligible_options(db: Session, *, category: str, sum_insured: float, options: QuoteOptionsIn, age: float | None) -> list[dict]:
+def list_eligible_options(db: Session, *, category: str, sum_insured: float, options: QuoteOptionsIn, year_of_manufacture: int) -> list[dict]:
+    # Vehicle age is always calculated server-side from year_of_manufacture --
+    # never accepted from the caller -- so it can't be manipulated to change
+    # which insurers/rates are shown as eligible.
+    age = calculate_vehicle_age(year_of_manufacture)
     levy_rate = get_setting(db, "levy.rate")
     stamp_duty = get_setting(db, "levy.stamp_duty")
 
@@ -65,7 +70,6 @@ def list_eligible_options(db: Session, *, category: str, sum_insured: float, opt
             continue
         engine_opts = _options_to_engine_dict(options, age)
         result = compute_premium(class_dict, sum_insured, engine_opts, levy_rate, stamp_duty)
-        age_warning = bool(mc.max_age and age is not None and age > mc.max_age)
         results.append(
             {
                 "insurer_id": mc.insurer.id,
@@ -76,7 +80,6 @@ def list_eligible_options(db: Session, *, category: str, sum_insured: float, opt
                 "motor_class_label": mc.label,
                 "cover_type": "third_party_only" if class_dict.get("flat_only") else "comprehensive",
                 "max_age": mc.max_age,
-                "age_warning": age_warning,
                 "basic_premium": result.lines[0].amount if result.lines else 0,
                 "subtotal": result.subtotal,
                 "levies": result.levies,
@@ -113,6 +116,9 @@ def get_or_create_client(db: Session, client_in: ClientIn) -> Client:
 
 def get_or_create_vehicle(db: Session, client: Client, vehicle_in: VehicleIn) -> Vehicle:
     reg = vehicle_in.registration_no.strip().upper()
+    # age_years is never taken from the caller -- always recalculated here
+    # from year_of_manufacture, which is the single source of truth.
+    calculated_age = calculate_vehicle_age(vehicle_in.year_of_manufacture)
     vehicle = (
         db.execute(select(Vehicle).where(Vehicle.client_id == client.id, Vehicle.registration_no == reg))
         .scalars()
@@ -123,15 +129,15 @@ def get_or_create_vehicle(db: Session, client: Client, vehicle_in: VehicleIn) ->
             client_id=client.id,
             registration_no=reg,
             year_of_manufacture=vehicle_in.year_of_manufacture,
-            age_years=vehicle_in.age_years,
+            age_years=calculated_age,
             make=vehicle_in.make,
             model=vehicle_in.model,
         )
         db.add(vehicle)
         db.flush()
     else:
-        vehicle.year_of_manufacture = vehicle_in.year_of_manufacture or vehicle.year_of_manufacture
-        vehicle.age_years = vehicle_in.age_years if vehicle_in.age_years is not None else vehicle.age_years
+        vehicle.year_of_manufacture = vehicle_in.year_of_manufacture
+        vehicle.age_years = calculated_age
         vehicle.make = vehicle_in.make or vehicle.make
         vehicle.model = vehicle_in.model or vehicle.model
     return vehicle
@@ -176,7 +182,9 @@ def generate_quotation(
         raise QuoteServiceError("Selected insurer/class is not available")
 
     class_dict = motor_class_to_dict(mc)
-    age = vehicle_in.age_years
+    # Authoritative age calculation: derived from year_of_manufacture only.
+    # A client-supplied age_years is never used for eligibility or pricing.
+    age = calculate_vehicle_age(vehicle_in.year_of_manufacture)
     if not is_eligible(class_dict, sum_insured, age):
         raise QuoteServiceError("This vehicle is not eligible for the selected insurer/class at this Sum Insured")
 
@@ -245,6 +253,11 @@ def generate_quotation(
             "stamp_duty": stamp_duty,
             "quotation_number": quotation_number,
             "generated_at": now.isoformat(),
+            # Immutable record of the vehicle age used to generate this
+            # quotation -- must never be recalculated when the quotation is
+            # viewed later, even after the calendar year changes.
+            "year_of_manufacture": vehicle_in.year_of_manufacture,
+            "calculated_age_years": age,
         }
     )
     db.add(
@@ -281,7 +294,12 @@ def generate_quotation(
         action="quotation_generated",
         entity_type="quotation",
         entity_id=str(quotation.id),
-        new_value={"quotation_number": quotation_number, "total_premium": result.total},
+        new_value={
+            "quotation_number": quotation_number,
+            "total_premium": result.total,
+            "year_of_manufacture": vehicle_in.year_of_manufacture,
+            "calculated_age_years": age,
+        },
     )
     db.commit()
     return get_quotation_full(db, quotation.id)

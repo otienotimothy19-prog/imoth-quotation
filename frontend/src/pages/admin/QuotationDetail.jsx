@@ -109,7 +109,8 @@ export default function QuotationDetail() {
             <p>
               {q.vehicle.registration_no}<br />
               {q.vehicle.make} {q.vehicle.model}<br />
-              Age: {q.vehicle.age_years ?? "—"} yrs
+              Year of Manufacture: {q.vehicle.year_of_manufacture ?? "—"}<br />
+              Vehicle Age at Quotation: {q.vehicle.age_years ?? "—"} years
             </p>
           </div>
           <div className="card">

@@ -124,8 +124,11 @@ def get_quotation_detail(quotation_id: uuid.UUID, db: Session = Depends(get_db),
             "registration_no": quotation.vehicle.registration_no,
             "make": quotation.vehicle.make,
             "model": quotation.vehicle.model,
-            "age_years": quotation.vehicle.age_years,
-            "year_of_manufacture": quotation.vehicle.year_of_manufacture,
+            # Sourced from this quotation's immutable snapshot, not
+            # recalculated -- a historical quotation must keep showing the
+            # age used when it was generated, even in a later calendar year.
+            "year_of_manufacture": (quotation.snapshot.data if quotation.snapshot else {}).get("year_of_manufacture"),
+            "age_years": (quotation.snapshot.data if quotation.snapshot else {}).get("calculated_age_years"),
         },
         "sum_insured": float(quotation.sum_insured),
         "basic_premium": float(quotation.basic_premium),
