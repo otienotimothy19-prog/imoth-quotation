@@ -3,6 +3,7 @@ upload/replace/remove semantics, validation, and admin-side visibility
 (list, authenticated download, verify).
 """
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +11,8 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
+
+CURRENT_YEAR = datetime.now(timezone.utc).year
 
 
 @pytest.fixture()
@@ -20,7 +23,7 @@ def quotation_id():
         "/api/quotes/compare",
         json={
             "client": {"full_name": "Doc Test Client", "phone": phone, "email": "doctest@example.com"},
-            "vehicle": {"registration_no": reg, "age_years": 4},
+            "vehicle": {"registration_no": reg, "year_of_manufacture": CURRENT_YEAR - 4},
             "category": "private",
             "sum_insured": 1200000,
         },
@@ -30,7 +33,7 @@ def quotation_id():
         "/api/quotes/generate",
         json={
             "client": {"full_name": "Doc Test Client", "phone": phone, "email": "doctest@example.com"},
-            "vehicle": {"registration_no": reg, "age_years": 4},
+            "vehicle": {"registration_no": reg, "year_of_manufacture": CURRENT_YEAR - 4},
             "insurer_id": cheapest["insurer_id"],
             "motor_class_id": cheapest["motor_class_id"],
             "sum_insured": 1200000,

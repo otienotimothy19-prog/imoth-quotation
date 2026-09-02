@@ -1646,3 +1646,18 @@ table tr:nth-child(even) td {
     display: none;
   }
 }
+
+/* ---- Read-only calculated field (vehicle age) ---- */
+.calculated-field {
+  min-height: 54px;
+  border-radius: 12px;
+  padding: 14px 15px;
+  font-size: 14.5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  user-select: none;
+}

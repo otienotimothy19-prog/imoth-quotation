@@ -152,8 +152,18 @@ def compute_premium(
     )
 
 
-def is_eligible(motor_class: dict, sum_insured: float, age: float | None) -> bool:
-    """Whether a motor class can be quoted for the given SI / vehicle age."""
+def is_eligible(motor_class: dict, sum_insured: float, age: int | None) -> bool:
+    """Whether a motor class can be quoted for the given SI / vehicle age.
+
+    Vehicles beyond a motor class's configured maximum age are excluded
+    outright rather than shown with a warning: there is no approved manual-
+    underwriting referral workflow in this system to route an over-age
+    option to instead, so it must not appear as an immediately eligible
+    quotation.
+    """
+    max_age = motor_class.get("max_age")
+    if max_age is not None and age is not None and age > max_age:
+        return False
     if motor_class.get("flat_only"):
         return True
     if sum_insured < motor_class.get("min_si", 0):
@@ -161,10 +171,4 @@ def is_eligible(motor_class: dict, sum_insured: float, age: float | None) -> boo
     max_si = motor_class.get("max_si")
     if max_si is not None and sum_insured > max_si:
         return False
-    max_age = motor_class.get("max_age")
-    if max_age is not None and age is not None and age > max_age:
-        # Still eligible in principle (insurer approval/substitution required in
-        # legacy tool's UI warning) -- callers surface this as a warning, not a
-        # hard block, mirroring the legacy ageWarn behaviour.
-        return True
     return True

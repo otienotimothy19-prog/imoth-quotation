@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.enums import QuotationStatus, RiskNoteStatus
+from app.services.vehicle_age import MIN_MANUFACTURE_YEAR, current_year
 
 
 class ClientIn(BaseModel):
@@ -15,10 +16,23 @@ class ClientIn(BaseModel):
 
 class VehicleIn(BaseModel):
     registration_no: str = Field(min_length=2, max_length=30)
-    year_of_manufacture: int | None = Field(default=None, ge=1960, le=2100)
+    year_of_manufacture: int
+    # Deprecated: vehicle age is always calculated server-side from
+    # year_of_manufacture. Any value sent here is accepted for API
+    # compatibility but never read for pricing, eligibility, or storage.
     age_years: int | None = Field(default=None, ge=0, le=80)
     make: str | None = Field(default=None, max_length=100)
     model: str | None = Field(default=None, max_length=100)
+
+    @field_validator("year_of_manufacture")
+    @classmethod
+    def _validate_year_of_manufacture(cls, v: int) -> int:
+        year = current_year()
+        if v > year:
+            raise ValueError(f"Year of manufacture cannot be later than {year}.")
+        if v < MIN_MANUFACTURE_YEAR:
+            raise ValueError(f"Enter a year between {MIN_MANUFACTURE_YEAR} and {year}.")
+        return v
 
 
 class QuoteOptionsIn(BaseModel):
@@ -47,7 +61,6 @@ class CompareOption(BaseModel):
     motor_class_label: str
     cover_type: str
     max_age: int | None
-    age_warning: bool
     basic_premium: float
     subtotal: float
     levies: float
@@ -58,6 +71,7 @@ class CompareOption(BaseModel):
 class CompareResponse(BaseModel):
     category: str
     sum_insured: float
+    calculated_age_years: int
     options: list[CompareOption]
 
 
@@ -97,6 +111,8 @@ class QuotationOut(BaseModel):
     excess: list[str]
     benefits: list[str]
     limits: list[str]
+    year_of_manufacture: int | None
+    calculated_age_years: int | None
     generated_at: datetime | None
     accepted_at: datetime | None
     rejected_at: datetime | None
