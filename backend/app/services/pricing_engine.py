@@ -56,8 +56,23 @@ def find_band(bands: list[dict], si: float) -> dict:
 def effective_band(motor_class: dict, band_: dict, age: float | None) -> dict:
     """Market rule: private motor vehicles over 15 years old are not offered
     Excess Protector (Own Damage) or PVT cover, regardless of what the normal
-    Sum-Insured band would otherwise include."""
-    if motor_class.get("category") == "private" and age is not None and age > PRIVATE_AGE_LIMIT_FOR_EP_PVT:
+    Sum-Insured band would otherwise include.
+
+    This blanket rule only applies to standard 15-year private-car products.
+    A product that is itself documented to cover vehicles beyond 15 years
+    (e.g. an insurer's dedicated older-vehicle class with its own max_age
+    and its own EP/PVT terms baked into its bands) is exempt -- its own
+    band configuration already governs the whole age range it is eligible
+    for, and this generic rule must not strip benefits that product
+    explicitly provides."""
+    class_max_age = motor_class.get("max_age")
+    is_dedicated_older_vehicle_product = class_max_age is not None and class_max_age > PRIVATE_AGE_LIMIT_FOR_EP_PVT
+    if (
+        motor_class.get("category") == "private"
+        and age is not None
+        and age > PRIVATE_AGE_LIMIT_FOR_EP_PVT
+        and not is_dedicated_older_vehicle_product
+    ):
         out = dict(band_)
         out.update(
             ep_included=False,
@@ -107,14 +122,18 @@ def compute_premium(
         lines.append(PremiumLine(f"Basic Premium @ {b['rate'] * 100:.2f}% of SI (Min {b['min_premium']:,.0f})", base))
         subtotal += base
 
-        if not b["ep_included"] and not b["ep_not_offered"] and options.get("ep"):
+        ep_charged = options.get("ep") or b.get("ep_mandatory")
+        if not b["ep_included"] and not b["ep_not_offered"] and ep_charged:
             ep = max(sum_insured * b["ep_rate"], b["ep_min"])
-            lines.append(PremiumLine(f"Excess Protector (Own Damage) @ {b['ep_rate'] * 100:.2f}%", ep))
+            label = "Excess Protector (Own Damage)" + (" (mandatory)" if b.get("ep_mandatory") else "")
+            lines.append(PremiumLine(f"{label} @ {b['ep_rate'] * 100:.2f}%", ep))
             subtotal += ep
 
-        if not b["pvt_included"] and not b["pvt_not_offered"] and options.get("pvt"):
+        pvt_charged = options.get("pvt") or b.get("pvt_mandatory")
+        if not b["pvt_included"] and not b["pvt_not_offered"] and pvt_charged:
             p = max(sum_insured * b["pvt_rate"], b["pvt_min"])
-            lines.append(PremiumLine(f"PVT Cover @ {b['pvt_rate'] * 100:.2f}%", p))
+            label = "PVT Cover" + (" (mandatory)" if b.get("pvt_mandatory") else "")
+            lines.append(PremiumLine(f"{label} @ {b['pvt_rate'] * 100:.2f}%", p))
             subtotal += p
 
         if options.get("pv_terror"):
@@ -152,23 +171,33 @@ def compute_premium(
     )
 
 
-def is_eligible(motor_class: dict, sum_insured: float, age: int | None) -> bool:
-    """Whether a motor class can be quoted for the given SI / vehicle age.
-
-    Vehicles beyond a motor class's configured maximum age are excluded
-    outright rather than shown with a warning: there is no approved manual-
-    underwriting referral workflow in this system to route an over-age
-    option to instead, so it must not appear as an immediately eligible
-    quotation.
-    """
+def eligibility_reason(motor_class: dict, sum_insured: float, age: int | None) -> str | None:
+    """None if the motor class is eligible for this Sum Insured / vehicle
+    age; otherwise a human-readable explanation of why not. Vehicles beyond
+    a motor class's configured maximum age are excluded outright rather
+    than shown with a warning: there is no approved manual-underwriting
+    referral workflow in this system to route an over-age option to
+    instead, so it must not appear as an immediately eligible quotation --
+    but the reason must still be surfaced clearly rather than the option
+    simply vanishing."""
     max_age = motor_class.get("max_age")
     if max_age is not None and age is not None and age > max_age:
-        return False
+        return (
+            f"Vehicle age: {age} years\n"
+            f"Maximum eligible age: {max_age} years\n"
+            "Not eligible for this insurer's product"
+        )
     if motor_class.get("flat_only"):
-        return True
-    if sum_insured < motor_class.get("min_si", 0):
-        return False
+        return None
+    min_si = motor_class.get("min_si", 0)
+    if sum_insured < min_si:
+        return f"Sum Insured of KES {sum_insured:,.0f} is below this product's minimum vehicle value of KES {min_si:,.0f}."
     max_si = motor_class.get("max_si")
     if max_si is not None and sum_insured > max_si:
-        return False
-    return True
+        return f"Sum Insured of KES {sum_insured:,.0f} exceeds this product's maximum vehicle value of KES {max_si:,.0f}."
+    return None
+
+
+def is_eligible(motor_class: dict, sum_insured: float, age: int | None) -> bool:
+    """Whether a motor class can be quoted for the given SI / vehicle age."""
+    return eligibility_reason(motor_class, sum_insured, age) is None

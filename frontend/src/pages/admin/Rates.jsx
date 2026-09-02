@@ -11,14 +11,20 @@ const BAND_FIELDS = [
   ["ep_not_offered", "EP Not Offered"],
   ["ep_rate", "EP Rate"],
   ["ep_min", "EP Min"],
+  ["ep_mandatory", "EP Mandatory"],
   ["pvt_included", "PVT Included"],
   ["pvt_not_offered", "PVT Not Offered"],
   ["pvt_rate", "PVT Rate"],
   ["pvt_min", "PVT Min"],
+  ["pvt_mandatory", "PVT Mandatory"],
 ];
 
 function emptyBand() {
-  return { min_si: 0, max_si: "", rate: 0, min_premium: 0, ep_included: true, ep_not_offered: false, ep_rate: 0, ep_min: 0, pvt_included: true, pvt_not_offered: false, pvt_rate: 0, pvt_min: 0 };
+  return {
+    min_si: 0, max_si: "", rate: 0, min_premium: 0,
+    ep_included: true, ep_not_offered: false, ep_rate: 0, ep_min: 0, ep_mandatory: false,
+    pvt_included: true, pvt_not_offered: false, pvt_rate: 0, pvt_min: 0, pvt_mandatory: false,
+  };
 }
 
 function BandRow({ band, onChange, onRemove }) {

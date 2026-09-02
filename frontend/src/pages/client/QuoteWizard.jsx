@@ -47,6 +47,7 @@ export default function QuoteWizard() {
   const [category, setCategory] = useState("private");
   const [sumInsured, setSumInsured] = useState("");
   const [options, setOptions] = useState([]);
+  const [ineligibleOptions, setIneligibleOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selecting, setSelecting] = useState(null);
@@ -121,8 +122,10 @@ export default function QuoteWizard() {
         sum_insured: si,
       });
       setOptions(res.data.options);
+      setIneligibleOptions(res.data.ineligible_options || []);
     } catch (err) {
       setOptions([]);
+      setIneligibleOptions([]);
       setError(errorMessage(err, "Could not calculate quotes for these details."));
     } finally {
       setLoading(false);
@@ -414,6 +417,28 @@ export default function QuoteWizard() {
                   >
                     {selecting === opt.motor_class_id ? <span className="spinner" /> : "Select this quote"}
                   </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {ineligibleOptions.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <h2 className="wizard-section-title">Not Eligible for This Vehicle</h2>
+            <p className="hint" style={{ marginBottom: 14 }}>
+              These insurers offer this vehicle class but cannot cover this particular vehicle.
+            </p>
+            {ineligibleOptions.map((opt) => (
+              <div key={opt.motor_class_id} className="insurer-card" style={{ opacity: 0.75 }}>
+                <div className="insurer-card-head">
+                  <div>
+                    <div className="insurer-card-name">{opt.insurer_name}</div>
+                    <div className="insurer-card-meta">{opt.motor_class_label}</div>
+                  </div>
+                </div>
+                <div className="insurer-card-details" style={{ whiteSpace: "pre-line" }}>
+                  {opt.reason}
                 </div>
               </div>
             ))}

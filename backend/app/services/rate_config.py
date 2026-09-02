@@ -15,10 +15,12 @@ def rate_band_to_dict(rb: RateBand) -> dict:
         "ep_not_offered": rb.ep_not_offered,
         "ep_rate": float(rb.ep_rate),
         "ep_min": float(rb.ep_min),
+        "ep_mandatory": rb.ep_mandatory,
         "pvt_included": rb.pvt_included,
         "pvt_not_offered": rb.pvt_not_offered,
         "pvt_rate": float(rb.pvt_rate),
         "pvt_min": float(rb.pvt_min),
+        "pvt_mandatory": rb.pvt_mandatory,
     }
 
 

@@ -13,6 +13,7 @@ from app.schemas.quotation import (
     CompareRequest,
     CompareResponse,
     GenerateQuotationRequest,
+    IneligibleOption,
     QuotationOut,
     RejectQuotationRequest,
     RiskNoteOut,
@@ -69,7 +70,7 @@ def _quotation_to_out(q) -> QuotationOut:
 @router.post("/compare", response_model=CompareResponse)
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 def compare_insurers(request: Request, payload: CompareRequest, db: Session = Depends(get_db)):
-    options = list_eligible_options(
+    options, ineligible = list_eligible_options(
         db,
         category=payload.category,
         sum_insured=payload.sum_insured,
@@ -77,15 +78,16 @@ def compare_insurers(request: Request, payload: CompareRequest, db: Session = De
         year_of_manufacture=payload.vehicle.year_of_manufacture,
     )
     if not options:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No insurer currently offers this vehicle class at the given Sum Insured and vehicle age. Try adjusting the Sum Insured or vehicle class.",
-        )
+        detail = "No insurer currently offers this vehicle class at the given Sum Insured and vehicle age. Try adjusting the Sum Insured or vehicle class."
+        if ineligible:
+            detail += " " + " | ".join(i["reason"].replace("\n", " ") for i in ineligible)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
     return CompareResponse(
         category=payload.category,
         sum_insured=payload.sum_insured,
         calculated_age_years=calculate_vehicle_age(payload.vehicle.year_of_manufacture),
         options=options,
+        ineligible_options=[IneligibleOption(**i) for i in ineligible],
     )
 
 

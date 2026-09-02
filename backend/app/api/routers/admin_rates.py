@@ -73,10 +73,12 @@ def update_rates(motor_class_id: uuid.UUID, payload: RateBandsUpdate, request: R
                     ep_not_offered=b.ep_not_offered,
                     ep_rate=b.ep_rate,
                     ep_min=b.ep_min,
+                    ep_mandatory=b.ep_mandatory,
                     pvt_included=b.pvt_included,
                     pvt_not_offered=b.pvt_not_offered,
                     pvt_rate=b.pvt_rate,
                     pvt_min=b.pvt_min,
+                    pvt_mandatory=b.pvt_mandatory,
                     active=True,
                 )
             )

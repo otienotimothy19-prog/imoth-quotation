@@ -35,10 +35,12 @@ def _create_rate_bands(db: Session, motor_class: MotorClass, bands: list[dict], 
                 ep_not_offered=b["ep_not_offered"],
                 ep_rate=b["ep_rate"],
                 ep_min=b["ep_min"],
+                ep_mandatory=b.get("ep_mandatory", False),
                 pvt_included=b["pvt_included"],
                 pvt_not_offered=b["pvt_not_offered"],
                 pvt_rate=b["pvt_rate"],
                 pvt_min=b["pvt_min"],
+                pvt_mandatory=b.get("pvt_mandatory", False),
             )
         )
 
