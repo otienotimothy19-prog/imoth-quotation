@@ -57,6 +57,7 @@ function emptyBand() {
   return {
     min_si: 0, max_si: "", rate: 0, min_premium: 0,
     min_passengers: "", max_passengers: "",
+    min_tonnage: "", max_tonnage: "",
     ep_included: true, ep_not_offered: false, ep_rate: 0, ep_min: 0, ep_mandatory: false,
     pvt_included: true, pvt_not_offered: false, pvt_rate: 0, pvt_min: 0, pvt_mandatory: false,
   };
@@ -140,7 +141,7 @@ function CoverSection({ title, band, prefix, onChange }) {
   );
 }
 
-function BandCard({ index, band, onChange, onRemove, showPassengerLimits, idPrefix }) {
+function BandCard({ index, band, onChange, onRemove, showPassengerLimits, showTonnageLimits, idPrefix }) {
   return (
     <div className="rate-band-card">
       <button type="button" className="btn btn-danger btn-sm remove-band" onClick={onRemove} aria-label={`Remove band ${index + 1}`}>
@@ -209,6 +210,39 @@ function BandCard({ index, band, onChange, onRemove, showPassengerLimits, idPref
         </div>
       )}
 
+      {showTonnageLimits && (
+        <div className="row2">
+          <div>
+            <label htmlFor={`${idPrefix}-min-tonnage`}>Minimum Tonnage</label>
+            <input
+              id={`${idPrefix}-min-tonnage`}
+              type="number"
+              step="any"
+              min="0"
+              placeholder="any"
+              value={numOrEmpty(band.min_tonnage)}
+              onChange={(e) => onChange({ ...band, min_tonnage: e.target.value === "" ? "" : Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <label htmlFor={`${idPrefix}-max-tonnage`}>Maximum Tonnage</label>
+            <input
+              id={`${idPrefix}-max-tonnage`}
+              type="number"
+              step="any"
+              min="0"
+              placeholder="any"
+              value={numOrEmpty(band.max_tonnage)}
+              onChange={(e) => onChange({ ...band, max_tonnage: e.target.value === "" ? "" : Number(e.target.value) })}
+            />
+          </div>
+          <div className="hint" style={{ gridColumn: "1 / -1" }}>
+            Leave blank on both to apply this band regardless of tonnage. Set both to limit this band to vehicles of
+            that carrying capacity (e.g. up to 3T vs 3.01-8T).
+          </div>
+        </div>
+      )}
+
       <CoverSection title="Excess Protector" band={band} prefix="ep" onChange={onChange} />
       <CoverSection title="Political Violence & Terrorism" band={band} prefix="pvt" onChange={onChange} />
     </div>
@@ -247,12 +281,125 @@ function VersionHistory({ versions }) {
   );
 }
 
+function PllEditor({ pllForm, setPllForm, reason, setReason, saving, onSave }) {
+  if (!pllForm) return null;
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <h3 style={{ fontSize: 13 }}>Passenger Legal Liability (PLL)</h3>
+      <p className="hint" style={{ marginBottom: 12 }}>
+        Charged per passenger on top of the base premium when the client provides a passenger count at quote time --
+        e.g. free or discounted for a school's own students, a higher rate for corporate/general hire.
+      </p>
+      <div className="tri-toggle">
+        {[
+          ["none", "None (not charged)"],
+          ["flat", "Flat rate per seat"],
+          ["tiered", "Tiered options (e.g. school vs corporate)"],
+        ].map(([value, label]) => (
+          <label key={value}>
+            <input type="radio" name="pll-mode" checked={pllForm.mode === value} onChange={() => setPllForm({ ...pllForm, mode: value })} />
+            {label}
+          </label>
+        ))}
+      </div>
+
+      {pllForm.mode === "flat" && (
+        <div className="row2" style={{ marginTop: 10 }}>
+          <div>
+            <label htmlFor="pll-per-seat">Rate per seat (KES)</label>
+            <input
+              id="pll-per-seat"
+              type="number"
+              step="any"
+              min="0"
+              value={numOrEmpty(pllForm.perSeat)}
+              onChange={(e) => setPllForm({ ...pllForm, perSeat: e.target.value === "" ? "" : Number(e.target.value) })}
+            />
+          </div>
+        </div>
+      )}
+
+      {pllForm.mode === "tiered" && (
+        <div style={{ marginTop: 10 }}>
+          {pllForm.options.map((opt, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 10, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 140px" }}>
+                <label htmlFor={`pll-option-${i}-key`}>Key</label>
+                <input
+                  id={`pll-option-${i}-key`}
+                  type="text"
+                  placeholder="e.g. student"
+                  value={opt.key}
+                  onChange={(e) =>
+                    setPllForm({ ...pllForm, options: pllForm.options.map((o, j) => (j === i ? { ...o, key: e.target.value } : o)) })
+                  }
+                />
+              </div>
+              <div style={{ flex: "2 1 220px" }}>
+                <label htmlFor={`pll-option-${i}-label`}>Label</label>
+                <input
+                  id={`pll-option-${i}-label`}
+                  type="text"
+                  placeholder="e.g. School's own students"
+                  value={opt.label}
+                  onChange={(e) =>
+                    setPllForm({ ...pllForm, options: pllForm.options.map((o, j) => (j === i ? { ...o, label: e.target.value } : o)) })
+                  }
+                />
+              </div>
+              <div style={{ flex: "1 1 140px" }}>
+                <label htmlFor={`pll-option-${i}-rate`}>Rate per seat (KES)</label>
+                <input
+                  id={`pll-option-${i}-rate`}
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={numOrEmpty(opt.rate)}
+                  onChange={(e) =>
+                    setPllForm({
+                      ...pllForm,
+                      options: pllForm.options.map((o, j) => (j === i ? { ...o, rate: e.target.value === "" ? "" : Number(e.target.value) } : o)),
+                    })
+                  }
+                />
+              </div>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                aria-label={`Remove option ${i + 1}`}
+                onClick={() => setPllForm({ ...pllForm, options: pllForm.options.filter((_, j) => j !== i) })}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setPllForm({ ...pllForm, options: [...pllForm.options, { key: "", label: "", rate: 0 }] })}
+          >
+            + Add Option
+          </button>
+        </div>
+      )}
+
+      <div style={{ marginTop: 18, borderTop: "1px solid var(--panel)", paddingTop: 14 }}>
+        <label className="first">Reason for this change (required, recorded in rate version history)</label>
+        <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. updated PLL rates for 2027" />
+        <button type="button" className="btn btn-primary" style={{ marginTop: 10 }} disabled={saving} aria-busy={saving} onClick={onSave}>
+          {saving ? <span className="spinner" /> : "Save Changes"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function siRange(b) {
   return [Number(b.min_si), b.max_si === "" || b.max_si === null || b.max_si === undefined ? Infinity : Number(b.max_si)];
 }
-function passengerRange(b) {
-  const lo = b.min_passengers === "" || b.min_passengers === null || b.min_passengers === undefined ? -Infinity : Number(b.min_passengers);
-  const hi = b.max_passengers === "" || b.max_passengers === null || b.max_passengers === undefined ? Infinity : Number(b.max_passengers);
+function optionalRange(b, loKey, hiKey) {
+  const lo = b[loKey] === "" || b[loKey] === null || b[loKey] === undefined ? -Infinity : Number(b[loKey]);
+  const hi = b[hiKey] === "" || b[hiKey] === null || b[hiKey] === undefined ? Infinity : Number(b[hiKey]);
   return [lo, hi];
 }
 function rangesOverlap([aLo, aHi], [bLo, bHi]) {
@@ -273,14 +420,27 @@ function validateBands(bands, label) {
         Number(b.max_passengers) < Number(b.min_passengers)) {
       return `${label}: a band's Maximum Passengers cannot be less than its Minimum.`;
     }
+    if ((b.min_tonnage !== "" && b.min_tonnage !== null && Number(b.min_tonnage) < 0) ||
+        (b.max_tonnage !== "" && b.max_tonnage !== null && Number(b.max_tonnage) < 0)) {
+      return `${label}: tonnage limits cannot be negative.`;
+    }
+    if (b.max_tonnage !== "" && b.max_tonnage !== null && b.min_tonnage !== "" && b.min_tonnage !== null &&
+        Number(b.max_tonnage) < Number(b.min_tonnage)) {
+      return `${label}: a band's Maximum Tonnage cannot be less than its Minimum.`;
+    }
   }
-  // Two bands only conflict if BOTH their Sum-Insured range and their
-  // passenger range overlap -- PSV classes intentionally reuse the same
-  // Sum-Insured range across bands split apart by passenger count.
+  // Two bands only conflict if their Sum-Insured range AND their passenger
+  // range AND their tonnage range all overlap -- PSV classes intentionally
+  // reuse the same Sum-Insured range across bands split apart by passenger
+  // count, and commercial classes do the same split apart by tonnage.
   for (let i = 0; i < bands.length; i++) {
     for (let j = i + 1; j < bands.length; j++) {
-      if (rangesOverlap(siRange(bands[i]), siRange(bands[j])) && rangesOverlap(passengerRange(bands[i]), passengerRange(bands[j]))) {
-        return `${label}: two bands overlap for the same Sum Insured and passenger range.`;
+      if (
+        rangesOverlap(siRange(bands[i]), siRange(bands[j])) &&
+        rangesOverlap(optionalRange(bands[i], "min_passengers", "max_passengers"), optionalRange(bands[j], "min_passengers", "max_passengers")) &&
+        rangesOverlap(optionalRange(bands[i], "min_tonnage", "max_tonnage"), optionalRange(bands[j], "min_tonnage", "max_tonnage"))
+      ) {
+        return `${label}: two bands overlap for the same Sum Insured, passenger and tonnage range.`;
       }
     }
   }
@@ -308,6 +468,9 @@ export default function Rates() {
   const [addMode, setAddMode] = useState(null); // null | "choose" | "comprehensive" | "tpo"
   const [newClassForm, setNewClassForm] = useState(null);
   const [creatingClass, setCreatingClass] = useState(false);
+  const [pllForm, setPllForm] = useState(null); // { mode: "none" | "flat" | "tiered", perSeat, options: [{key,label,rate}] }
+  const [pllReason, setPllReason] = useState("");
+  const [savingPll, setSavingPll] = useState(false);
 
   useEffect(() => {
     api.get("/api/admin/insurers").then((res) => setInsurers(res.data));
@@ -343,6 +506,24 @@ export default function Rates() {
     }
     api.get("/api/admin/motor-classes", { params: { insurer_id: insurerId } }).then((res) => setClasses(res.data));
   }, [insurerId]);
+
+  // Passenger Legal Liability config lives on the motor class itself (not
+  // the rates payload), so it's re-derived from `classes` whenever the
+  // selected class or the loaded class list changes -- including right
+  // after a PLL save, so the form reflects what was actually persisted.
+  useEffect(() => {
+    const cls = classes.find((c) => c.id === classId);
+    if (!cls) return;
+    if (cls.pll_options && cls.pll_options.length > 0) {
+      setPllForm({ mode: "tiered", perSeat: "", options: cls.pll_options.map((o) => ({ ...o })) });
+    } else if (cls.pll_per_seat) {
+      setPllForm({ mode: "flat", perSeat: cls.pll_per_seat, options: [] });
+    } else {
+      setPllForm({ mode: "none", perSeat: "", options: [] });
+    }
+    setPllReason("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId, classes]);
 
   async function loadRates(id) {
     if (!id) return;
@@ -471,6 +652,8 @@ export default function Rates() {
           max_si: b.max_si === "" ? null : b.max_si,
           min_passengers: b.min_passengers === "" ? null : b.min_passengers,
           max_passengers: b.max_passengers === "" ? null : b.max_passengers,
+          min_tonnage: b.min_tonnage === "" ? null : b.min_tonnage,
+          max_tonnage: b.max_tonnage === "" ? null : b.max_tonnage,
         }));
       await api.put(`/api/admin/rates/${classId}`, {
         bands: clean(bands),
@@ -484,6 +667,48 @@ export default function Rates() {
       setError(errorMessage(err));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function savePll() {
+    setError("");
+    setStatus("");
+    if (!pllForm) return;
+    if (!pllReason.trim()) return setError("Please provide a reason for this change (for the audit trail).");
+
+    let pll_per_seat = null;
+    let pll_options = null;
+    if (pllForm.mode === "flat") {
+      if (pllForm.perSeat === "" || pllForm.perSeat === null || Number(pllForm.perSeat) < 0) {
+        return setError("Enter a non-negative Passenger Legal Liability rate per seat.");
+      }
+      pll_per_seat = Number(pllForm.perSeat);
+    } else if (pllForm.mode === "tiered") {
+      if (pllForm.options.length === 0) {
+        return setError("Add at least one Passenger Legal Liability option, or choose None or Flat rate.");
+      }
+      for (const o of pllForm.options) {
+        if (!o.key.trim() || !o.label.trim()) return setError("Each Passenger Legal Liability option needs a key and a label.");
+        if (o.rate === "" || o.rate === null || Number(o.rate) < 0) return setError("Passenger Legal Liability rates cannot be negative.");
+      }
+      const keys = pllForm.options.map((o) => o.key.trim());
+      if (new Set(keys).size !== keys.length) return setError("Passenger Legal Liability option keys must be unique.");
+      pll_options = pllForm.options.map((o) => ({ key: o.key.trim(), label: o.label.trim(), rate: Number(o.rate) }));
+    }
+
+    setSavingPll(true);
+    try {
+      await api.patch(`/api/admin/motor-classes/${classId}`, { pll_per_seat, pll_options, change_reason: pllReason });
+      setStatus("Passenger Legal Liability rates updated.");
+      setPllReason("");
+      const res = await api.get("/api/admin/motor-classes", { params: { insurer_id: insurerId } });
+      setClasses(res.data);
+      const v = await api.get(`/api/admin/rates/${classId}/versions`);
+      setVersions(v.data);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSavingPll(false);
     }
   }
 
@@ -720,6 +945,13 @@ export default function Rates() {
       {resolvingDeepLink && <div className="card">Loading…</div>}
       {!resolvingDeepLink && classId && loadingRates && <div className="card">Loading rates…</div>}
 
+      {!resolvingDeepLink &&
+        classId &&
+        !loadingRates &&
+        (selectedClass?.category === "psv" || selectedClass?.category === "institutional") && (
+          <PllEditor pllForm={pllForm} setPllForm={setPllForm} reason={pllReason} setReason={setPllReason} saving={savingPll} onSave={savePll} />
+        )}
+
       {!resolvingDeepLink && classId && !loadingRates && flatOnly && flatForm && (
         <div className="card" style={{ marginBottom: 16 }}>
           <h3 style={{ fontSize: 13 }}>Flat-Rate Product</h3>
@@ -789,6 +1021,7 @@ export default function Rates() {
                   idPrefix={`band-${i}`}
                   band={b}
                   showPassengerLimits={selectedClass?.category === "psv"}
+                  showTonnageLimits={selectedClass?.category === "commercial"}
                   onChange={(nb) => setBands(bands.map((x, j) => (j === i ? nb : x)))}
                   onRemove={() => {
                     if (window.confirm(`Remove Band ${i + 1}? This cannot be undone until you save, but will apply once you do.`)) {
@@ -813,6 +1046,7 @@ export default function Rates() {
                       idPrefix={`alt-band-${i}`}
                       band={b}
                       showPassengerLimits={selectedClass?.category === "psv"}
+                      showTonnageLimits={selectedClass?.category === "commercial"}
                       onChange={(nb) => setBandsAlt(bandsAlt.map((x, j) => (j === i ? nb : x)))}
                       onRemove={() => {
                         if (window.confirm(`Remove Alternative Band ${i + 1}?`)) {

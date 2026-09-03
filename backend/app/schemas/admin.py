@@ -55,9 +55,18 @@ class InsurerOut(BaseModel):
 
 
 class PllOption(BaseModel):
-    key: str
-    label: str
-    rate: float
+    key: str = Field(min_length=1, max_length=50)
+    label: str = Field(min_length=1, max_length=255)
+    rate: float = Field(ge=0)
+
+
+def _validate_pll_options(options: list[PllOption] | None) -> list[PllOption] | None:
+    if options is None:
+        return None
+    keys = [o.key for o in options]
+    if len(keys) != len(set(keys)):
+        raise ValueError("Passenger Legal Liability option keys must be unique within a class")
+    return options
 
 
 class FlatOnly(BaseModel):
@@ -91,6 +100,11 @@ class MotorClassCreate(BaseModel):
     benefits: list[str] = []
     limits: list[str] = []
 
+    @field_validator("pll_options")
+    @classmethod
+    def _pll_options_unique_create(cls, v):
+        return _validate_pll_options(v)
+
     @model_validator(mode="after")
     def _si_range(self):
         if self.max_si is not None and self.max_si < self.min_si:
@@ -113,9 +127,15 @@ class MotorClassUpdate(BaseModel):
     limits: list[str] | None = None
     active: bool | None = None
     # Optional: when set, this update is also recorded as a new RateVersion
-    # (used by the Rates screen when editing a flat-rate product's premium,
-    # so flat-rate changes get the same version history as banded rates).
+    # (used by the Rates screen when editing a flat-rate product's premium
+    # or its Passenger Legal Liability rates, so those changes get the same
+    # version history as banded rates).
     change_reason: str | None = None
+
+    @field_validator("pll_options")
+    @classmethod
+    def _pll_options_unique_update(cls, v):
+        return _validate_pll_options(v)
 
     @model_validator(mode="after")
     def _si_range(self):
@@ -134,6 +154,10 @@ class RateBandIn(BaseModel):
     # every non-PSV class.
     min_passengers: int | None = Field(default=None, ge=0)
     max_passengers: int | None = Field(default=None, ge=0)
+    # Optional tonnage limits (commercial/goods-carrying classes). Same
+    # leave-both-blank-for-any convention as the passenger limits above.
+    min_tonnage: float | None = Field(default=None, ge=0)
+    max_tonnage: float | None = Field(default=None, ge=0)
     ep_included: bool = True
     ep_not_offered: bool = False
     ep_rate: float = Field(default=0, ge=0)
@@ -151,6 +175,8 @@ class RateBandIn(BaseModel):
             raise ValueError("Max SI cannot be less than Min SI")
         if self.max_passengers is not None and self.min_passengers is not None and self.max_passengers < self.min_passengers:
             raise ValueError("Max passengers cannot be less than Min passengers")
+        if self.max_tonnage is not None and self.min_tonnage is not None and self.max_tonnage < self.min_tonnage:
+            raise ValueError("Max tonnage cannot be less than Min tonnage")
         if self.ep_included and self.ep_not_offered:
             raise ValueError("Excess Protector cannot be both Included and Not Offered")
         if self.ep_mandatory and (self.ep_included or self.ep_not_offered):
@@ -168,30 +194,36 @@ def _si_ranges_overlap(a: RateBandIn, b: RateBandIn) -> bool:
     return a.min_si <= b_hi and b.min_si <= a_hi
 
 
-def _passenger_ranges_overlap(a: RateBandIn, b: RateBandIn) -> bool:
-    """A band with no passenger range configured applies to every passenger
-    count, so it's treated as an unbounded range for overlap purposes."""
-    a_lo = a.min_passengers if a.min_passengers is not None else float("-inf")
-    a_hi = a.max_passengers if a.max_passengers is not None else float("inf")
-    b_lo = b.min_passengers if b.min_passengers is not None else float("-inf")
-    b_hi = b.max_passengers if b.max_passengers is not None else float("inf")
+def _optional_ranges_overlap(a: RateBandIn, b: RateBandIn, *, lo_attr: str, hi_attr: str) -> bool:
+    """A band with no range configured on this optional dimension (e.g.
+    passenger capacity, tonnage) applies to every value of it, so it's
+    treated as unbounded for overlap purposes."""
+    a_lo = getattr(a, lo_attr) if getattr(a, lo_attr) is not None else float("-inf")
+    a_hi = getattr(a, hi_attr) if getattr(a, hi_attr) is not None else float("inf")
+    b_lo = getattr(b, lo_attr) if getattr(b, lo_attr) is not None else float("-inf")
+    b_hi = getattr(b, hi_attr) if getattr(b, hi_attr) is not None else float("inf")
     return a_lo <= b_hi and b_lo <= a_hi
 
 
 def _check_no_band_overlaps(bands: list[RateBandIn], *, label: str) -> None:
-    # Two bands only genuinely conflict if BOTH their Sum-Insured range and
-    # their passenger-capacity range overlap -- PSV classes intentionally
-    # use the same (or overlapping) Sum-Insured range across several bands
-    # split apart by passenger count instead (e.g. 7-14 seats vs 15-33
-    # seats), which is not a conflict.
+    # Two bands only genuinely conflict if their Sum-Insured range AND their
+    # passenger-capacity range AND their tonnage range all overlap -- PSV
+    # classes intentionally reuse the same Sum-Insured range across bands
+    # split apart by passenger count (e.g. 7-14 vs 15-33 seats), and
+    # commercial classes do the same split apart by tonnage, neither of
+    # which is a conflict.
     ordered = sorted(bands, key=lambda b: b.min_si)
     for i, a in enumerate(ordered):
         for b in ordered[i + 1 :]:
-            if _si_ranges_overlap(a, b) and _passenger_ranges_overlap(a, b):
+            if (
+                _si_ranges_overlap(a, b)
+                and _optional_ranges_overlap(a, b, lo_attr="min_passengers", hi_attr="max_passengers")
+                and _optional_ranges_overlap(a, b, lo_attr="min_tonnage", hi_attr="max_tonnage")
+            ):
                 raise ValueError(
                     f"{label}: band {a.min_si:,.0f}-{'∞' if a.max_si is None else f'{a.max_si:,.0f}'} "
                     f"overlaps band {b.min_si:,.0f}-{'∞' if b.max_si is None else f'{b.max_si:,.0f}'} "
-                    "for the same passenger range"
+                    "for the same passenger and tonnage range"
                 )
 
 

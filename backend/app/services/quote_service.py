@@ -29,6 +29,7 @@ def _options_to_engine_dict(options: QuoteOptionsIn, age: float | None) -> dict:
         "lr_band": options.lr_band,
         "pll_seats": options.pll_seats,
         "pll_option_key": options.pll_option_key,
+        "tonnage": options.tonnage,
         "age": age,
     }
 

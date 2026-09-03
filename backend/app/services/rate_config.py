@@ -13,6 +13,8 @@ def rate_band_to_dict(rb: RateBand) -> dict:
         "min_premium": float(rb.min_premium),
         "min_passengers": rb.min_passengers,
         "max_passengers": rb.max_passengers,
+        "min_tonnage": float(rb.min_tonnage) if rb.min_tonnage is not None else None,
+        "max_tonnage": float(rb.max_tonnage) if rb.max_tonnage is not None else None,
         "ep_included": rb.ep_included,
         "ep_not_offered": rb.ep_not_offered,
         "ep_rate": float(rb.ep_rate),
