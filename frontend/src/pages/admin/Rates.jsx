@@ -2,6 +2,57 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, dateTimeFmt, errorMessage } from "../../api/client";
 
+const CATEGORIES = ["private", "commercial", "institutional", "psv", "tuktuk", "motorcycle", "asset", "special", "tpo"];
+
+function emptyNewClassForm(kind) {
+  return {
+    code: "",
+    label: "",
+    category: kind === "tpo" ? "tpo" : "private",
+    max_age: "",
+    min_si: 0,
+    max_si: "",
+    premium: "",
+    rate_on_si: "",
+    min_premium: "",
+    note: "",
+  };
+}
+
+function validateNewClassForm(kind, form) {
+  if (!form.code.trim()) return "Code is required.";
+  if (!form.label.trim()) return "Label is required.";
+  if (!form.category) return "Category is required.";
+  if (form.max_age !== "" && (Number.isNaN(Number(form.max_age)) || Number(form.max_age) < 0)) {
+    return "Max Age must be a non-negative number.";
+  }
+  if (kind === "tpo") {
+    const hasPremium = form.premium !== "" && form.premium !== null;
+    const hasRateOnSi = form.rate_on_si !== "" && form.rate_on_si !== null;
+    if (form.premium !== "" && (Number.isNaN(Number(form.premium)) || Number(form.premium) < 0)) {
+      return "Fixed Premium must be a non-negative number.";
+    }
+    if (form.rate_on_si !== "" && (Number.isNaN(Number(form.rate_on_si)) || Number(form.rate_on_si) < 0)) {
+      return "Rate on Sum Insured must be a non-negative number.";
+    }
+    if (!hasPremium && !hasRateOnSi) return "Provide either a fixed premium or a rate on sum insured for this third-party product.";
+    if (hasRateOnSi && (form.min_premium === "" || form.min_premium === null)) {
+      return "A minimum premium is required when using a rate on sum insured.";
+    }
+    return "";
+  }
+  if (form.min_si !== "" && (Number.isNaN(Number(form.min_si)) || Number(form.min_si) < 0)) {
+    return "Min Sum Insured must be a non-negative number.";
+  }
+  if (form.max_si !== "" && (Number.isNaN(Number(form.max_si)) || Number(form.max_si) < 0)) {
+    return "Max Sum Insured must be a non-negative number.";
+  }
+  if (form.max_si !== "" && form.min_si !== "" && Number(form.max_si) < Number(form.min_si)) {
+    return "Max Sum Insured cannot be less than Min Sum Insured.";
+  }
+  return "";
+}
+
 function emptyBand() {
   return {
     min_si: 0, max_si: "", rate: 0, min_premium: 0,
@@ -254,6 +305,9 @@ export default function Rates() {
   const [status, setStatus] = useState("");
   const [loadingRates, setLoadingRates] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [addMode, setAddMode] = useState(null); // null | "choose" | "comprehensive" | "tpo"
+  const [newClassForm, setNewClassForm] = useState(null);
+  const [creatingClass, setCreatingClass] = useState(false);
 
   useEffect(() => {
     api.get("/api/admin/insurers").then((res) => setInsurers(res.data));
@@ -326,6 +380,45 @@ export default function Rates() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
+
+  async function createNewClass() {
+    setError("");
+    setStatus("");
+    const validationError = validateNewClassForm(addMode, newClassForm);
+    if (validationError) return setError(validationError);
+
+    setCreatingClass(true);
+    try {
+      const isTpo = addMode === "tpo";
+      const res = await api.post("/api/admin/motor-classes", {
+        insurer_id: insurerId,
+        code: newClassForm.code,
+        label: newClassForm.label,
+        category: newClassForm.category,
+        max_age: newClassForm.max_age === "" ? null : Number(newClassForm.max_age),
+        min_si: isTpo ? 0 : Number(newClassForm.min_si) || 0,
+        max_si: isTpo ? null : newClassForm.max_si === "" ? null : Number(newClassForm.max_si),
+        flat_only: isTpo
+          ? {
+              premium: newClassForm.premium === "" ? null : Number(newClassForm.premium),
+              rate_on_si: newClassForm.rate_on_si === "" ? null : Number(newClassForm.rate_on_si),
+              min_premium: newClassForm.min_premium === "" ? null : Number(newClassForm.min_premium),
+              note: newClassForm.note || "",
+            }
+          : null,
+      });
+      const classesRes = await api.get("/api/admin/motor-classes", { params: { insurer_id: insurerId } });
+      setClasses(classesRes.data);
+      setAddMode(null);
+      setNewClassForm(null);
+      setStatus(isTpo ? "Third-party product created. Configure its premium below." : "Comprehensive class created. Add its rate bands below.");
+      setClassId(res.data.id);
+    } catch (err) {
+      setError(errorMessage(err, "Could not create this class."));
+    } finally {
+      setCreatingClass(false);
+    }
+  }
 
   async function save() {
     setError("");
@@ -411,6 +504,8 @@ export default function Rates() {
                 setInsurerId(e.target.value);
                 setClassId("");
                 setSearchParams({});
+                setAddMode(null);
+                setNewClassForm(null);
               }}
             >
               <option value="">Select insurer…</option>
@@ -441,6 +536,183 @@ export default function Rates() {
           </div>
         </div>
       </div>
+
+      {insurerId && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          {!addMode && (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAddMode("choose")}>
+              + Add New Rate
+            </button>
+          )}
+
+          {addMode === "choose" && (
+            <>
+              <div className="hint" style={{ marginBottom: 10 }}>
+                Is this a new Comprehensive product (Sum-Insured bands) or a Third Party (flat-rate) product for{" "}
+                {insurers.find((i) => i.id === insurerId)?.name}?
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    setNewClassForm(emptyNewClassForm("comprehensive"));
+                    setAddMode("comprehensive");
+                  }}
+                >
+                  Comprehensive (Sum-Insured bands)
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    setNewClassForm(emptyNewClassForm("tpo"));
+                    setAddMode("tpo");
+                  }}
+                >
+                  Third Party (flat rate)
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAddMode(null)}>
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+
+          {(addMode === "comprehensive" || addMode === "tpo") && newClassForm && (
+            <>
+              <div className="hint" style={{ marginBottom: 10 }}>
+                New {addMode === "tpo" ? "Third Party (flat-rate)" : "Comprehensive"} class for{" "}
+                {insurers.find((i) => i.id === insurerId)?.name}
+              </div>
+              <div className="row2">
+                <div>
+                  <label className="first" htmlFor="new-rate-class-code">Code (unique per insurer)</label>
+                  <input
+                    id="new-rate-class-code"
+                    type="text"
+                    value={newClassForm.code}
+                    onChange={(e) => setNewClassForm({ ...newClassForm, code: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="first" htmlFor="new-rate-class-label">Label</label>
+                  <input
+                    id="new-rate-class-label"
+                    type="text"
+                    value={newClassForm.label}
+                    onChange={(e) => setNewClassForm({ ...newClassForm, label: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="row2">
+                <div>
+                  <label htmlFor="new-rate-class-category">Category</label>
+                  <select
+                    id="new-rate-class-category"
+                    value={newClassForm.category}
+                    onChange={(e) => setNewClassForm({ ...newClassForm, category: e.target.value })}
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label>Max Age (blank = no limit)</label>
+                  <input
+                    type="number"
+                    value={newClassForm.max_age}
+                    onChange={(e) => setNewClassForm({ ...newClassForm, max_age: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {addMode === "tpo" ? (
+                <>
+                  <div className="row2">
+                    <div>
+                      <label htmlFor="new-rate-class-premium">Fixed Premium (leave blank to use a rate instead)</label>
+                      <input
+                        id="new-rate-class-premium"
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={newClassForm.premium}
+                        onChange={(e) => setNewClassForm({ ...newClassForm, premium: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label>Rate on Sum Insured (e.g. 0.04 = 4%)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={newClassForm.rate_on_si}
+                        onChange={(e) => setNewClassForm({ ...newClassForm, rate_on_si: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="row2">
+                    <div>
+                      <label>Minimum Premium (required if using a rate)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={newClassForm.min_premium}
+                        onChange={(e) => setNewClassForm({ ...newClassForm, min_premium: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label>Note</label>
+                      <input type="text" value={newClassForm.note} onChange={(e) => setNewClassForm({ ...newClassForm, note: e.target.value })} />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="row2">
+                  <div>
+                    <label>Min Sum Insured</label>
+                    <input
+                      type="number"
+                      value={newClassForm.min_si}
+                      onChange={(e) => setNewClassForm({ ...newClassForm, min_si: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label>Max Sum Insured (blank = open)</label>
+                    <input
+                      type="number"
+                      value={newClassForm.max_si}
+                      onChange={(e) => setNewClassForm({ ...newClassForm, max_si: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <button type="button" className="btn btn-primary" disabled={creatingClass} aria-busy={creatingClass} onClick={createNewClass}>
+                  {creatingClass ? <span className="spinner" /> : "Create Class"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={creatingClass}
+                  onClick={() => {
+                    setAddMode(null);
+                    setNewClassForm(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {error && <div className="alert alert-error">{error}</div>}
       {status && <div className="alert alert-success">{status}</div>}

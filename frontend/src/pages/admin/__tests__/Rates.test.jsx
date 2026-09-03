@@ -7,7 +7,7 @@ import Rates from "../Rates";
 
 vi.mock("../../../api/client", async () => {
   const actual = await vi.importActual("../../../api/client");
-  return { ...actual, api: { get: vi.fn(), put: vi.fn(), patch: vi.fn() } };
+  return { ...actual, api: { get: vi.fn(), put: vi.fn(), patch: vi.fn(), post: vi.fn() } };
 });
 
 const INSURER = { id: "ins1", name: "Test Insurer" };
@@ -77,6 +77,7 @@ describe("Rates admin page", () => {
     api.get.mockReset();
     api.put.mockReset();
     api.patch.mockReset();
+    api.post.mockReset();
   });
 
   it("Included / Not Offered / Mandatory are mutually exclusive for a rate band", async () => {
@@ -220,5 +221,109 @@ describe("Rates admin page", () => {
         })
       )
     );
+  });
+
+  it("offers a Comprehensive vs Third Party choice when adding a new rate for an insurer", async () => {
+    const user = userEvent.setup();
+    mockBaseCalls();
+    render(
+      <MemoryRouter>
+        <Rates />
+      </MemoryRouter>
+    );
+    await screen.findByRole("option", { name: "Test Insurer" });
+    await user.selectOptions(screen.getByLabelText("Insurer"), "ins1");
+    await user.click(screen.getByRole("button", { name: "+ Add New Rate" }));
+
+    expect(screen.getByRole("button", { name: /comprehensive \(sum-insured bands\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /third party \(flat rate\)/i })).toBeInTheDocument();
+  });
+
+  it("creates a Third Party class with the entered premium and switches straight to editing it", async () => {
+    const user = userEvent.setup();
+    mockBaseCalls();
+    api.post.mockResolvedValue({ data: { id: "new-tpo", flat_only: { premium: 3200 } } });
+    api.get.mockImplementation((url, config) => {
+      if (url === "/api/admin/insurers") return Promise.resolve({ data: [INSURER] });
+      if (url === "/api/admin/motor-classes" && config?.params?.insurer_id === "ins1") {
+        return Promise.resolve({
+          data: [BANDED_CLASS, FLAT_CLASS, PSV_CLASS, { id: "new-tpo", label: "New TPO", category: "tpo", active: true, flat_only: { premium: 3200 } }],
+        });
+      }
+      if (url === "/api/admin/rates/new-tpo") {
+        return Promise.resolve({
+          data: { motor_class_id: "new-tpo", flat_only: { premium: 3200, rate_on_si: null, min_premium: null, note: "" }, bands: [], bands_alt: null },
+        });
+      }
+      if (url === "/api/admin/rates/new-tpo/versions") return Promise.resolve({ data: [] });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+
+    render(
+      <MemoryRouter>
+        <Rates />
+      </MemoryRouter>
+    );
+    await screen.findByRole("option", { name: "Test Insurer" });
+    await user.selectOptions(screen.getByLabelText("Insurer"), "ins1");
+    await user.click(screen.getByRole("button", { name: "+ Add New Rate" }));
+    await user.click(screen.getByRole("button", { name: /third party \(flat rate\)/i }));
+
+    await user.type(screen.getByLabelText(/code \(unique/i), "tpo_new");
+    await user.type(screen.getByLabelText("Label"), "New TPO");
+    await user.type(screen.getByLabelText(/^fixed premium/i), "3200");
+    await user.click(screen.getByRole("button", { name: "Create Class" }));
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        "/api/admin/motor-classes",
+        expect.objectContaining({
+          insurer_id: "ins1",
+          code: "tpo_new",
+          category: "tpo",
+          flat_only: expect.objectContaining({ premium: 3200, rate_on_si: null }),
+        })
+      )
+    );
+    expect(await screen.findByText("Flat-Rate Product")).toBeInTheDocument();
+  });
+
+  it("creates a Comprehensive class without flat_only and switches straight to its band editor", async () => {
+    const user = userEvent.setup();
+    mockBaseCalls();
+    api.post.mockResolvedValue({ data: { id: "new-comp" } });
+    api.get.mockImplementation((url, config) => {
+      if (url === "/api/admin/insurers") return Promise.resolve({ data: [INSURER] });
+      if (url === "/api/admin/motor-classes" && config?.params?.insurer_id === "ins1") {
+        return Promise.resolve({ data: [BANDED_CLASS, FLAT_CLASS, PSV_CLASS] });
+      }
+      if (url === "/api/admin/rates/new-comp") {
+        return Promise.resolve({ data: { motor_class_id: "new-comp", flat_only: null, has_lr_toggle: false, bands: [], bands_alt: null } });
+      }
+      if (url === "/api/admin/rates/new-comp/versions") return Promise.resolve({ data: [] });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+
+    render(
+      <MemoryRouter>
+        <Rates />
+      </MemoryRouter>
+    );
+    await screen.findByRole("option", { name: "Test Insurer" });
+    await user.selectOptions(screen.getByLabelText("Insurer"), "ins1");
+    await user.click(screen.getByRole("button", { name: "+ Add New Rate" }));
+    await user.click(screen.getByRole("button", { name: /comprehensive \(sum-insured bands\)/i }));
+
+    await user.type(screen.getByLabelText(/code \(unique/i), "comp_new");
+    await user.type(screen.getByLabelText("Label"), "New Comprehensive");
+    await user.click(screen.getByRole("button", { name: "Create Class" }));
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        "/api/admin/motor-classes",
+        expect.objectContaining({ insurer_id: "ins1", code: "comp_new", flat_only: null })
+      )
+    );
+    expect(await screen.findByText("Standard Bands")).toBeInTheDocument();
   });
 });
