@@ -140,13 +140,11 @@ describe("MotorClasses admin page", () => {
     confirmSpy.mockRestore();
   });
 
-  it("shows the backend's reason when deletion is blocked because quotations reference the class", async () => {
+  it("deletes a class that quotations reference and reports how many kept their history", async () => {
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     mockBaseCalls([CLASS]);
-    api.delete.mockRejectedValue({
-      response: { status: 409, data: { detail: "Cannot delete: 3 quotation(s) already reference this class. Disable it instead." } },
-    });
+    api.delete.mockResolvedValue({ data: { deleted: true, id: "cls1", quotations_detached: 3 } });
     render(
       <MemoryRouter>
         <MotorClasses />
@@ -155,7 +153,8 @@ describe("MotorClasses admin page", () => {
 
     await user.click(await screen.findByRole("button", { name: "Delete" }));
 
-    expect(await screen.findByText(/already reference this class/i)).toBeInTheDocument();
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/api/admin/motor-classes/cls1"));
+    expect(await screen.findByText(/3 quotation\(s\) that referenced it kept their history/i)).toBeInTheDocument();
     confirmSpy.mockRestore();
   });
 });

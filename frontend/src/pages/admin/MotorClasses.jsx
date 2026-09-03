@@ -106,15 +106,20 @@ export default function MotorClasses() {
   }
 
   async function deleteClass(cls) {
-    if (!window.confirm(`Permanently delete "${cls.label}"? This cannot be undone. This only succeeds if no quotation has ever used this class -- use Disable instead to keep its history but hide it from new quotations.`)) {
+    if (
+      !window.confirm(
+        `Permanently delete "${cls.label}"? This cannot be undone. If any quotations were generated against this class, they keep their own record, pricing and PDF -- they just won't show this class anymore, since it will no longer exist. Use Disable instead if you just want to hide it from new quotations while keeping it intact.`
+      )
+    ) {
       return;
     }
     setError("");
     setStatus("");
     setBusyId(cls.id);
     try {
-      await api.delete(`/api/admin/motor-classes/${cls.id}`);
-      setStatus(`${cls.label} deleted.`);
+      const res = await api.delete(`/api/admin/motor-classes/${cls.id}`);
+      const detached = res.data?.quotations_detached || 0;
+      setStatus(`${cls.label} deleted.${detached ? ` ${detached} quotation(s) that referenced it kept their history.` : ""}`);
       await loadClasses();
     } catch (err) {
       setError(errorMessage(err, "Could not delete this class."));
@@ -458,7 +463,7 @@ export default function MotorClasses() {
                         disabled={busyId === c.id}
                         aria-busy={busyId === c.id}
                         onClick={() => deleteClass(c)}
-                        title="Permanently delete -- only allowed if no quotation has ever used this class"
+                        title="Permanently delete this class. Quotations that used it keep their own history but lose the class reference."
                       >
                         {busyId === c.id ? <span className="spinner" /> : "Delete"}
                       </button>

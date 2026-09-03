@@ -586,7 +586,7 @@ def test_delete_unused_motor_class_succeeds(admin_headers):
     assert comprehensive_after["active"] is True
 
 
-def test_delete_motor_class_with_quotations_is_blocked(admin_headers):
+def test_delete_motor_class_with_quotations_detaches_them_without_losing_history(admin_headers):
     comprehensive = _get_a_banded_motor_class(admin_headers)
     create_resp = client.post(
         "/api/admin/motor-classes",
@@ -614,14 +614,23 @@ def test_delete_motor_class_with_quotations_is_blocked(admin_headers):
         },
     )
     assert gen_resp.status_code == 200, gen_resp.text
+    quotation_id = gen_resp.json()["id"]
+    before = client.get(f"/api/admin/quotations/{quotation_id}", headers=admin_headers).json()
 
     delete_resp = client.delete(f"/api/admin/motor-classes/{new_id}", headers=admin_headers)
-    assert delete_resp.status_code == 409
-    assert "quotation" in delete_resp.json()["detail"].lower()
+    assert delete_resp.status_code == 200, delete_resp.text
+    assert delete_resp.json()["quotations_detached"] == 1
 
-    # Blocked, not partially applied -- the class is still there afterward.
-    fetch_resp = client.get(f"/api/admin/motor-classes/{new_id}", headers=admin_headers)
-    assert fetch_resp.status_code == 200
+    # The class itself is really gone now.
+    fetch_class_resp = client.get(f"/api/admin/motor-classes/{new_id}", headers=admin_headers)
+    assert fetch_class_resp.status_code == 404
+
+    # But the quotation survives with its pricing/label untouched -- it
+    # never dereferences the live class, only its own denormalized snapshot.
+    after = client.get(f"/api/admin/quotations/{quotation_id}", headers=admin_headers).json()
+    assert after["quotation_number"] == before["quotation_number"]
+    assert after["vehicle_class_label"] == before["vehicle_class_label"] == "Delete Used Test Class"
+    assert after["total_premium"] == before["total_premium"]
 
 
 def test_delete_missing_motor_class_returns_404(admin_headers):
