@@ -11,11 +11,14 @@ export default function RiskNotes() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const pageSize = 20;
 
-  async function load() {
+  async function load(targetPage) {
+    setError("");
+    setLoading(true);
     try {
-      const params = { page, page_size: pageSize };
+      const params = { page: targetPage, page_size: pageSize };
       if (q) params.q = q;
       if (status) params.status = status;
       const res = await api.get("/api/admin/risk-notes", { params });
@@ -23,13 +26,22 @@ export default function RiskNotes() {
       setTotal(res.data.total);
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setLoading(false);
     }
   }
 
+  function search() {
+    if (page === 1) load(1);
+    else setPage(1);
+  }
+
   useEffect(() => {
-    load();
+    load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
+
+  const lastPage = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div>
@@ -39,7 +51,13 @@ export default function RiskNotes() {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div style={{ flex: 1, minWidth: 220 }}>
             <label className="first">Search</label>
-            <input type="text" placeholder="RN #, quotation #, client, or reg. no." value={q} onChange={(e) => setQ(e.target.value)} />
+            <input
+              type="text"
+              placeholder="RN #, quotation #, client, or reg. no."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && search()}
+            />
           </div>
           <div>
             <label className="first">Status</label>
@@ -52,8 +70,8 @@ export default function RiskNotes() {
               ))}
             </select>
           </div>
-          <button className="btn btn-primary" onClick={() => { setPage(1); load(); }}>
-            Search
+          <button className="btn btn-primary" onClick={search} disabled={loading} aria-busy={loading}>
+            {loading ? <span className="spinner" /> : "Search"}
           </button>
         </div>
       </div>
@@ -94,7 +112,7 @@ export default function RiskNotes() {
                   </td>
                 </tr>
               ))}
-              {items.length === 0 && (
+              {!loading && items.length === 0 && (
                 <tr>
                   <td colSpan={8} style={{ textAlign: "center", color: "var(--muted)" }}>
                     No risk notes found.
@@ -104,15 +122,15 @@ export default function RiskNotes() {
             </tbody>
           </table>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, flexWrap: "wrap", gap: 8 }}>
           <span className="hint">
-            {total} total · page {page} of {Math.max(1, Math.ceil(total / pageSize))}
+            {total} total · page {page} of {lastPage}
           </span>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            <button className="btn btn-ghost btn-sm" disabled={loading || page <= 1} onClick={() => setPage((p) => p - 1)}>
               ← Prev
             </button>
-            <button className="btn btn-ghost btn-sm" disabled={page * pageSize >= total} onClick={() => setPage((p) => p + 1)}>
+            <button className="btn btn-ghost btn-sm" disabled={loading || page >= lastPage} onClick={() => setPage((p) => p + 1)}>
               Next →
             </button>
           </div>

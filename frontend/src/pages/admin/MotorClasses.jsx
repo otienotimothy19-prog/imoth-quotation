@@ -4,27 +4,54 @@ import { api, errorMessage } from "../../api/client";
 
 const CATEGORIES = ["private", "commercial", "institutional", "psv", "tuktuk", "motorcycle", "asset", "special", "tpo"];
 
+function validateClassForm(form) {
+  if (!form.code.trim()) return "Code is required.";
+  if (!form.label.trim()) return "Label is required.";
+  if (!form.category) return "Category is required.";
+  if (form.max_age !== "" && (Number.isNaN(Number(form.max_age)) || Number(form.max_age) < 0)) {
+    return "Max Age must be a non-negative number.";
+  }
+  if (form.min_si !== "" && (Number.isNaN(Number(form.min_si)) || Number(form.min_si) < 0)) {
+    return "Min Sum Insured must be a non-negative number.";
+  }
+  if (form.max_si !== "" && (Number.isNaN(Number(form.max_si)) || Number(form.max_si) < 0)) {
+    return "Max Sum Insured must be a non-negative number.";
+  }
+  if (form.max_si !== "" && form.min_si !== "" && Number(form.max_si) < Number(form.min_si)) {
+    return "Max Sum Insured cannot be less than Min Sum Insured.";
+  }
+  return "";
+}
+
 export default function MotorClasses() {
   const [insurers, setInsurers] = useState([]);
   const [insurerId, setInsurerId] = useState("");
   const [classes, setClasses] = useState([]);
   const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ code: "", label: "", category: "private", max_age: "", min_si: 0, max_si: "" });
+  const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
+  const [busyId, setBusyId] = useState(null);
 
   async function loadInsurers() {
     const res = await api.get("/api/admin/insurers");
     setInsurers(res.data);
   }
   async function loadClasses() {
+    setError("");
+    setLoading(true);
     try {
       const params = insurerId ? { insurer_id: insurerId } : {};
       const res = await api.get("/api/admin/motor-classes", { params });
       setClasses(res.data);
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -37,13 +64,27 @@ export default function MotorClasses() {
   }, [insurerId]);
 
   async function toggleActive(cls) {
-    await api.patch(`/api/admin/motor-classes/${cls.id}`, { active: !cls.active });
-    loadClasses();
+    if (cls.active && !window.confirm(`Disable "${cls.label}"? It will stop appearing for new quotations. Existing quotations are not affected.`)) {
+      return;
+    }
+    setError("");
+    setStatus("");
+    setBusyId(cls.id);
+    try {
+      await api.patch(`/api/admin/motor-classes/${cls.id}`, { active: !cls.active });
+      setStatus(`${cls.label} ${cls.active ? "disabled" : "activated"}.`);
+      await loadClasses();
+    } catch (err) {
+      setError(errorMessage(err, "Could not update this class."));
+    } finally {
+      setBusyId(null);
+    }
   }
 
   function startEdit(cls) {
     setEditingId(cls.id);
     setEditForm({
+      code: cls.code,
       label: cls.label,
       category: cls.category,
       max_age: cls.max_age ?? "",
@@ -59,6 +100,14 @@ export default function MotorClasses() {
   }
 
   async function saveEdit(clsId) {
+    const validationError = validateClassForm(editForm);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setError("");
+    setStatus("");
+    setBusyId(clsId);
     try {
       await api.patch(`/api/admin/motor-classes/${clsId}`, {
         label: editForm.label,
@@ -68,37 +117,56 @@ export default function MotorClasses() {
         max_si: editForm.max_si === "" ? null : Number(editForm.max_si),
       });
       cancelEdit();
-      loadClasses();
+      setStatus("Class updated.");
+      await loadClasses();
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, "Could not save changes."));
+    } finally {
+      setBusyId(null);
     }
   }
 
   async function createClass() {
-    if (!insurerId) return setError("Select an insurer first");
+    setError("");
+    setStatus("");
+    if (!insurerId) return setError("Select an insurer first.");
+    const validationError = validateClassForm(form);
+    if (validationError) return setError(validationError);
+
+    setCreating(true);
     try {
       await api.post("/api/admin/motor-classes", {
         insurer_id: insurerId,
         code: form.code,
         label: form.label,
         category: form.category,
-        max_age: form.max_age ? Number(form.max_age) : null,
+        max_age: form.max_age === "" ? null : Number(form.max_age),
         min_si: Number(form.min_si) || 0,
-        max_si: form.max_si ? Number(form.max_si) : null,
+        max_si: form.max_si === "" ? null : Number(form.max_si),
       });
       setShowAdd(false);
       setForm({ code: "", label: "", category: "private", max_age: "", min_si: 0, max_si: "" });
-      loadClasses();
+      setStatus("Motor class created.");
+      await loadClasses();
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, "Could not create this class."));
+    } finally {
+      setCreating(false);
     }
   }
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <h1 style={{ fontSize: 20, color: "var(--imoth-blue)" }}>Motor Classes</h1>
-        <button className="btn btn-primary" onClick={() => setShowAdd((v) => !v)}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => {
+            setShowAdd((v) => !v);
+            setError("");
+          }}
+        >
           + Add Class
         </button>
       </div>
@@ -116,6 +184,7 @@ export default function MotorClasses() {
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
+      {status && <div className="alert alert-success">{status}</div>}
 
       {showAdd && (
         <div className="card" style={{ marginBottom: 16 }}>
@@ -157,9 +226,14 @@ export default function MotorClasses() {
             </div>
           </div>
           <div className="hint">After creating the class, configure its rate bands under Admin → Rates.</div>
-          <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={createClass}>
-            Save Class
-          </button>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button type="button" className="btn btn-primary" disabled={creating} aria-busy={creating} onClick={createClass}>
+              {creating ? <span className="spinner" /> : "Save Class"}
+            </button>
+            <button type="button" className="btn btn-ghost" disabled={creating} onClick={() => setShowAdd(false)}>
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
@@ -224,10 +298,10 @@ export default function MotorClasses() {
                       <span className={`badge ${c.active ? "badge-green" : "badge-gray"}`}>{c.active ? "Active" : "Disabled"}</span>
                     </td>
                     <td style={{ display: "flex", gap: 6 }}>
-                      <button className="btn btn-primary btn-sm" onClick={() => saveEdit(c.id)}>
-                        Save
+                      <button type="button" className="btn btn-primary btn-sm" disabled={busyId === c.id} aria-busy={busyId === c.id} onClick={() => saveEdit(c.id)}>
+                        {busyId === c.id ? <span className="spinner" /> : "Save"}
                       </button>
-                      <button className="btn btn-ghost btn-sm" onClick={cancelEdit}>
+                      <button type="button" className="btn btn-ghost btn-sm" disabled={busyId === c.id} onClick={cancelEdit}>
                         Cancel
                       </button>
                     </td>
@@ -249,23 +323,27 @@ export default function MotorClasses() {
                     <td>
                       <span className={`badge ${c.active ? "badge-green" : "badge-gray"}`}>{c.active ? "Active" : "Disabled"}</span>
                     </td>
-                    <td style={{ display: "flex", gap: 6 }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => startEdit(c)}>
+                    <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button type="button" className="btn btn-secondary btn-sm" disabled={busyId === c.id} onClick={() => startEdit(c)}>
                         Edit
                       </button>
-                      {!c.flat_only && (
-                        <Link className="btn btn-secondary btn-sm" to={`/admin/rates?motor_class_id=${c.id}`}>
-                          Rates
-                        </Link>
-                      )}
-                      <button className="btn btn-ghost btn-sm" onClick={() => toggleActive(c)}>
-                        {c.active ? "Disable" : "Activate"}
+                      <Link className="btn btn-secondary btn-sm" to={`/admin/rates?motor_class_id=${c.id}`}>
+                        {c.flat_only ? "Flat Rate" : "Rates"}
+                      </Link>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        disabled={busyId === c.id}
+                        aria-busy={busyId === c.id}
+                        onClick={() => toggleActive(c)}
+                      >
+                        {busyId === c.id ? <span className="spinner spinner-dark" /> : c.active ? "Disable" : "Activate"}
                       </button>
                     </td>
                   </tr>
                 )
               )}
-              {classes.length === 0 && (
+              {!loading && classes.length === 0 && (
                 <tr>
                   <td colSpan={7} style={{ textAlign: "center", color: "var(--muted)" }}>
                     No classes found.

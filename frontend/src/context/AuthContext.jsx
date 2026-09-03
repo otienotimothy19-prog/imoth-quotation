@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
     return raw ? JSON.parse(raw) : null;
   });
   const [ready, setReady] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("imoth_admin_token");
@@ -39,17 +40,22 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
+    setLoggingOut(true);
     try {
       await api.post("/api/auth/logout", {});
     } catch {
-      /* ignore */
+      /* Logout is best-effort server-side (audit log only); the session is
+      cleared client-side regardless so the admin is never stuck logged in
+      because of a network blip. */
+    } finally {
+      localStorage.removeItem("imoth_admin_token");
+      localStorage.removeItem("imoth_admin_user");
+      setUser(null);
+      setLoggingOut(false);
     }
-    localStorage.removeItem("imoth_admin_token");
-    localStorage.removeItem("imoth_admin_user");
-    setUser(null);
   }
 
-  const value = useMemo(() => ({ user, ready, login, logout }), [user, ready]);
+  const value = useMemo(() => ({ user, ready, login, logout, loggingOut }), [user, ready, loggingOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

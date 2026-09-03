@@ -6,11 +6,11 @@ from sqlalchemy.orm import Session, joinedload
 from app.api.deps import get_client_ip, require_admin
 from app.database import get_db
 from app.models.enums import ActorType
-from app.models.insurer_rate import Insurer, MotorClass
+from app.models.insurer_rate import Insurer, MotorClass, RateVersion
 from app.models.user import User
 from app.schemas.admin import MotorClassCreate, MotorClassUpdate
 from app.services import audit_service
-from app.services.rate_config import motor_class_to_dict
+from app.services.rate_config import motor_class_to_dict, rate_version_snapshot
 
 router = APIRouter(prefix="/api/admin/motor-classes", tags=["admin-motor-classes"])
 
@@ -98,6 +98,7 @@ def update_motor_class(motor_class_id: uuid.UUID, payload: MotorClassUpdate, req
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Motor class not found")
 
     data = payload.model_dump(exclude_unset=True)
+    change_reason = data.pop("change_reason", None)
     previous = {k: getattr(mc, k) for k in data if hasattr(mc, k)}
     if "pll_options" in data and data["pll_options"] is not None:
         data["pll_options"] = [o if isinstance(o, dict) else o.model_dump() for o in data["pll_options"]]
@@ -105,6 +106,7 @@ def update_motor_class(motor_class_id: uuid.UUID, payload: MotorClassUpdate, req
         data["flat_only"] = data["flat_only"] if isinstance(data["flat_only"], dict) else data["flat_only"].model_dump()
     for k, v in data.items():
         setattr(mc, k, v)
+    db.flush()
 
     audit_service.record(
         db, actor_type=ActorType.ADMIN, actor_label=user.email, actor_id=user.id,
@@ -112,6 +114,28 @@ def update_motor_class(motor_class_id: uuid.UUID, payload: MotorClassUpdate, req
         previous_value={k: str(v) for k, v in previous.items()}, new_value={k: str(v) for k, v in data.items()},
         ip_address=get_client_ip(request),
     )
+
+    # A change_reason means this edit should also be versioned like a
+    # standard rate change -- primarily for flat-rate products, which have
+    # no RateBand rows of their own to version through the Rates PUT.
+    if change_reason:
+        last_version = (
+            db.query(RateVersion)
+            .filter(RateVersion.motor_class_id == mc.id)
+            .order_by(RateVersion.version_no.desc())
+            .first()
+        )
+        db.refresh(mc)
+        db.add(
+            RateVersion(
+                motor_class_id=mc.id,
+                version_no=(last_version.version_no + 1) if last_version else 1,
+                data=rate_version_snapshot(mc),
+                change_reason=change_reason,
+                created_by=user.id,
+            )
+        )
+
     db.commit()
     db.refresh(mc)
     return _class_out(mc)

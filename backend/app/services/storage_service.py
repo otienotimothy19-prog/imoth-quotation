@@ -5,10 +5,27 @@ this file only -- no caller needs to change.
 """
 import hashlib
 import os
+import re
 import uuid
 from pathlib import Path
 
 from app.core.config import settings
+
+# Anything outside this set is stripped from a client-supplied filename
+# before it touches the filesystem. This blocks path traversal (e.g. a
+# filename of "../../etc/cron.d/evil" or an embedded "/") and control
+# characters, while keeping the extension and a readable stem.
+_UNSAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def sanitize_filename(filename: str | None, *, fallback: str = "file") -> str:
+    """Reduce a client-supplied filename to a safe basename with no path
+    separators or traversal sequences. Never trust this value for anything
+    other than a display label -- storage paths always prefix it with a
+    random UUID (see save_bytes)."""
+    name = os.path.basename((filename or "").strip().replace("\\", "/"))
+    name = _UNSAFE_FILENAME_CHARS.sub("_", name).strip("._") or fallback
+    return name[:200]
 
 
 def _root() -> Path:
@@ -26,7 +43,7 @@ def save_bytes(content: bytes, *, subdir: str, filename: str) -> tuple[str, str]
     target_dir = _root() / subdir
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    safe_name = f"{uuid.uuid4().hex}_{filename}"
+    safe_name = f"{uuid.uuid4().hex}_{sanitize_filename(filename)}"
     path = target_dir / safe_name
     path.write_bytes(content)
 
@@ -36,7 +53,14 @@ def save_bytes(content: bytes, *, subdir: str, filename: str) -> tuple[str, str]
 
 
 def read_bytes(storage_path: str) -> bytes:
-    path = _root() / storage_path
+    """Read a file previously written by save_bytes. `storage_path` is
+    always a value this module generated (never taken verbatim from a
+    request), but resolved-path containment is still checked as a
+    defence-in-depth measure against a corrupted/tampered stored path."""
+    root = _root().resolve()
+    path = (root / storage_path).resolve()
+    if root not in path.parents and path != root:
+        raise ValueError("Invalid storage path")
     return path.read_bytes()
 
 

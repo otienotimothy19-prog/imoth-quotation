@@ -72,9 +72,8 @@ def upload_client_document(
     content = file.file.read()
     _validate_file(db, file, content)
 
-    storage_path, checksum = storage_service.save_bytes(
-        content, subdir=STORAGE_SUBDIR, filename=file.filename or f"{document_type.value}.bin"
-    )
+    safe_filename = storage_service.sanitize_filename(file.filename, fallback=f"{document_type.value}.bin")
+    storage_path, checksum = storage_service.save_bytes(content, subdir=STORAGE_SUBDIR, filename=safe_filename)
 
     # Supersede any existing active upload of the same type -- never let two
     # ACTIVE rows of the same document_type satisfy the requirement, and keep
@@ -94,7 +93,7 @@ def upload_client_document(
         quotation_id=quotation.id,
         client_id=quotation.client_id,
         document_type=document_type,
-        original_filename=file.filename or f"{document_type.value}",
+        original_filename=safe_filename,
         storage_path=storage_path,
         checksum=checksum,
         mime_type=file.content_type,
