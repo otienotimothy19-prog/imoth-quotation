@@ -5,6 +5,7 @@ import { api, dateTimeFmt, errorMessage } from "../../api/client";
 function emptyBand() {
   return {
     min_si: 0, max_si: "", rate: 0, min_premium: 0,
+    min_passengers: "", max_passengers: "",
     ep_included: true, ep_not_offered: false, ep_rate: 0, ep_min: 0, ep_mandatory: false,
     pvt_included: true, pvt_not_offered: false, pvt_rate: 0, pvt_min: 0, pvt_mandatory: false,
   };
@@ -88,7 +89,7 @@ function CoverSection({ title, band, prefix, onChange }) {
   );
 }
 
-function BandCard({ index, band, onChange, onRemove }) {
+function BandCard({ index, band, onChange, onRemove, showPassengerLimits, idPrefix }) {
   return (
     <div className="rate-band-card">
       <button type="button" className="btn btn-danger btn-sm remove-band" onClick={onRemove} aria-label={`Remove band ${index + 1}`}>
@@ -123,6 +124,39 @@ function BandCard({ index, band, onChange, onRemove }) {
           <input type="number" step="any" min="0" value={numOrEmpty(band.min_premium)} onChange={(e) => onChange({ ...band, min_premium: e.target.value === "" ? 0 : Number(e.target.value) })} />
         </div>
       </div>
+
+      {showPassengerLimits && (
+        <div className="row2">
+          <div>
+            <label htmlFor={`${idPrefix}-min-passengers`}>Minimum Passengers</label>
+            <input
+              id={`${idPrefix}-min-passengers`}
+              type="number"
+              step="1"
+              min="0"
+              placeholder="any"
+              value={numOrEmpty(band.min_passengers)}
+              onChange={(e) => onChange({ ...band, min_passengers: e.target.value === "" ? "" : Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <label htmlFor={`${idPrefix}-max-passengers`}>Maximum Passengers</label>
+            <input
+              id={`${idPrefix}-max-passengers`}
+              type="number"
+              step="1"
+              min="0"
+              placeholder="any"
+              value={numOrEmpty(band.max_passengers)}
+              onChange={(e) => onChange({ ...band, max_passengers: e.target.value === "" ? "" : Number(e.target.value) })}
+            />
+          </div>
+          <div className="hint" style={{ gridColumn: "1 / -1" }}>
+            Leave blank on both to apply this band regardless of passenger count. Set both to limit this band to
+            vehicles carrying that many passengers (e.g. 7-14 vs 15-33 seats).
+          </div>
+        </div>
+      )}
 
       <CoverSection title="Excess Protector" band={band} prefix="ep" onChange={onChange} />
       <CoverSection title="Political Violence & Terrorism" band={band} prefix="pvt" onChange={onChange} />
@@ -162,17 +196,42 @@ function VersionHistory({ versions }) {
   );
 }
 
+function siRange(b) {
+  return [Number(b.min_si), b.max_si === "" || b.max_si === null || b.max_si === undefined ? Infinity : Number(b.max_si)];
+}
+function passengerRange(b) {
+  const lo = b.min_passengers === "" || b.min_passengers === null || b.min_passengers === undefined ? -Infinity : Number(b.min_passengers);
+  const hi = b.max_passengers === "" || b.max_passengers === null || b.max_passengers === undefined ? Infinity : Number(b.max_passengers);
+  return [lo, hi];
+}
+function rangesOverlap([aLo, aHi], [bLo, bHi]) {
+  return aLo <= bHi && bLo <= aHi;
+}
+
 function validateBands(bands, label) {
   for (const b of bands) {
     if (b.min_si < 0 || b.rate < 0 || b.min_premium < 0) return `${label}: values cannot be negative.`;
     if (b.max_si !== null && b.max_si !== "" && Number(b.max_si) < Number(b.min_si)) {
       return `${label}: a band's Maximum Sum Insured cannot be less than its Minimum.`;
     }
+    if ((b.min_passengers !== "" && b.min_passengers !== null && Number(b.min_passengers) < 0) ||
+        (b.max_passengers !== "" && b.max_passengers !== null && Number(b.max_passengers) < 0)) {
+      return `${label}: passenger limits cannot be negative.`;
+    }
+    if (b.max_passengers !== "" && b.max_passengers !== null && b.min_passengers !== "" && b.min_passengers !== null &&
+        Number(b.max_passengers) < Number(b.min_passengers)) {
+      return `${label}: a band's Maximum Passengers cannot be less than its Minimum.`;
+    }
   }
-  const sorted = [...bands].sort((a, b) => a.min_si - b.min_si);
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const prevEnd = sorted[i].max_si === "" || sorted[i].max_si === null ? Infinity : Number(sorted[i].max_si);
-    if (sorted[i + 1].min_si <= prevEnd) return `${label}: bands overlap around Sum Insured ${sorted[i + 1].min_si.toLocaleString()}.`;
+  // Two bands only conflict if BOTH their Sum-Insured range and their
+  // passenger range overlap -- PSV classes intentionally reuse the same
+  // Sum-Insured range across bands split apart by passenger count.
+  for (let i = 0; i < bands.length; i++) {
+    for (let j = i + 1; j < bands.length; j++) {
+      if (rangesOverlap(siRange(bands[i]), siRange(bands[j])) && rangesOverlap(passengerRange(bands[i]), passengerRange(bands[j]))) {
+        return `${label}: two bands overlap for the same Sum Insured and passenger range.`;
+      }
+    }
   }
   return "";
 }
@@ -313,7 +372,13 @@ export default function Rates() {
 
     setSaving(true);
     try {
-      const clean = (list) => list.map((b) => ({ ...b, max_si: b.max_si === "" ? null : b.max_si }));
+      const clean = (list) =>
+        list.map((b) => ({
+          ...b,
+          max_si: b.max_si === "" ? null : b.max_si,
+          min_passengers: b.min_passengers === "" ? null : b.min_passengers,
+          max_passengers: b.max_passengers === "" ? null : b.max_passengers,
+        }));
       await api.put(`/api/admin/rates/${classId}`, {
         bands: clean(bands),
         bands_alt: hasLrToggle ? clean(bandsAlt) : null,
@@ -449,7 +514,9 @@ export default function Rates() {
                 <BandCard
                   key={i}
                   index={i}
+                  idPrefix={`band-${i}`}
                   band={b}
+                  showPassengerLimits={selectedClass?.category === "psv"}
                   onChange={(nb) => setBands(bands.map((x, j) => (j === i ? nb : x)))}
                   onRemove={() => {
                     if (window.confirm(`Remove Band ${i + 1}? This cannot be undone until you save, but will apply once you do.`)) {
@@ -471,7 +538,9 @@ export default function Rates() {
                     <BandCard
                       key={i}
                       index={i}
+                      idPrefix={`alt-band-${i}`}
                       band={b}
+                      showPassengerLimits={selectedClass?.category === "psv"}
                       onChange={(nb) => setBandsAlt(bandsAlt.map((x, j) => (j === i ? nb : x)))}
                       onRemove={() => {
                         if (window.confirm(`Remove Alternative Band ${i + 1}?`)) {

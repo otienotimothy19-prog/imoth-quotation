@@ -129,6 +129,11 @@ class RateBandIn(BaseModel):
     max_si: float | None = Field(default=None, ge=0)
     rate: float = Field(ge=0)
     min_premium: float = Field(ge=0)
+    # Optional passenger-capacity limits (PSV classes). Leave both blank for
+    # a band that applies regardless of passenger count -- the norm for
+    # every non-PSV class.
+    min_passengers: int | None = Field(default=None, ge=0)
+    max_passengers: int | None = Field(default=None, ge=0)
     ep_included: bool = True
     ep_not_offered: bool = False
     ep_rate: float = Field(default=0, ge=0)
@@ -144,6 +149,8 @@ class RateBandIn(BaseModel):
     def _validate_band(self):
         if self.max_si is not None and self.max_si < self.min_si:
             raise ValueError("Max SI cannot be less than Min SI")
+        if self.max_passengers is not None and self.min_passengers is not None and self.max_passengers < self.min_passengers:
+            raise ValueError("Max passengers cannot be less than Min passengers")
         if self.ep_included and self.ep_not_offered:
             raise ValueError("Excess Protector cannot be both Included and Not Offered")
         if self.ep_mandatory and (self.ep_included or self.ep_not_offered):
@@ -155,15 +162,37 @@ class RateBandIn(BaseModel):
         return self
 
 
+def _si_ranges_overlap(a: RateBandIn, b: RateBandIn) -> bool:
+    a_hi = a.max_si if a.max_si is not None else float("inf")
+    b_hi = b.max_si if b.max_si is not None else float("inf")
+    return a.min_si <= b_hi and b.min_si <= a_hi
+
+
+def _passenger_ranges_overlap(a: RateBandIn, b: RateBandIn) -> bool:
+    """A band with no passenger range configured applies to every passenger
+    count, so it's treated as an unbounded range for overlap purposes."""
+    a_lo = a.min_passengers if a.min_passengers is not None else float("-inf")
+    a_hi = a.max_passengers if a.max_passengers is not None else float("inf")
+    b_lo = b.min_passengers if b.min_passengers is not None else float("-inf")
+    b_hi = b.max_passengers if b.max_passengers is not None else float("inf")
+    return a_lo <= b_hi and b_lo <= a_hi
+
+
 def _check_no_band_overlaps(bands: list[RateBandIn], *, label: str) -> None:
+    # Two bands only genuinely conflict if BOTH their Sum-Insured range and
+    # their passenger-capacity range overlap -- PSV classes intentionally
+    # use the same (or overlapping) Sum-Insured range across several bands
+    # split apart by passenger count instead (e.g. 7-14 seats vs 15-33
+    # seats), which is not a conflict.
     ordered = sorted(bands, key=lambda b: b.min_si)
-    for prev, cur in zip(ordered, ordered[1:]):
-        prev_end = prev.max_si if prev.max_si is not None else float("inf")
-        if cur.min_si <= prev_end:
-            raise ValueError(
-                f"{label}: band {prev.min_si:,.0f}-{'∞' if prev.max_si is None else f'{prev.max_si:,.0f}'} "
-                f"overlaps band starting at {cur.min_si:,.0f}"
-            )
+    for i, a in enumerate(ordered):
+        for b in ordered[i + 1 :]:
+            if _si_ranges_overlap(a, b) and _passenger_ranges_overlap(a, b):
+                raise ValueError(
+                    f"{label}: band {a.min_si:,.0f}-{'∞' if a.max_si is None else f'{a.max_si:,.0f}'} "
+                    f"overlaps band {b.min_si:,.0f}-{'∞' if b.max_si is None else f'{b.max_si:,.0f}'} "
+                    "for the same passenger range"
+                )
 
 
 class RateBandsUpdate(BaseModel):

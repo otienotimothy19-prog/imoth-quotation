@@ -73,6 +73,15 @@ class RateBand(UUIDPKMixin, TimestampMixin, Base):
     rate: Mapped[float] = mapped_column(Numeric(8, 5), nullable=False)
     min_premium: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
 
+    # Optional passenger-capacity limits (PSV classes only). Null on both
+    # sides means the band applies regardless of passenger count -- the
+    # historical behaviour for every non-PSV class and any PSV band that
+    # doesn't need this dimension. When set, `find_band` requires the
+    # quoted passenger count to fall within [min_passengers, max_passengers]
+    # in addition to the Sum-Insured range before the band is eligible.
+    min_passengers: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_passengers: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     ep_included: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     ep_not_offered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ep_rate: Mapped[float] = mapped_column(Numeric(8, 5), default=0, nullable=False)

@@ -11,14 +11,15 @@ vi.mock("../../../api/client", async () => {
 });
 
 const INSURER = { id: "ins1", name: "Test Insurer" };
-const BANDED_CLASS = { id: "cls1", label: "Private Car", active: true, flat_only: null };
-const FLAT_CLASS = { id: "cls2", label: "TPO Flat", active: true, flat_only: { premium: 3100, rate_on_si: null, min_premium: null, note: "Annual TPO" } };
+const BANDED_CLASS = { id: "cls1", label: "Private Car", category: "private", active: true, flat_only: null };
+const FLAT_CLASS = { id: "cls2", label: "TPO Flat", category: "tpo", active: true, flat_only: { premium: 3100, rate_on_si: null, min_premium: null, note: "Annual TPO" } };
+const PSV_CLASS = { id: "cls3", label: "PSV Chauffeur Driven", category: "psv", active: true, flat_only: null };
 
 function mockBaseCalls() {
   api.get.mockImplementation((url, config) => {
     if (url === "/api/admin/insurers") return Promise.resolve({ data: [INSURER] });
     if (url === "/api/admin/motor-classes" && config?.params?.insurer_id === "ins1") {
-      return Promise.resolve({ data: [BANDED_CLASS, FLAT_CLASS] });
+      return Promise.resolve({ data: [BANDED_CLASS, FLAT_CLASS, PSV_CLASS] });
     }
     if (url === "/api/admin/rates/cls1") {
       return Promise.resolve({
@@ -29,6 +30,7 @@ function mockBaseCalls() {
           bands: [
             {
               min_si: 500000, max_si: 999999, rate: 0.06, min_premium: 37500,
+              min_passengers: null, max_passengers: null,
               ep_included: false, ep_not_offered: false, ep_rate: 0.0025, ep_min: 5000, ep_mandatory: false,
               pvt_included: true, pvt_not_offered: false, pvt_rate: 0, pvt_min: 0, pvt_mandatory: false,
             },
@@ -40,6 +42,25 @@ function mockBaseCalls() {
     if (url === "/api/admin/rates/cls1/versions") return Promise.resolve({ data: [] });
     if (url === "/api/admin/rates/cls2") return Promise.resolve({ data: { motor_class_id: "cls2", flat_only: FLAT_CLASS.flat_only, bands: [], bands_alt: null } });
     if (url === "/api/admin/rates/cls2/versions") return Promise.resolve({ data: [] });
+    if (url === "/api/admin/rates/cls3") {
+      return Promise.resolve({
+        data: {
+          motor_class_id: "cls3",
+          flat_only: null,
+          has_lr_toggle: false,
+          bands: [
+            {
+              min_si: 500000, max_si: null, rate: 0.05, min_premium: 35000,
+              min_passengers: null, max_passengers: null,
+              ep_included: false, ep_not_offered: false, ep_rate: 0.005, ep_min: 10000, ep_mandatory: false,
+              pvt_included: false, pvt_not_offered: false, pvt_rate: 0.005, pvt_min: 10000, pvt_mandatory: false,
+            },
+          ],
+          bands_alt: null,
+        },
+      });
+    }
+    if (url === "/api/admin/rates/cls3/versions") return Promise.resolve({ data: [] });
     return Promise.reject(new Error(`unexpected GET ${url}`));
   });
 }
@@ -151,6 +172,52 @@ describe("Rates admin page", () => {
       expect(api.patch).toHaveBeenCalledWith(
         "/api/admin/motor-classes/cls2",
         expect.objectContaining({ change_reason: "annual review", flat_only: expect.objectContaining({ premium: 3100 }) })
+      )
+    );
+  });
+
+  it("shows passenger-limit fields for PSV bands but not for non-PSV bands", async () => {
+    const user = userEvent.setup();
+    mockBaseCalls();
+    render(
+      <MemoryRouter>
+        <Rates />
+      </MemoryRouter>
+    );
+
+    await selectInsurerAndClass(user, "Private Car");
+    const privateCard = (await screen.findByText("Band 1")).closest(".rate-band-card");
+    expect(within(privateCard).queryByLabelText("Minimum Passengers")).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Motor Class"), screen.getByRole("option", { name: /PSV Chauffeur Driven/ }));
+    const psvCard = (await screen.findByText("Band 1")).closest(".rate-band-card");
+    expect(within(psvCard).getByLabelText("Minimum Passengers")).toBeInTheDocument();
+    expect(within(psvCard).getByLabelText("Maximum Passengers")).toBeInTheDocument();
+  });
+
+  it("saves passenger limits entered on a PSV band", async () => {
+    const user = userEvent.setup();
+    mockBaseCalls();
+    api.put.mockResolvedValue({ data: {} });
+    render(
+      <MemoryRouter>
+        <Rates />
+      </MemoryRouter>
+    );
+    await selectInsurerAndClass(user, "PSV Chauffeur Driven");
+    const card = (await screen.findByText("Band 1")).closest(".rate-band-card");
+
+    await user.type(within(card).getByLabelText("Minimum Passengers"), "7");
+    await user.type(within(card).getByLabelText("Maximum Passengers"), "14");
+    await user.type(screen.getByPlaceholderText(/2027 rate card update/i), "split by passenger count");
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith(
+        "/api/admin/rates/cls3",
+        expect.objectContaining({
+          bands: [expect.objectContaining({ min_passengers: 7, max_passengers: 14 })],
+        })
       )
     );
   });
