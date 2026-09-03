@@ -11,6 +11,23 @@ function validateClassForm(form) {
   if (form.max_age !== "" && (Number.isNaN(Number(form.max_age)) || Number(form.max_age) < 0)) {
     return "Max Age must be a non-negative number.";
   }
+  if (form.flatOnly) {
+    const hasPremium = form.flatPremium !== "" && form.flatPremium !== null;
+    const hasRateOnSi = form.flatRateOnSi !== "" && form.flatRateOnSi !== null;
+    if (form.flatPremium !== "" && (Number.isNaN(Number(form.flatPremium)) || Number(form.flatPremium) < 0)) {
+      return "Fixed Premium must be a non-negative number.";
+    }
+    if (form.flatRateOnSi !== "" && (Number.isNaN(Number(form.flatRateOnSi)) || Number(form.flatRateOnSi) < 0)) {
+      return "Rate on Sum Insured must be a non-negative number.";
+    }
+    if (!hasPremium && !hasRateOnSi) {
+      return "Provide either a fixed premium or a rate on sum insured for this flat-rate product.";
+    }
+    if (hasRateOnSi && (form.flatMinPremium === "" || form.flatMinPremium === null)) {
+      return "A minimum premium is required when using a rate on sum insured.";
+    }
+    return "";
+  }
   if (form.min_si !== "" && (Number.isNaN(Number(form.min_si)) || Number(form.min_si) < 0)) {
     return "Min Sum Insured must be a non-negative number.";
   }
@@ -23,6 +40,13 @@ function validateClassForm(form) {
   return "";
 }
 
+function emptyForm() {
+  return {
+    code: "", label: "", category: "private", max_age: "", min_si: 0, max_si: "",
+    flatOnly: false, flatPremium: "", flatRateOnSi: "", flatMinPremium: "", flatNote: "",
+  };
+}
+
 export default function MotorClasses() {
   const [insurers, setInsurers] = useState([]);
   const [insurerId, setInsurerId] = useState("");
@@ -31,7 +55,7 @@ export default function MotorClasses() {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ code: "", label: "", category: "private", max_age: "", min_si: 0, max_si: "" });
+  const [form, setForm] = useState(emptyForm());
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
@@ -141,11 +165,19 @@ export default function MotorClasses() {
         label: form.label,
         category: form.category,
         max_age: form.max_age === "" ? null : Number(form.max_age),
-        min_si: Number(form.min_si) || 0,
-        max_si: form.max_si === "" ? null : Number(form.max_si),
+        min_si: form.flatOnly ? 0 : Number(form.min_si) || 0,
+        max_si: form.flatOnly ? null : form.max_si === "" ? null : Number(form.max_si),
+        flat_only: form.flatOnly
+          ? {
+              premium: form.flatPremium === "" ? null : Number(form.flatPremium),
+              rate_on_si: form.flatRateOnSi === "" ? null : Number(form.flatRateOnSi),
+              min_premium: form.flatMinPremium === "" ? null : Number(form.flatMinPremium),
+              note: form.flatNote || "",
+            }
+          : null,
       });
       setShowAdd(false);
-      setForm({ code: "", label: "", category: "private", max_age: "", min_si: 0, max_si: "" });
+      setForm(emptyForm());
       setStatus("Motor class created.");
       await loadClasses();
     } catch (err) {
@@ -172,8 +204,8 @@ export default function MotorClasses() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <label className="first">Filter by Insurer</label>
-        <select value={insurerId} onChange={(e) => setInsurerId(e.target.value)}>
+        <label className="first" htmlFor="motor-classes-insurer-filter">Filter by Insurer</label>
+        <select id="motor-classes-insurer-filter" value={insurerId} onChange={(e) => setInsurerId(e.target.value)}>
           <option value="">All Insurers</option>
           {insurers.map((i) => (
             <option key={i.id} value={i.id}>
@@ -191,18 +223,18 @@ export default function MotorClasses() {
           <div className="hint" style={{ marginBottom: 10 }}>Adding a class for: {insurers.find((i) => i.id === insurerId)?.name || "(select insurer above)"}</div>
           <div className="row2">
             <div>
-              <label className="first">Code (unique per insurer)</label>
-              <input type="text" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+              <label className="first" htmlFor="new-class-code">Code (unique per insurer)</label>
+              <input id="new-class-code" type="text" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
             </div>
             <div>
-              <label className="first">Label</label>
-              <input type="text" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+              <label className="first" htmlFor="new-class-label">Label</label>
+              <input id="new-class-label" type="text" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
             </div>
           </div>
           <div className="row2">
             <div>
-              <label>Category</label>
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+              <label htmlFor="new-class-category">Category</label>
+              <select id="new-class-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -215,22 +247,85 @@ export default function MotorClasses() {
               <input type="number" value={form.max_age} onChange={(e) => setForm({ ...form, max_age: e.target.value })} />
             </div>
           </div>
-          <div className="row2">
-            <div>
-              <label>Min Sum Insured</label>
-              <input type="number" value={form.min_si} onChange={(e) => setForm({ ...form, min_si: e.target.value })} />
-            </div>
-            <div>
-              <label>Max Sum Insured (blank = open)</label>
-              <input type="number" value={form.max_si} onChange={(e) => setForm({ ...form, max_si: e.target.value })} />
-            </div>
+          <div style={{ margin: "10px 0" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 400 }}>
+              <input
+                type="checkbox"
+                checked={form.flatOnly}
+                onChange={(e) => setForm({ ...form, flatOnly: e.target.checked })}
+              />
+              Flat-rate product (e.g. Third Party Only) — a fixed premium instead of Sum-Insured bands
+            </label>
           </div>
-          <div className="hint">After creating the class, configure its rate bands under Admin → Rates.</div>
+
+          {form.flatOnly ? (
+            <>
+              <div className="row2">
+                <div>
+                  <label htmlFor="new-class-flat-premium">Fixed Premium (leave blank to use a rate instead)</label>
+                  <input
+                    id="new-class-flat-premium"
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={form.flatPremium}
+                    onChange={(e) => setForm({ ...form, flatPremium: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label>Rate on Sum Insured (e.g. 0.04 = 4%)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={form.flatRateOnSi}
+                    onChange={(e) => setForm({ ...form, flatRateOnSi: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="row2">
+                <div>
+                  <label>Minimum Premium (required if using a rate)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={form.flatMinPremium}
+                    onChange={(e) => setForm({ ...form, flatMinPremium: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label>Note</label>
+                  <input type="text" value={form.flatNote} onChange={(e) => setForm({ ...form, flatNote: e.target.value })} />
+                </div>
+              </div>
+              <div className="hint">
+                This creates the product ready to quote immediately -- no Sum-Insured bands to configure. You can
+                still adjust the premium later from Admin → Rates. This is independent of any Comprehensive class
+                for the same insurer; neither affects the other.
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="row2">
+                <div>
+                  <label>Min Sum Insured</label>
+                  <input type="number" value={form.min_si} onChange={(e) => setForm({ ...form, min_si: e.target.value })} />
+                </div>
+                <div>
+                  <label>Max Sum Insured (blank = open)</label>
+                  <input type="number" value={form.max_si} onChange={(e) => setForm({ ...form, max_si: e.target.value })} />
+                </div>
+              </div>
+              <div className="hint">After creating the class, configure its rate bands under Admin → Rates.</div>
+            </>
+          )}
+
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button type="button" className="btn btn-primary" disabled={creating} aria-busy={creating} onClick={createClass}>
               {creating ? <span className="spinner" /> : "Save Class"}
             </button>
-            <button type="button" className="btn btn-ghost" disabled={creating} onClick={() => setShowAdd(false)}>
+            <button type="button" className="btn btn-ghost" disabled={creating} onClick={() => { setShowAdd(false); setForm(emptyForm()); }}>
               Cancel
             </button>
           </div>

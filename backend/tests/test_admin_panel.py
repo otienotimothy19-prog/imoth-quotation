@@ -480,6 +480,82 @@ def test_flat_rate_update_with_change_reason_creates_rate_version(admin_headers)
 
 
 # ---------------------------------------------------------------------
+# Adding a brand-new flat-rate (e.g. Third Party Only) class for an
+# insurer that has no such product yet -- must not disturb that
+# insurer's existing Comprehensive/banded classes in any way.
+# ---------------------------------------------------------------------
+def test_create_flat_rate_class_succeeds_without_disturbing_comprehensive_class(admin_headers):
+    comprehensive = _get_a_banded_motor_class(admin_headers)
+    comprehensive_before = client.get(f"/api/admin/rates/{comprehensive['id']}", headers=admin_headers).json()
+
+    resp = client.post(
+        "/api/admin/motor-classes",
+        json={
+            "insurer_id": comprehensive["insurer_id"],
+            "code": f"tpo_test_{uuid.uuid4().hex[:8]}",
+            "label": "Third Party Only – Private (test)",
+            "category": "tpo",
+            "min_si": 0,
+            "max_si": None,
+            "flat_only": {"premium": 3200, "rate_on_si": None, "min_premium": None, "note": "Annual premium"},
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 201
+    created = resp.json()
+    assert created["flat_only"]["premium"] == 3200
+    assert created["active"] is True
+
+    # New product is independently visible and editable via the Rates screen.
+    fetched_rates = client.get(f"/api/admin/rates/{created['id']}", headers=admin_headers).json()
+    assert fetched_rates["flat_only"]["premium"] == 3200
+
+    # The pre-existing comprehensive class for the same insurer is untouched.
+    comprehensive_after = client.get(f"/api/admin/rates/{comprehensive['id']}", headers=admin_headers).json()
+    assert comprehensive_after == comprehensive_before
+
+
+def test_create_flat_rate_class_requires_premium_or_rate_on_si(admin_headers):
+    comprehensive = _get_a_banded_motor_class(admin_headers)
+    resp = client.post(
+        "/api/admin/motor-classes",
+        json={
+            "insurer_id": comprehensive["insurer_id"],
+            "code": f"tpo_test_{uuid.uuid4().hex[:8]}",
+            "label": "Third Party Only – invalid (test)",
+            "category": "tpo",
+            "flat_only": {"premium": None, "rate_on_si": None, "min_premium": None, "note": ""},
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_newly_created_flat_rate_class_can_be_disabled_independently(admin_headers):
+    comprehensive = _get_a_banded_motor_class(admin_headers)
+    create_resp = client.post(
+        "/api/admin/motor-classes",
+        json={
+            "insurer_id": comprehensive["insurer_id"],
+            "code": f"tpo_test_{uuid.uuid4().hex[:8]}",
+            "label": "Third Party Only – disable test",
+            "category": "tpo",
+            "flat_only": {"premium": 2800, "rate_on_si": None, "min_premium": None, "note": ""},
+        },
+        headers=admin_headers,
+    )
+    new_id = create_resp.json()["id"]
+
+    disable_resp = client.patch(f"/api/admin/motor-classes/{new_id}", json={"active": False}, headers=admin_headers)
+    assert disable_resp.status_code == 200
+    assert disable_resp.json()["active"] is False
+
+    # Disabling it must not touch the comprehensive class's active state.
+    comprehensive_after = client.get(f"/api/admin/motor-classes/{comprehensive['id']}", headers=admin_headers).json()
+    assert comprehensive_after["active"] is True
+
+
+# ---------------------------------------------------------------------
 # Motor class Sum-Insured range validation
 # ---------------------------------------------------------------------
 def test_motor_class_update_rejects_max_si_below_min_si(admin_headers):
