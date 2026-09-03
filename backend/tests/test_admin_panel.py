@@ -442,6 +442,172 @@ def test_rate_band_rejects_negative_passenger_limits(admin_headers):
 
 
 # ---------------------------------------------------------------------
+# Commercial (goods-carrying) rate bands limited by tonnage
+# ---------------------------------------------------------------------
+def _get_a_commercial_banded_motor_class(admin_headers):
+    insurers = client.get("/api/admin/insurers", headers=admin_headers).json()
+    for insurer in insurers:
+        classes = client.get("/api/admin/motor-classes", params={"insurer_id": insurer["id"]}, headers=admin_headers).json()
+        for c in classes:
+            if c["category"] == "commercial" and not c.get("flat_only") and c.get("bands"):
+                return c
+    pytest.fail("No banded commercial motor class found in seed data")
+
+
+def test_rate_band_tonnage_limits_round_trip(admin_headers):
+    cls = _get_a_commercial_banded_motor_class(admin_headers)
+    resp = client.put(
+        f"/api/admin/rates/{cls['id']}",
+        json={
+            "bands": [_valid_band(min_tonnage=3, max_tonnage=8)],
+            "bands_alt": None,
+            "change_reason": "test: add tonnage limit",
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200
+
+    fetched = client.get(f"/api/admin/rates/{cls['id']}", headers=admin_headers).json()
+    assert fetched["bands"][0]["min_tonnage"] == 3
+    assert fetched["bands"][0]["max_tonnage"] == 8
+
+
+def test_rate_bands_same_si_range_but_different_tonnage_ranges_do_not_conflict(admin_headers):
+    cls = _get_a_commercial_banded_motor_class(admin_headers)
+    resp = client.put(
+        f"/api/admin/rates/{cls['id']}",
+        json={
+            "bands": [
+                _valid_band(min_si=500000, max_si=None, min_tonnage=0, max_tonnage=3),
+                _valid_band(min_si=500000, max_si=None, min_tonnage=3.01, max_tonnage=8),
+            ],
+            "bands_alt": None,
+            "change_reason": "test: split by tonnage",
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200
+    fetched = client.get(f"/api/admin/rates/{cls['id']}", headers=admin_headers).json()
+    tonnage_ranges = {(b["min_tonnage"], b["max_tonnage"]) for b in fetched["bands"]}
+    assert tonnage_ranges == {(0, 3), (3.01, 8)}
+
+
+def test_rate_bands_reject_overlap_with_same_tonnage_range(admin_headers):
+    cls = _get_a_commercial_banded_motor_class(admin_headers)
+    resp = client.put(
+        f"/api/admin/rates/{cls['id']}",
+        json={
+            "bands": [
+                _valid_band(min_si=500000, max_si=None, min_tonnage=0, max_tonnage=5),
+                _valid_band(min_si=500000, max_si=None, min_tonnage=3, max_tonnage=8),
+            ],
+            "bands_alt": None,
+            "change_reason": "test",
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_rate_band_rejects_max_tonnage_below_min_tonnage(admin_headers):
+    cls = _get_a_commercial_banded_motor_class(admin_headers)
+    resp = client.put(
+        f"/api/admin/rates/{cls['id']}",
+        json={"bands": [_valid_band(min_tonnage=8, max_tonnage=3)], "bands_alt": None, "change_reason": "test"},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_rate_band_rejects_negative_tonnage_limits(admin_headers):
+    cls = _get_a_commercial_banded_motor_class(admin_headers)
+    resp = client.put(
+        f"/api/admin/rates/{cls['id']}",
+        json={"bands": [_valid_band(min_tonnage=-1)], "bands_alt": None, "change_reason": "test"},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------
+# Passenger Legal Liability (PLL) rate editing for institutional/PSV
+# classes -- previously only settable via seed data, now admin-editable
+# through the same motor-class PATCH endpoint used for flat-rate premiums.
+# ---------------------------------------------------------------------
+def _get_an_institutional_motor_class(admin_headers):
+    insurers = client.get("/api/admin/insurers", headers=admin_headers).json()
+    for insurer in insurers:
+        classes = client.get("/api/admin/motor-classes", params={"insurer_id": insurer["id"]}, headers=admin_headers).json()
+        for c in classes:
+            if c["category"] == "institutional":
+                return c
+    pytest.fail("No institutional motor class found in seed data")
+
+
+def test_update_pll_options_round_trip_and_versions(admin_headers):
+    cls = _get_an_institutional_motor_class(admin_headers)
+    before_versions = client.get(f"/api/admin/rates/{cls['id']}/versions", headers=admin_headers).json()
+
+    resp = client.patch(
+        f"/api/admin/motor-classes/{cls['id']}",
+        json={
+            "pll_options": [
+                {"key": "student", "label": "School students", "rate": 250},
+                {"key": "corporate", "label": "Corporate / general hire", "rate": 500},
+            ],
+            "change_reason": "test: set school vs corporate PLL rates",
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["pll_options"] == [
+        {"key": "student", "label": "School students", "rate": 250},
+        {"key": "corporate", "label": "Corporate / general hire", "rate": 500},
+    ]
+
+    after_versions = client.get(f"/api/admin/rates/{cls['id']}/versions", headers=admin_headers).json()
+    assert len(after_versions) == len(before_versions) + 1
+    assert after_versions[0]["change_reason"] == "test: set school vs corporate PLL rates"
+
+
+def test_update_pll_per_seat_round_trip(admin_headers):
+    cls = _get_an_institutional_motor_class(admin_headers)
+    resp = client.patch(f"/api/admin/motor-classes/{cls['id']}", json={"pll_per_seat": 300}, headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.json()["pll_per_seat"] == 300
+
+
+def test_pll_options_reject_duplicate_keys(admin_headers):
+    cls = _get_an_institutional_motor_class(admin_headers)
+    resp = client.patch(
+        f"/api/admin/motor-classes/{cls['id']}",
+        json={"pll_options": [{"key": "student", "label": "A", "rate": 250}, {"key": "student", "label": "B", "rate": 500}]},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_pll_options_reject_negative_rate(admin_headers):
+    cls = _get_an_institutional_motor_class(admin_headers)
+    resp = client.patch(
+        f"/api/admin/motor-classes/{cls['id']}",
+        json={"pll_options": [{"key": "student", "label": "School students", "rate": -1}]},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_pll_options_reject_blank_label(admin_headers):
+    cls = _get_an_institutional_motor_class(admin_headers)
+    resp = client.patch(
+        f"/api/admin/motor-classes/{cls['id']}",
+        json={"pll_options": [{"key": "student", "label": "", "rate": 250}]},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------
 # Flat-rate editing via the motor-classes endpoint, versioned
 # ---------------------------------------------------------------------
 def test_flat_rate_requires_premium_or_rate_on_si(admin_headers):

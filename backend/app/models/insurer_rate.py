@@ -82,6 +82,12 @@ class RateBand(UUIDPKMixin, TimestampMixin, Base):
     min_passengers: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_passengers: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Optional tonnage limits (commercial/goods-carrying classes only), same
+    # null-means-any-tonnage convention as the passenger limits above.
+    # Tonnage is fractional (e.g. 3.5T), unlike passenger counts.
+    min_tonnage: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    max_tonnage: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+
     ep_included: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     ep_not_offered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ep_rate: Mapped[float] = mapped_column(Numeric(8, 5), default=0, nullable=False)

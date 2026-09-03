@@ -49,32 +49,41 @@ def _si_matches(b: dict, si: float) -> bool:
     return si >= b["min_si"] and (b["max_si"] is None or si <= b["max_si"])
 
 
-def _passengers_match(b: dict, passengers: int | None) -> bool:
-    """True if this band's optional passenger-capacity range (PSV classes
-    only) admits the given passenger count. A band with no passenger range
-    configured (the default, and the only case for non-PSV classes) always
-    matches -- passenger count is simply not a dimension for it."""
-    lo, hi = b.get("min_passengers"), b.get("max_passengers")
+def _optional_range_matches(b: dict, value: float | None, *, lo_key: str, hi_key: str) -> bool:
+    """True if this band's optional numeric range (e.g. passenger-capacity
+    for PSV classes, tonnage for commercial/goods-carrying classes) admits
+    the given value. A band with no range configured on this dimension --
+    the default, and the only case for classes that don't use it -- always
+    matches, since the dimension simply doesn't apply to it."""
+    lo, hi = b.get(lo_key), b.get(hi_key)
     if lo is None and hi is None:
         return True
-    if passengers is None:
+    if value is None:
         return False
-    if lo is not None and passengers < lo:
+    if lo is not None and value < lo:
         return False
-    if hi is not None and passengers > hi:
+    if hi is not None and value > hi:
         return False
     return True
 
 
-def find_band(bands: list[dict], si: float, passengers: int | None = None) -> dict:
+def _passengers_match(b: dict, passengers: int | None) -> bool:
+    return _optional_range_matches(b, passengers, lo_key="min_passengers", hi_key="max_passengers")
+
+
+def _tonnage_matches(b: dict, tonnage: float | None) -> bool:
+    return _optional_range_matches(b, tonnage, lo_key="min_tonnage", hi_key="max_tonnage")
+
+
+def find_band(bands: list[dict], si: float, passengers: int | None = None, tonnage: float | None = None) -> dict:
     for b in bands:
-        if _si_matches(b, si) and _passengers_match(b, passengers):
+        if _si_matches(b, si) and _passengers_match(b, passengers) and _tonnage_matches(b, tonnage):
             return b
-    # No band matches both dimensions (e.g. passenger count outside every
-    # configured band's range). Fall back to matching by Sum Insured alone
-    # so a class that hasn't opted into passenger-based bands -- or a
-    # passenger count outside what's configured -- still prices instead of
-    # erroring out, mirroring the pre-existing SI-only fallback below.
+    # No band matches every dimension (e.g. passenger count or tonnage
+    # outside every configured band's range). Fall back to matching by Sum
+    # Insured alone so a class that hasn't opted into passenger/tonnage
+    # bands -- or a value outside what's configured -- still prices instead
+    # of erroring out, mirroring the pre-existing SI-only fallback below.
     for b in bands:
         if _si_matches(b, si):
             return b
@@ -145,7 +154,7 @@ def compute_premium(
             if (motor_class.get("has_lr_toggle") and options.get("lr_band") == "bad")
             else motor_class["bands"]
         )
-        raw_band = find_band(use_bands, sum_insured, options.get("pll_seats") or None)
+        raw_band = find_band(use_bands, sum_insured, options.get("pll_seats") or None, options.get("tonnage"))
         b = effective_band(motor_class, raw_band, options.get("age"))
         base = max(sum_insured * b["rate"], b["min_premium"])
         lines.append(PremiumLine(f"Basic Premium @ {b['rate'] * 100:.2f}% of SI (Min {b['min_premium']:,.0f})", base))

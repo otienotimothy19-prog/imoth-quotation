@@ -47,6 +47,7 @@ export default function QuoteWizard() {
   const [category, setCategory] = useState("private");
   const [sumInsured, setSumInsured] = useState("");
   const [numPassengers, setNumPassengers] = useState("");
+  const [tonnage, setTonnage] = useState("");
   const [options, setOptions] = useState([]);
   const [ineligibleOptions, setIneligibleOptions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -93,6 +94,9 @@ export default function QuoteWizard() {
     if (coverType === "comprehensive" && category === "psv" && (!numPassengers || Number(numPassengers) <= 0)) {
       return "Please enter the number of passengers.";
     }
+    if (coverType === "comprehensive" && category === "commercial" && tonnage && Number(tonnage) < 0) {
+      return "Tonnage cannot be negative.";
+    }
     return "";
   }
 
@@ -117,9 +121,17 @@ export default function QuoteWizard() {
   // 500/passenger where the selected insurer's class offers it). Sent as
   // options.pll_seats -- the backend looks up each motor class's own
   // documented per-seat rate, so this never hard-codes the 500 figure.
+  //
+  // Tonnage: commercial (goods-carrying) classes may split their rate
+  // bands by carrying capacity as well as Sum Insured (e.g. up to 3T vs
+  // 3.01-8T) -- optional, since not every insurer's commercial product
+  // uses this. Left blank, pricing falls back to the Sum-Insured-only band.
   function cleanOptions() {
     if (coverType === "comprehensive" && category === "psv" && numPassengers) {
       return { pll_seats: Number(numPassengers) };
+    }
+    if (coverType === "comprehensive" && category === "commercial" && tonnage) {
+      return { tonnage: Number(tonnage) };
     }
     return {};
   }
@@ -354,8 +366,8 @@ export default function QuoteWizard() {
         {coverType === "comprehensive" && (
           <div className="row2">
             <div className="field-group">
-              <label>Vehicle Class</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+              <label htmlFor="wizard-category-select">Vehicle Class</label>
+              <select id="wizard-category-select" value={category} onChange={(e) => setCategory(e.target.value)}>
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}
@@ -380,8 +392,9 @@ export default function QuoteWizard() {
 
         {coverType === "comprehensive" && category === "psv" && (
           <div className="field-group">
-            <label>Number of Passengers</label>
+            <label htmlFor="wizard-passengers-input">Number of Passengers</label>
             <input
+              id="wizard-passengers-input"
               type="number"
               min="1"
               step="1"
@@ -390,6 +403,25 @@ export default function QuoteWizard() {
               placeholder="e.g. 14"
             />
             <div className="hint">Passenger Legal Liability is charged per passenger (Kshs 500/passenger where applicable) and is added to the premium.</div>
+          </div>
+        )}
+
+        {coverType === "comprehensive" && category === "commercial" && (
+          <div className="field-group">
+            <div className="field-label-row">
+              <label htmlFor="wizard-tonnage-input">Vehicle Tonnage</label>
+              <span className="optional-badge">Optional</span>
+            </div>
+            <input
+              id="wizard-tonnage-input"
+              type="number"
+              min="0"
+              step="any"
+              value={tonnage}
+              onChange={(e) => setTonnage(e.target.value)}
+              placeholder="e.g. 5"
+            />
+            <div className="hint">Some insurers price goods-carrying vehicles by carrying capacity as well as Sum Insured. Leave blank if unsure.</div>
           </div>
         )}
 

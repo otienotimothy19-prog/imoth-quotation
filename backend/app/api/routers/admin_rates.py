@@ -71,6 +71,8 @@ def update_rates(motor_class_id: uuid.UUID, payload: RateBandsUpdate, request: R
                     min_premium=b.min_premium,
                     min_passengers=b.min_passengers,
                     max_passengers=b.max_passengers,
+                    min_tonnage=b.min_tonnage,
+                    max_tonnage=b.max_tonnage,
                     ep_included=b.ep_included,
                     ep_not_offered=b.ep_not_offered,
                     ep_rate=b.ep_rate,

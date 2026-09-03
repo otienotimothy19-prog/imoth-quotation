@@ -14,12 +14,24 @@ const INSURER = { id: "ins1", name: "Test Insurer" };
 const BANDED_CLASS = { id: "cls1", label: "Private Car", category: "private", active: true, flat_only: null };
 const FLAT_CLASS = { id: "cls2", label: "TPO Flat", category: "tpo", active: true, flat_only: { premium: 3100, rate_on_si: null, min_premium: null, note: "Annual TPO" } };
 const PSV_CLASS = { id: "cls3", label: "PSV Chauffeur Driven", category: "psv", active: true, flat_only: null };
+const COMMERCIAL_CLASS = { id: "cls4", label: "Commercial General Cartage", category: "commercial", active: true, flat_only: null };
+const INSTITUTIONAL_CLASS = {
+  id: "cls5",
+  label: "Commercial Institutional",
+  category: "institutional",
+  active: true,
+  flat_only: null,
+  pll_options: [
+    { key: "student", label: "School students", rate: 250 },
+    { key: "corporate", label: "Corporate / general hire", rate: 500 },
+  ],
+};
 
 function mockBaseCalls() {
   api.get.mockImplementation((url, config) => {
     if (url === "/api/admin/insurers") return Promise.resolve({ data: [INSURER] });
     if (url === "/api/admin/motor-classes" && config?.params?.insurer_id === "ins1") {
-      return Promise.resolve({ data: [BANDED_CLASS, FLAT_CLASS, PSV_CLASS] });
+      return Promise.resolve({ data: [BANDED_CLASS, FLAT_CLASS, PSV_CLASS, COMMERCIAL_CLASS, INSTITUTIONAL_CLASS] });
     }
     if (url === "/api/admin/rates/cls1") {
       return Promise.resolve({
@@ -61,6 +73,44 @@ function mockBaseCalls() {
       });
     }
     if (url === "/api/admin/rates/cls3/versions") return Promise.resolve({ data: [] });
+    if (url === "/api/admin/rates/cls4") {
+      return Promise.resolve({
+        data: {
+          motor_class_id: "cls4",
+          flat_only: null,
+          has_lr_toggle: false,
+          bands: [
+            {
+              min_si: 500000, max_si: null, rate: 0.045, min_premium: 30000,
+              min_passengers: null, max_passengers: null, min_tonnage: null, max_tonnage: null,
+              ep_included: false, ep_not_offered: false, ep_rate: 0.005, ep_min: 10000, ep_mandatory: false,
+              pvt_included: false, pvt_not_offered: false, pvt_rate: 0.005, pvt_min: 10000, pvt_mandatory: false,
+            },
+          ],
+          bands_alt: null,
+        },
+      });
+    }
+    if (url === "/api/admin/rates/cls4/versions") return Promise.resolve({ data: [] });
+    if (url === "/api/admin/rates/cls5") {
+      return Promise.resolve({
+        data: {
+          motor_class_id: "cls5",
+          flat_only: null,
+          has_lr_toggle: false,
+          bands: [
+            {
+              min_si: 500000, max_si: null, rate: 0.0325, min_premium: 30000,
+              min_passengers: null, max_passengers: null,
+              ep_included: false, ep_not_offered: false, ep_rate: 0.005, ep_min: 5000, ep_mandatory: false,
+              pvt_included: false, pvt_not_offered: false, pvt_rate: 0.0025, pvt_min: 3500, pvt_mandatory: false,
+            },
+          ],
+          bands_alt: null,
+        },
+      });
+    }
+    if (url === "/api/admin/rates/cls5/versions") return Promise.resolve({ data: [] });
     return Promise.reject(new Error(`unexpected GET ${url}`));
   });
 }
@@ -207,11 +257,12 @@ describe("Rates admin page", () => {
     );
     await selectInsurerAndClass(user, "PSV Chauffeur Driven");
     const card = (await screen.findByText("Band 1")).closest(".rate-band-card");
+    const bandsCard = screen.getByText("Standard Bands").closest(".card");
 
     await user.type(within(card).getByLabelText("Minimum Passengers"), "7");
     await user.type(within(card).getByLabelText("Maximum Passengers"), "14");
-    await user.type(screen.getByPlaceholderText(/2027 rate card update/i), "split by passenger count");
-    await user.click(screen.getByRole("button", { name: /save changes/i }));
+    await user.type(within(bandsCard).getByPlaceholderText(/2027 rate card update/i), "split by passenger count");
+    await user.click(within(bandsCard).getByRole("button", { name: /save changes/i }));
 
     await waitFor(() =>
       expect(api.put).toHaveBeenCalledWith(
@@ -325,5 +376,117 @@ describe("Rates admin page", () => {
       )
     );
     expect(await screen.findByText("Standard Bands")).toBeInTheDocument();
+  });
+
+  it("shows tonnage-limit fields for commercial bands but not for private bands", async () => {
+    const user = userEvent.setup();
+    mockBaseCalls();
+    render(
+      <MemoryRouter>
+        <Rates />
+      </MemoryRouter>
+    );
+
+    await selectInsurerAndClass(user, "Private Car");
+    const privateCard = (await screen.findByText("Band 1")).closest(".rate-band-card");
+    expect(within(privateCard).queryByLabelText("Minimum Tonnage")).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Motor Class"), screen.getByRole("option", { name: /Commercial General Cartage/ }));
+    const commercialCard = (await screen.findByText("Band 1")).closest(".rate-band-card");
+    expect(within(commercialCard).getByLabelText("Minimum Tonnage")).toBeInTheDocument();
+    expect(within(commercialCard).getByLabelText("Maximum Tonnage")).toBeInTheDocument();
+  });
+
+  it("saves tonnage limits entered on a commercial band", async () => {
+    const user = userEvent.setup();
+    mockBaseCalls();
+    api.put.mockResolvedValue({ data: {} });
+    render(
+      <MemoryRouter>
+        <Rates />
+      </MemoryRouter>
+    );
+    await selectInsurerAndClass(user, "Commercial General Cartage");
+    const card = (await screen.findByText("Band 1")).closest(".rate-band-card");
+    const bandsCard = screen.getByText("Standard Bands").closest(".card");
+
+    await user.type(within(card).getByLabelText("Minimum Tonnage"), "3");
+    await user.type(within(card).getByLabelText("Maximum Tonnage"), "8");
+    await user.type(within(bandsCard).getByPlaceholderText(/2027 rate card update/i), "split by tonnage");
+    await user.click(within(bandsCard).getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith(
+        "/api/admin/rates/cls4",
+        expect.objectContaining({
+          bands: [expect.objectContaining({ min_tonnage: 3, max_tonnage: 8 })],
+        })
+      )
+    );
+  });
+
+  it("shows the Passenger Legal Liability editor pre-filled with existing tiered options for an institutional class", async () => {
+    const user = userEvent.setup();
+    mockBaseCalls();
+    render(
+      <MemoryRouter>
+        <Rates />
+      </MemoryRouter>
+    );
+    await selectInsurerAndClass(user, "Commercial Institutional");
+
+    await screen.findByText("Passenger Legal Liability (PLL)");
+    expect(screen.getByDisplayValue("student")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("School students")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("250")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("corporate")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("500")).toBeInTheDocument();
+  });
+
+  it("does not show the Passenger Legal Liability editor for a private (non-passenger) class", async () => {
+    const user = userEvent.setup();
+    mockBaseCalls();
+    render(
+      <MemoryRouter>
+        <Rates />
+      </MemoryRouter>
+    );
+    await selectInsurerAndClass(user, "Private Car");
+    await screen.findByText("Standard Bands");
+    expect(screen.queryByText("Passenger Legal Liability (PLL)")).not.toBeInTheDocument();
+  });
+
+  it("saves a new tiered Passenger Legal Liability rate (school vs corporate)", async () => {
+    const user = userEvent.setup();
+    mockBaseCalls();
+    api.patch.mockResolvedValue({ data: {} });
+    render(
+      <MemoryRouter>
+        <Rates />
+      </MemoryRouter>
+    );
+    await selectInsurerAndClass(user, "PSV Chauffeur Driven");
+    await screen.findByText("Passenger Legal Liability (PLL)");
+
+    await user.click(screen.getByRole("radio", { name: /tiered options/i }));
+    await user.click(screen.getByRole("button", { name: "+ Add Option" }));
+    await user.type(screen.getByLabelText("Key"), "student");
+    await user.type(screen.getByLabelText("Label"), "School students");
+    await user.type(screen.getByLabelText("Rate per seat (KES)"), "250");
+
+    const pllCard = screen.getByText("Passenger Legal Liability (PLL)").closest(".card");
+    await user.type(within(pllCard).getByPlaceholderText(/updated pll rates/i), "add school rate");
+    await user.click(within(pllCard).getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        "/api/admin/motor-classes/cls3",
+        expect.objectContaining({
+          pll_per_seat: null,
+          pll_options: [{ key: "student", label: "School students", rate: 250 }],
+          change_reason: "add school rate",
+        })
+      )
+    );
   });
 });

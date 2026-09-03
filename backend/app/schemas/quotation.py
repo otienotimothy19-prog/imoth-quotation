@@ -42,6 +42,9 @@ class QuoteOptionsIn(BaseModel):
     lr_band: str | None = None  # 'good' | 'bad'
     pll_seats: int = 0
     pll_option_key: str | None = None
+    # Vehicle carrying capacity in tonnes, for commercial/goods-carrying
+    # classes whose rate bands are split by tonnage as well as Sum Insured.
+    tonnage: float | None = Field(default=None, ge=0)
 
 
 class CompareRequest(BaseModel):
