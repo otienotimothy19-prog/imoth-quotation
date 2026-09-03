@@ -1,15 +1,27 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../../api/client";
 import MotorClasses from "../MotorClasses";
 
 vi.mock("../../../api/client", async () => {
   const actual = await vi.importActual("../../../api/client");
-  return { ...actual, api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() } };
+  return { ...actual, api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } };
 });
 
 const INSURER = { id: "ins1", name: "Test Insurer" };
+const CLASS = {
+  id: "cls1",
+  label: "Commercial General Cartage",
+  category: "commercial",
+  max_age: 20,
+  min_si: 500000,
+  max_si: null,
+  active: true,
+  flat_only: null,
+  insurer_name: "Test Insurer",
+};
 
 function mockBaseCalls(classes = []) {
   api.get.mockImplementation((url) => {
@@ -30,6 +42,7 @@ describe("MotorClasses admin page", () => {
     api.get.mockReset();
     api.post.mockReset();
     api.patch.mockReset();
+    api.delete.mockReset();
   });
 
   it("toggling the flat-rate checkbox swaps Sum-Insured fields for fixed-premium/rate fields", async () => {
@@ -89,5 +102,60 @@ describe("MotorClasses admin page", () => {
         })
       )
     );
+  });
+
+  it("asks for confirmation, then deletes the class and reloads the list", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockBaseCalls([CLASS]);
+    api.delete.mockResolvedValue({ data: { deleted: true, id: "cls1" } });
+    render(
+      <MemoryRouter>
+        <MotorClasses />
+      </MemoryRouter>
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/api/admin/motor-classes/cls1"));
+    expect(await screen.findByText(/deleted/i)).toBeInTheDocument();
+    confirmSpy.mockRestore();
+  });
+
+  it("does not delete when the confirmation is declined", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    mockBaseCalls([CLASS]);
+    render(
+      <MemoryRouter>
+        <MotorClasses />
+      </MemoryRouter>
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(api.delete).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it("shows the backend's reason when deletion is blocked because quotations reference the class", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockBaseCalls([CLASS]);
+    api.delete.mockRejectedValue({
+      response: { status: 409, data: { detail: "Cannot delete: 3 quotation(s) already reference this class. Disable it instead." } },
+    });
+    render(
+      <MemoryRouter>
+        <MotorClasses />
+      </MemoryRouter>
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    expect(await screen.findByText(/already reference this class/i)).toBeInTheDocument();
+    confirmSpy.mockRestore();
   });
 });

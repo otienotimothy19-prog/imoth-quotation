@@ -7,6 +7,7 @@ from app.api.deps import get_client_ip, require_admin
 from app.database import get_db
 from app.models.enums import ActorType
 from app.models.insurer_rate import Insurer, MotorClass, RateVersion
+from app.models.quotation import Quotation
 from app.models.user import User
 from app.schemas.admin import MotorClassCreate, MotorClassUpdate
 from app.services import audit_service
@@ -89,6 +90,39 @@ def create_motor_class(payload: MotorClassCreate, request: Request, db: Session 
     db.commit()
     db.refresh(mc)
     return _class_out(mc)
+
+
+@router.delete("/{motor_class_id}")
+def delete_motor_class(motor_class_id: uuid.UUID, request: Request, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    """Permanently removes a motor class. Only allowed when no quotation has
+    ever been generated against it -- once a Quotation references a class,
+    it must be kept (as a record, even if wrong) and Disabled instead, so
+    that quotation/risk-note history never loses its pricing context. Rate
+    bands and rate-version history for the class cascade-delete with it at
+    the database level."""
+    mc = db.query(MotorClass).options(joinedload(MotorClass.insurer)).filter(MotorClass.id == motor_class_id).one_or_none()
+    if mc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Motor class not found")
+
+    quotation_count = db.query(Quotation).filter(Quotation.motor_class_id == mc.id).count()
+    if quotation_count:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cannot delete: {quotation_count} quotation(s) already reference this class. "
+                "Disable it instead to hide it from new quotations without losing that history."
+            ),
+        )
+
+    audit_service.record(
+        db, actor_type=ActorType.ADMIN, actor_label=user.email, actor_id=user.id,
+        action="motor_class_deleted", entity_type="motor_class", entity_id=str(mc.id),
+        previous_value={"insurer": mc.insurer.code, "code": mc.code, "label": mc.label},
+        ip_address=get_client_ip(request),
+    )
+    db.delete(mc)
+    db.commit()
+    return {"deleted": True, "id": str(motor_class_id)}
 
 
 @router.patch("/{motor_class_id}")

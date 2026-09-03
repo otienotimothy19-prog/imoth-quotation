@@ -105,6 +105,24 @@ export default function MotorClasses() {
     }
   }
 
+  async function deleteClass(cls) {
+    if (!window.confirm(`Permanently delete "${cls.label}"? This cannot be undone. This only succeeds if no quotation has ever used this class -- use Disable instead to keep its history but hide it from new quotations.`)) {
+      return;
+    }
+    setError("");
+    setStatus("");
+    setBusyId(cls.id);
+    try {
+      await api.delete(`/api/admin/motor-classes/${cls.id}`);
+      setStatus(`${cls.label} deleted.`);
+      await loadClasses();
+    } catch (err) {
+      setError(errorMessage(err, "Could not delete this class."));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function startEdit(cls) {
     setEditingId(cls.id);
     setEditForm({
@@ -433,6 +451,16 @@ export default function MotorClasses() {
                         onClick={() => toggleActive(c)}
                       >
                         {busyId === c.id ? <span className="spinner spinner-dark" /> : c.active ? "Disable" : "Activate"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        disabled={busyId === c.id}
+                        aria-busy={busyId === c.id}
+                        onClick={() => deleteClass(c)}
+                        title="Permanently delete -- only allowed if no quotation has ever used this class"
+                      >
+                        {busyId === c.id ? <span className="spinner" /> : "Delete"}
                       </button>
                     </td>
                   </tr>
