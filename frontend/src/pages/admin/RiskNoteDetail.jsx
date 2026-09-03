@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, dateTimeFmt, errorMessage, money } from "../../api/client";
+import { api, dateTimeFmt, downloadBlob, errorMessage, money } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 
 export default function RiskNoteDetail() {
@@ -8,15 +8,18 @@ export default function RiskNoteDetail() {
   const { user } = useAuth();
   const [rn, setRn] = useState(null);
   const [audit, setAudit] = useState([]);
+  const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
   const [voidBox, setVoidBox] = useState(false);
   const [voidStatus, setVoidStatus] = useState("VOID");
   const [voidReason, setVoidReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [emailTo, setEmailTo] = useState("");
   const [emailStatus, setEmailStatus] = useState("");
 
   async function load() {
+    setLoadError("");
     try {
       const [d, a] = await Promise.all([
         api.get(`/api/admin/risk-notes/${id}`),
@@ -25,7 +28,7 @@ export default function RiskNoteDetail() {
       setRn(d.data);
       setAudit(a.data);
     } catch (err) {
-      setError(errorMessage(err));
+      setLoadError(errorMessage(err));
     }
   }
 
@@ -34,7 +37,32 @@ export default function RiskNoteDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  async function downloadPdf() {
+    setError("");
+    setPdfBusy(true);
+    try {
+      const res = await api.get(`/api/admin/risk-notes/${id}/pdf`, { responseType: "blob" });
+      downloadBlob(res.data, `${rn.risk_note_number}.pdf`);
+    } catch (err) {
+      setError(errorMessage(err, "Could not download the PDF."));
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   async function handleVoid() {
+    if (rn.status !== "ACTIVE") {
+      setError("This risk note is already inactive and cannot be voided again.");
+      return;
+    }
+    if (!voidReason.trim()) {
+      setError("A reason is required.");
+      return;
+    }
+    if (!window.confirm(`Mark ${rn.risk_note_number} as ${voidStatus}? This cannot be undone.`)) {
+      return;
+    }
+    setError("");
     setBusy(true);
     try {
       await api.post(`/api/admin/risk-notes/${id}/void`, { new_status: voidStatus, reason: voidReason });
@@ -42,7 +70,7 @@ export default function RiskNoteDetail() {
       setVoidReason("");
       await load();
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, "Could not void this risk note."));
     } finally {
       setBusy(false);
     }
@@ -51,6 +79,7 @@ export default function RiskNoteDetail() {
   async function sendEmail(both) {
     setBusy(true);
     setEmailStatus("");
+    setError("");
     try {
       const res = await api.post(`/api/admin/risk-notes/${id}/email`, {
         to_email: emailTo || null,
@@ -59,13 +88,14 @@ export default function RiskNoteDetail() {
       });
       setEmailStatus(res.data.status === "SENT" ? "Sent!" : `Failed: ${res.data.error}`);
     } catch (err) {
-      setEmailStatus(errorMessage(err));
+      setEmailStatus("");
+      setError(errorMessage(err, "Could not send the email."));
     } finally {
       setBusy(false);
     }
   }
 
-  if (error) return <div className="alert alert-error">{error}</div>;
+  if (loadError) return <div className="alert alert-error">{loadError}</div>;
   if (!rn) return <div className="card">Loading…</div>;
 
   const canVoid = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
@@ -75,20 +105,29 @@ export default function RiskNoteDetail() {
       <Link to="/admin/risk-notes" className="hint">
         ← Back to Risk Notes
       </Link>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "10px 0 18px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "10px 0 18px", flexWrap: "wrap", gap: 8 }}>
         <h1 style={{ fontSize: 20, color: "var(--imoth-blue)" }}>{rn.risk_note_number}</h1>
         <span className={`badge ${rn.status === "ACTIVE" ? "badge-green" : "badge-gray"}`}>{rn.status}</span>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <a className="btn btn-secondary btn-sm" href={`/api/admin/risk-notes/${id}/pdf`} target="_blank" rel="noreferrer">
-          ⬇ Download PDF
-        </a>
+      {error && <div className="alert alert-error">{error}</div>}
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={downloadPdf} disabled={pdfBusy} aria-busy={pdfBusy}>
+          {pdfBusy ? <span className="spinner spinner-dark" /> : "⬇ Download PDF"}
+        </button>
         <Link className="btn btn-secondary btn-sm" to={`/admin/quotations/${rn.quotation_id}`}>
           View Quotation ({rn.quotation_number})
         </Link>
         {canVoid && rn.status === "ACTIVE" && (
-          <button className="btn btn-danger btn-sm" onClick={() => setVoidBox((v) => !v)}>
+          <button
+            type="button"
+            className="btn btn-danger btn-sm"
+            onClick={() => {
+              setVoidBox((v) => !v);
+              setError("");
+            }}
+          >
             Void / Cancel
           </button>
         )}
@@ -103,9 +142,14 @@ export default function RiskNoteDetail() {
           </select>
           <label>Reason (required)</label>
           <input type="text" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Explain why this risk note is being voided" />
-          <button className="btn btn-danger" disabled={busy || !voidReason.trim()} onClick={handleVoid} style={{ marginTop: 12 }}>
-            Confirm
-          </button>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button type="button" className="btn btn-danger" disabled={busy || !voidReason.trim()} aria-busy={busy} onClick={handleVoid}>
+              {busy ? <span className="spinner" /> : "Confirm"}
+            </button>
+            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setVoidBox(false)}>
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
@@ -130,11 +174,11 @@ export default function RiskNoteDetail() {
             <div style={{ display: "flex", gap: 8 }}>
               <input type="email" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="client@email.com" />
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => sendEmail(false)}>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={busy} aria-busy={busy} onClick={() => sendEmail(false)}>
                 Email Risk Note
               </button>
-              <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => sendEmail(true)}>
+              <button type="button" className="btn btn-primary btn-sm" disabled={busy} aria-busy={busy} onClick={() => sendEmail(true)}>
                 Email Both Documents
               </button>
             </div>
@@ -173,6 +217,9 @@ export default function RiskNoteDetail() {
                   <td>{dateTimeFmt(a.timestamp)}</td>
                 </tr>
               ))}
+              {audit.length === 0 && (
+                <tr><td colSpan={3} style={{ textAlign: "center", color: "var(--muted)" }}>No audit entries.</td></tr>
+              )}
             </tbody>
           </table>
         </div>

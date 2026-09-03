@@ -491,6 +491,8 @@ def void_risk_note(
         raise QuoteServiceError("A reason is required to void or cancel a risk note")
     if new_status not in (RiskNoteStatus.VOID, RiskNoteStatus.CANCELLED):
         raise QuoteServiceError("new_status must be VOID or CANCELLED")
+    if risk_note.status != RiskNoteStatus.ACTIVE:
+        raise QuoteServiceError(f"Cannot void a risk note that is already {risk_note.status.value}")
 
     previous_status = risk_note.status
     now = datetime.now(timezone.utc)

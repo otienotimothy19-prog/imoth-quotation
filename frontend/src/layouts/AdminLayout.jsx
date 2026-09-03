@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -12,26 +13,32 @@ const NAV_ITEMS = [
   { to: "/admin/users", label: "Users" },
 ];
 
+function LogoutButton({ style }) {
+  const { logout, loggingOut } = useAuth();
+  return (
+    <button
+      className="btn btn-ghost btn-sm"
+      style={{ width: "100%", color: "#fff", borderColor: "rgba(255,255,255,0.4)", ...style }}
+      onClick={logout}
+      disabled={loggingOut}
+      aria-busy={loggingOut}
+    >
+      {loggingOut ? <span className="spinner" /> : "Log out"}
+    </button>
+  );
+}
+
 export default function AdminLayout() {
-  const { user, ready, logout } = useAuth();
+  const { user, ready } = useAuth();
+  const [navOpen, setNavOpen] = useState(false);
 
   if (!ready) return null;
   if (!user) return <Navigate to="/admin/login" replace />;
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside
-        style={{
-          width: 230,
-          flex: "none",
-          background: "var(--imoth-blue)",
-          color: "#fff",
-          padding: "20px 14px",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 26, padding: "0 6px" }}>
+    <div className="admin-shell">
+      <aside className="admin-sidebar">
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 6px" }}>
           <div
             style={{
               width: 36,
@@ -43,6 +50,7 @@ export default function AdminLayout() {
               justifyContent: "center",
               fontWeight: 800,
               fontSize: 14,
+              flex: "none",
             }}
           >
             IM
@@ -51,13 +59,27 @@ export default function AdminLayout() {
             <div style={{ fontWeight: 700, fontSize: 14 }}>Imoth Admin</div>
             <div style={{ fontSize: 10.5, opacity: 0.75 }}>Motor Quotation System</div>
           </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm admin-sidebar-toggle"
+            style={{ color: "#fff", borderColor: "rgba(255,255,255,0.4)" }}
+            aria-expanded={navOpen}
+            aria-controls="admin-nav"
+            onClick={() => setNavOpen((v) => !v)}
+          >
+            {navOpen ? "Close" : "Menu"}
+          </button>
         </div>
 
-        <nav style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+        <nav
+          id="admin-nav"
+          className={`admin-sidebar-nav ${navOpen ? "open" : ""}`}
+        >
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={() => setNavOpen(false)}
               style={({ isActive }) => ({
                 padding: "10px 12px",
                 borderRadius: 7,
@@ -71,17 +93,20 @@ export default function AdminLayout() {
               {item.label}
             </NavLink>
           ))}
+          <div className="admin-sidebar-footer-mobile" style={{ fontSize: 12 }}>
+            <div style={{ fontWeight: 700 }}>{user.full_name}</div>
+            <div style={{ opacity: 0.75, marginBottom: 10 }}>{user.role.replace("_", " ")}</div>
+            <LogoutButton />
+          </div>
         </nav>
 
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 12, fontSize: 12 }}>
+        <div className="admin-sidebar-footer" style={{ borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 12, marginTop: 20, fontSize: 12 }}>
           <div style={{ fontWeight: 700 }}>{user.full_name}</div>
           <div style={{ opacity: 0.75, marginBottom: 10 }}>{user.role.replace("_", " ")}</div>
-          <button className="btn btn-ghost btn-sm" style={{ width: "100%", color: "#fff", borderColor: "rgba(255,255,255,0.4)" }} onClick={logout}>
-            Log out
-          </button>
+          <LogoutButton />
         </div>
       </aside>
-      <main style={{ flex: 1, padding: "24px 28px", background: "var(--panel)", overflowX: "auto" }}>
+      <main className="admin-main">
         <Outlet />
       </main>
     </div>

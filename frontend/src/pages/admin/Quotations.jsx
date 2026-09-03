@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, dateTimeFmt, errorMessage, money } from "../../api/client";
+import { api, errorMessage, money } from "../../api/client";
 
 const STATUSES = ["DRAFT", "GENERATED", "SENT", "ACCEPTED", "REJECTED", "EXPIRED", "CANCELLED"];
 
@@ -11,11 +11,19 @@ export default function Quotations() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const pageSize = 20;
 
-  async function load() {
+  // The `page` state is the single source of truth for what's loaded --
+  // this effect is the only place that fetches. Prev/Next/search all just
+  // change `page` (or call load() directly when they need a page React
+  // would treat as unchanged, e.g. searching while already on page 1) so
+  // there is exactly one fetch per page change, never a duplicate.
+  async function load(targetPage) {
+    setError("");
+    setLoading(true);
     try {
-      const params = { page, page_size: pageSize };
+      const params = { page: targetPage, page_size: pageSize };
       if (q) params.q = q;
       if (status) params.status = status;
       const res = await api.get("/api/admin/quotations", { params });
@@ -23,13 +31,24 @@ export default function Quotations() {
       setTotal(res.data.total);
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setLoading(false);
     }
   }
 
+  function search() {
+    // Always jump back to page 1 -- a new search/filter invalidates
+    // whatever page the user was previously on.
+    if (page === 1) load(1);
+    else setPage(1);
+  }
+
   useEffect(() => {
-    load();
+    load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
+
+  const lastPage = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div>
@@ -39,7 +58,13 @@ export default function Quotations() {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div style={{ flex: 1, minWidth: 220 }}>
             <label className="first">Search</label>
-            <input type="text" placeholder="Quotation #, client, or reg. no." value={q} onChange={(e) => setQ(e.target.value)} />
+            <input
+              type="text"
+              placeholder="Quotation #, client, or reg. no."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && search()}
+            />
           </div>
           <div>
             <label className="first">Status</label>
@@ -52,14 +77,8 @@ export default function Quotations() {
               ))}
             </select>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setPage(1);
-              load();
-            }}
-          >
-            Search
+          <button className="btn btn-primary" onClick={search} disabled={loading} aria-busy={loading}>
+            {loading ? <span className="spinner" /> : "Search"}
           </button>
         </div>
       </div>
@@ -102,7 +121,7 @@ export default function Quotations() {
                   </td>
                 </tr>
               ))}
-              {items.length === 0 && (
+              {!loading && items.length === 0 && (
                 <tr>
                   <td colSpan={9} style={{ textAlign: "center", color: "var(--muted)" }}>
                     No quotations found.
@@ -113,15 +132,15 @@ export default function Quotations() {
           </table>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, flexWrap: "wrap", gap: 8 }}>
           <span className="hint">
-            {total} total · page {page} of {Math.max(1, Math.ceil(total / pageSize))}
+            {total} total · page {page} of {lastPage}
           </span>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            <button className="btn btn-ghost btn-sm" disabled={loading || page <= 1} onClick={() => setPage((p) => p - 1)}>
               ← Prev
             </button>
-            <button className="btn btn-ghost btn-sm" disabled={page * pageSize >= total} onClick={() => setPage((p) => p + 1)}>
+            <button className="btn btn-ghost btn-sm" disabled={loading || page >= lastPage} onClick={() => setPage((p) => p + 1)}>
               Next →
             </button>
           </div>

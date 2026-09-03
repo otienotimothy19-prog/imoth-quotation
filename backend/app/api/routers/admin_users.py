@@ -6,12 +6,19 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_client_ip, require_admin, require_super_admin
 from app.core.security import hash_password
 from app.database import get_db
-from app.models.enums import ActorType
+from app.models.enums import ActorType, UserRole
 from app.models.user import User
 from app.schemas.auth import UserCreate, UserOut, UserUpdate
 from app.services import audit_service
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])
+
+
+def _active_super_admin_count(db: Session, *, excluding: uuid.UUID | None = None) -> int:
+    q = db.query(User).filter(User.role == UserRole.SUPER_ADMIN, User.is_active == True)  # noqa: E712
+    if excluding is not None:
+        q = q.filter(User.id != excluding)
+    return q.count()
 
 
 @router.get("", response_model=list[UserOut])
@@ -52,6 +59,22 @@ def update_user(user_id: uuid.UUID, payload: UserUpdate, request: Request, db: S
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     data = payload.model_dump(exclude_unset=True)
+
+    is_self = target.id == user.id
+    if is_self and "is_active" in data and data["is_active"] is False:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot disable your own account")
+    if is_self and "role" in data and data["role"] != target.role:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot change your own role")
+
+    will_deactivate = "is_active" in data and data["is_active"] is False
+    will_demote = "role" in data and data["role"] != UserRole.SUPER_ADMIN
+    if target.role == UserRole.SUPER_ADMIN and target.is_active and (will_deactivate or will_demote):
+        if _active_super_admin_count(db, excluding=target.id) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot disable or demote the last active Super Admin",
+            )
+
     previous = {k: getattr(target, k) for k in data if k != "password" and hasattr(target, k)}
 
     if "password" in data:

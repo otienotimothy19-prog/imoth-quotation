@@ -65,10 +65,13 @@ def upload_logo(insurer_id: uuid.UUID, request: Request, file: UploadFile = File
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Logo must be a PNG, JPEG, WEBP or SVG image")
 
     content = file.file.read()
+    if len(content) == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The uploaded file appears to be empty")
     if len(content) > 2 * 1024 * 1024:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Logo must be under 2MB")
 
-    storage_path, _ = storage_service.save_bytes(content, subdir="insurer_logos", filename=file.filename or f"{insurer.code}.png")
+    safe_filename = storage_service.sanitize_filename(file.filename, fallback=f"{insurer.code}.png")
+    storage_path, _ = storage_service.save_bytes(content, subdir="insurer_logos", filename=safe_filename)
     insurer.logo_path = storage_path
 
     audit_service.record(
