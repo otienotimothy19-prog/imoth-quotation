@@ -11,6 +11,8 @@ def rate_band_to_dict(rb: RateBand) -> dict:
         "max_si": float(rb.max_si) if rb.max_si is not None else None,
         "rate": float(rb.rate),
         "min_premium": float(rb.min_premium),
+        "min_passengers": rb.min_passengers,
+        "max_passengers": rb.max_passengers,
         "ep_included": rb.ep_included,
         "ep_not_offered": rb.ep_not_offered,
         "ep_rate": float(rb.ep_rate),

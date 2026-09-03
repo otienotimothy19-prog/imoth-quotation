@@ -354,6 +354,94 @@ def test_valid_rate_band_update_succeeds_and_versions(admin_headers):
 
 
 # ---------------------------------------------------------------------
+# PSV rate bands limited by number of passengers
+# ---------------------------------------------------------------------
+def _get_a_psv_banded_motor_class(admin_headers):
+    insurers = client.get("/api/admin/insurers", headers=admin_headers).json()
+    for insurer in insurers:
+        classes = client.get("/api/admin/motor-classes", params={"insurer_id": insurer["id"]}, headers=admin_headers).json()
+        for c in classes:
+            if c["category"] == "psv" and not c.get("flat_only") and c.get("bands"):
+                return c
+    pytest.fail("No banded PSV motor class found in seed data")
+
+
+def test_rate_band_passenger_limits_round_trip(admin_headers):
+    cls = _get_a_psv_banded_motor_class(admin_headers)
+    resp = client.put(
+        f"/api/admin/rates/{cls['id']}",
+        json={
+            "bands": [_valid_band(min_passengers=7, max_passengers=14)],
+            "bands_alt": None,
+            "change_reason": "test: add passenger limit",
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200
+
+    fetched = client.get(f"/api/admin/rates/{cls['id']}", headers=admin_headers).json()
+    assert fetched["bands"][0]["min_passengers"] == 7
+    assert fetched["bands"][0]["max_passengers"] == 14
+
+
+def test_rate_bands_same_si_range_but_different_passenger_ranges_do_not_conflict(admin_headers):
+    cls = _get_a_psv_banded_motor_class(admin_headers)
+    resp = client.put(
+        f"/api/admin/rates/{cls['id']}",
+        json={
+            "bands": [
+                _valid_band(min_si=500000, max_si=None, min_passengers=7, max_passengers=14),
+                _valid_band(min_si=500000, max_si=None, min_passengers=15, max_passengers=33),
+            ],
+            "bands_alt": None,
+            "change_reason": "test: split by passenger count",
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200
+    fetched = client.get(f"/api/admin/rates/{cls['id']}", headers=admin_headers).json()
+    passenger_ranges = {(b["min_passengers"], b["max_passengers"]) for b in fetched["bands"]}
+    assert passenger_ranges == {(7, 14), (15, 33)}
+
+
+def test_rate_bands_reject_overlap_with_same_passenger_range(admin_headers):
+    cls = _get_a_psv_banded_motor_class(admin_headers)
+    resp = client.put(
+        f"/api/admin/rates/{cls['id']}",
+        json={
+            "bands": [
+                _valid_band(min_si=500000, max_si=None, min_passengers=7, max_passengers=20),
+                _valid_band(min_si=500000, max_si=None, min_passengers=15, max_passengers=33),
+            ],
+            "bands_alt": None,
+            "change_reason": "test",
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_rate_band_rejects_max_passengers_below_min_passengers(admin_headers):
+    cls = _get_a_psv_banded_motor_class(admin_headers)
+    resp = client.put(
+        f"/api/admin/rates/{cls['id']}",
+        json={"bands": [_valid_band(min_passengers=20, max_passengers=5)], "bands_alt": None, "change_reason": "test"},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_rate_band_rejects_negative_passenger_limits(admin_headers):
+    cls = _get_a_psv_banded_motor_class(admin_headers)
+    resp = client.put(
+        f"/api/admin/rates/{cls['id']}",
+        json={"bands": [_valid_band(min_passengers=-1)], "bands_alt": None, "change_reason": "test"},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------
 # Flat-rate editing via the motor-classes endpoint, versioned
 # ---------------------------------------------------------------------
 def test_flat_rate_requires_premium_or_rate_on_si(admin_headers):

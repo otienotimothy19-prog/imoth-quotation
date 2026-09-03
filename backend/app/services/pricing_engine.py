@@ -45,9 +45,38 @@ class PremiumResult:
         }
 
 
-def find_band(bands: list[dict], si: float) -> dict:
+def _si_matches(b: dict, si: float) -> bool:
+    return si >= b["min_si"] and (b["max_si"] is None or si <= b["max_si"])
+
+
+def _passengers_match(b: dict, passengers: int | None) -> bool:
+    """True if this band's optional passenger-capacity range (PSV classes
+    only) admits the given passenger count. A band with no passenger range
+    configured (the default, and the only case for non-PSV classes) always
+    matches -- passenger count is simply not a dimension for it."""
+    lo, hi = b.get("min_passengers"), b.get("max_passengers")
+    if lo is None and hi is None:
+        return True
+    if passengers is None:
+        return False
+    if lo is not None and passengers < lo:
+        return False
+    if hi is not None and passengers > hi:
+        return False
+    return True
+
+
+def find_band(bands: list[dict], si: float, passengers: int | None = None) -> dict:
     for b in bands:
-        if si >= b["min_si"] and (b["max_si"] is None or si <= b["max_si"]):
+        if _si_matches(b, si) and _passengers_match(b, passengers):
+            return b
+    # No band matches both dimensions (e.g. passenger count outside every
+    # configured band's range). Fall back to matching by Sum Insured alone
+    # so a class that hasn't opted into passenger-based bands -- or a
+    # passenger count outside what's configured -- still prices instead of
+    # erroring out, mirroring the pre-existing SI-only fallback below.
+    for b in bands:
+        if _si_matches(b, si):
             return b
     # fall back to nearest band if outside declared ranges (mirrors legacy behaviour)
     return bands[-1]
@@ -116,7 +145,7 @@ def compute_premium(
             if (motor_class.get("has_lr_toggle") and options.get("lr_band") == "bad")
             else motor_class["bands"]
         )
-        raw_band = find_band(use_bands, sum_insured)
+        raw_band = find_band(use_bands, sum_insured, options.get("pll_seats") or None)
         b = effective_band(motor_class, raw_band, options.get("age"))
         base = max(sum_insured * b["rate"], b["min_premium"])
         lines.append(PremiumLine(f"Basic Premium @ {b['rate'] * 100:.2f}% of SI (Min {b['min_premium']:,.0f})", base))
