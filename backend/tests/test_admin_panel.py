@@ -556,6 +556,89 @@ def test_newly_created_flat_rate_class_can_be_disabled_independently(admin_heade
 
 
 # ---------------------------------------------------------------------
+# Motor class deletion: permanent removal, allowed only when unused
+# ---------------------------------------------------------------------
+def test_delete_unused_motor_class_succeeds(admin_headers):
+    comprehensive = _get_a_banded_motor_class(admin_headers)
+    create_resp = client.post(
+        "/api/admin/motor-classes",
+        json={
+            "insurer_id": comprehensive["insurer_id"],
+            "code": f"delete_test_{uuid.uuid4().hex[:8]}",
+            "label": "Delete Test Class",
+            "category": "tpo",
+            "flat_only": {"premium": 1000, "rate_on_si": None, "min_premium": None, "note": ""},
+        },
+        headers=admin_headers,
+    )
+    new_id = create_resp.json()["id"]
+
+    delete_resp = client.delete(f"/api/admin/motor-classes/{new_id}", headers=admin_headers)
+    assert delete_resp.status_code == 200
+    assert delete_resp.json()["deleted"] is True
+
+    fetch_resp = client.get(f"/api/admin/motor-classes/{new_id}", headers=admin_headers)
+    assert fetch_resp.status_code == 404
+
+    # The comprehensive class used only to source a valid insurer_id above
+    # must be completely unaffected.
+    comprehensive_after = client.get(f"/api/admin/motor-classes/{comprehensive['id']}", headers=admin_headers).json()
+    assert comprehensive_after["active"] is True
+
+
+def test_delete_motor_class_with_quotations_detaches_them_without_losing_history(admin_headers):
+    comprehensive = _get_a_banded_motor_class(admin_headers)
+    create_resp = client.post(
+        "/api/admin/motor-classes",
+        json={
+            "insurer_id": comprehensive["insurer_id"],
+            "code": f"delete_used_{uuid.uuid4().hex[:8]}",
+            "label": "Delete Used Test Class",
+            "category": "tpo",
+            "flat_only": {"premium": 1000, "rate_on_si": None, "min_premium": None, "note": ""},
+        },
+        headers=admin_headers,
+    )
+    new_id = create_resp.json()["id"]
+
+    reg = f"KDU {uuid.uuid4().hex[:3].upper()}Z"
+    phone = f"07{uuid.uuid4().int % 10**8:08d}"
+    gen_resp = client.post(
+        "/api/quotes/generate",
+        json={
+            "client": {"full_name": "Delete Test Client", "phone": phone, "email": "deletetest@example.com"},
+            "vehicle": {"registration_no": reg, "year_of_manufacture": CURRENT_YEAR - 3},
+            "insurer_id": comprehensive["insurer_id"],
+            "motor_class_id": new_id,
+            "sum_insured": 500000,
+        },
+    )
+    assert gen_resp.status_code == 200, gen_resp.text
+    quotation_id = gen_resp.json()["id"]
+    before = client.get(f"/api/admin/quotations/{quotation_id}", headers=admin_headers).json()
+
+    delete_resp = client.delete(f"/api/admin/motor-classes/{new_id}", headers=admin_headers)
+    assert delete_resp.status_code == 200, delete_resp.text
+    assert delete_resp.json()["quotations_detached"] == 1
+
+    # The class itself is really gone now.
+    fetch_class_resp = client.get(f"/api/admin/motor-classes/{new_id}", headers=admin_headers)
+    assert fetch_class_resp.status_code == 404
+
+    # But the quotation survives with its pricing/label untouched -- it
+    # never dereferences the live class, only its own denormalized snapshot.
+    after = client.get(f"/api/admin/quotations/{quotation_id}", headers=admin_headers).json()
+    assert after["quotation_number"] == before["quotation_number"]
+    assert after["vehicle_class_label"] == before["vehicle_class_label"] == "Delete Used Test Class"
+    assert after["total_premium"] == before["total_premium"]
+
+
+def test_delete_missing_motor_class_returns_404(admin_headers):
+    resp = client.delete(f"/api/admin/motor-classes/{uuid.uuid4()}", headers=admin_headers)
+    assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------
 # Motor class Sum-Insured range validation
 # ---------------------------------------------------------------------
 def test_motor_class_update_rejects_max_si_below_min_si(admin_headers):

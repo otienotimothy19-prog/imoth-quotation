@@ -25,8 +25,14 @@ class Quotation(UUIDPKMixin, TimestampMixin, Base):
     insurer_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("insurers.id"), nullable=False, index=True
     )
-    motor_class_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("motor_classes.id"), nullable=False, index=True
+    # Nullable, unlike the other FKs above: if the motor class this
+    # quotation was generated against is later permanently deleted (as
+    # opposed to Disabled), the column is set NULL at the database level
+    # rather than blocking the delete or removing the quotation -- the
+    # quotation itself, its pricing snapshot, PDF and any risk note must
+    # survive regardless of what happens to the class afterward.
+    motor_class_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("motor_classes.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     cover_type: Mapped[str] = mapped_column(String(50), nullable=False)  # comprehensive | tpo
@@ -69,7 +75,7 @@ class Quotation(UUIDPKMixin, TimestampMixin, Base):
     client: Mapped["Client"] = relationship()  # noqa: F821
     vehicle: Mapped["Vehicle"] = relationship()  # noqa: F821
     insurer: Mapped["Insurer"] = relationship()  # noqa: F821
-    motor_class: Mapped["MotorClass"] = relationship()  # noqa: F821
+    motor_class: Mapped["MotorClass | None"] = relationship()  # noqa: F821
 
     items: Mapped[list["QuotationItem"]] = relationship(
         back_populates="quotation", cascade="all, delete-orphan", order_by="QuotationItem.sort_order"
