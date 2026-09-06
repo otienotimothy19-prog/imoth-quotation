@@ -17,16 +17,8 @@ client = TestClient(app)
 
 CURRENT_YEAR = datetime.now(timezone.utc).year
 
-
-@pytest.fixture(scope="module")
-def admin_token():
-    login = client.post("/api/auth/login", json={"email": "admin@imoth.co.ke", "password": "ChangeMe123!"})
-    return login.json()["access_token"]
-
-
-@pytest.fixture(scope="module")
-def admin_headers(admin_token):
-    return {"Authorization": f"Bearer {admin_token}"}
+# admin_token / admin_headers come from tests/conftest.py (session-scoped,
+# shared across the whole suite to stay under the login rate limit).
 
 
 def _unique_email():

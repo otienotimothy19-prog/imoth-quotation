@@ -28,6 +28,25 @@ INK = colors.HexColor("#1c1c1c")
 MUTED = colors.HexColor("#5a5f6a")
 PANEL = colors.HexColor("#f4f6fb")
 
+# Display labels for commercial_use values -- generic title-casing would
+# wrongly render "commercial_tuktuk" as "Commercial Tuktuk".
+_COMMERCIAL_USE_LABELS = {
+    "own_goods": "Own Goods",
+    "general_cartage": "General Cartage",
+    "commercial_institutional": "Commercial Institutional",
+    "commercial_tuktuk": "Commercial Tuk Tuk",
+    "hybrid": "Hybrid",
+    "private_hire": "Private Hire",
+    "online_hailed": "Online-Hailed",
+    "tanker": "Tanker",
+}
+
+
+def _commercial_use_label(value: str | None) -> str:
+    if not value:
+        return ""
+    return _COMMERCIAL_USE_LABELS.get(value, value.replace("_", " ").title())
+
 LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "imoth_logo.jpg"
 
 _styles = getSampleStyleSheet()
@@ -148,17 +167,19 @@ def render_quotation_pdf(*, quotation, company: dict, footer_text: str, conditio
     story.append(Spacer(1, 8))
 
     options_used = quotation.snapshot.data.get("options_used") or {}
-    if options_used.get("institution_type"):
-        seats = options_used.get("pll_seats")
-        institutional_bits = [
-            f"<b>Institution Type:</b> {options_used['institution_type'].title()}",
-            f"<b>Vehicle Type:</b> {(options_used.get('institutional_vehicle_type') or '').title()}",
-            f"<b>Passenger Category:</b> {(options_used.get('passenger_category') or '').replace('_', ' ').title()}",
-        ]
-        if seats:
-            institutional_bits.append(f"<b>Passenger Seats (excl. driver):</b> {seats}")
-        story.append(Paragraph("Institutional Details", STYLE_H3))
-        story.append(Paragraph(" &nbsp;&nbsp; ".join(institutional_bits), STYLE_LI))
+    if options_used.get("commercial_use"):
+        commercial_bits = [f"<b>Commercial Use:</b> {_commercial_use_label(options_used['commercial_use'])}"]
+        if options_used.get("tonnage"):
+            commercial_bits.append(f"<b>Tonnage:</b> {options_used['tonnage']:,g} tons")
+        if options_used.get("institution_type"):
+            seats = options_used.get("pll_seats")
+            commercial_bits.append(f"<b>Institution Type:</b> {options_used['institution_type'].title()}")
+            commercial_bits.append(f"<b>Vehicle Type:</b> {(options_used.get('institutional_vehicle_type') or '').title()}")
+            commercial_bits.append(f"<b>Passenger Category:</b> {(options_used.get('passenger_category') or '').replace('_', ' ').title()}")
+            if seats:
+                commercial_bits.append(f"<b>Passenger Seats (excl. driver):</b> {seats}")
+        story.append(Paragraph("Commercial Details", STYLE_H3))
+        story.append(Paragraph(" &nbsp;&nbsp; ".join(commercial_bits), STYLE_LI))
         story.append(Spacer(1, 8))
 
     rows = [["Item", "Sum Insured (Kshs)", "Premium (Kshs)"]]
@@ -252,12 +273,16 @@ def render_risk_note_pdf(*, risk_note, quotation, company: dict, conditions: lis
         ["Status", risk_note.status.value],
     ]
     options_used = (quotation.snapshot.data.get("options_used") if quotation.snapshot else None) or {}
-    if options_used.get("institution_type"):
-        rows.append(["Institution Type", options_used["institution_type"].title()])
-        rows.append(["Vehicle Type", (options_used.get("institutional_vehicle_type") or "").title()])
-        rows.append(["Passenger Category", (options_used.get("passenger_category") or "").replace("_", " ").title()])
-        if options_used.get("pll_seats"):
-            rows.append(["Passenger Seats (excl. driver)", str(options_used["pll_seats"])])
+    if options_used.get("commercial_use"):
+        rows.append(["Commercial Use", _commercial_use_label(options_used["commercial_use"])])
+        if options_used.get("tonnage"):
+            rows.append(["Tonnage", f"{options_used['tonnage']:,g} tons"])
+        if options_used.get("institution_type"):
+            rows.append(["Institution Type", options_used["institution_type"].title()])
+            rows.append(["Vehicle Type", (options_used.get("institutional_vehicle_type") or "").title()])
+            rows.append(["Passenger Category", (options_used.get("passenger_category") or "").replace("_", " ").title()])
+            if options_used.get("pll_seats"):
+                rows.append(["Passenger Seats (excl. driver)", str(options_used["pll_seats"])])
 
     tbl = Table(rows, colWidths=[55 * mm, 130 * mm])
     tbl.setStyle(

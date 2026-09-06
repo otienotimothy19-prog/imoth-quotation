@@ -7,7 +7,7 @@ const CATEGORIES = ["private", "commercial", "psv", "tuktuk", "motorcycle", "ass
 // Sub-uses of category="commercial". Only the first 3 are ever offered to
 // a customer in the wizard; the rest are insurer-internal products an
 // admin can still configure here.
-const COMMERCIAL_USES = ["own_goods", "general_cartage", "commercial_institutional", "hybrid", "private_hire", "online_hailed", "tanker"];
+const COMMERCIAL_USES = ["own_goods", "general_cartage", "commercial_institutional", "commercial_tuktuk", "hybrid", "private_hire", "online_hailed", "tanker"];
 const INSTITUTION_TYPES = ["SCHOOL", "CHURCH", "COMPANY", "NGO", "GOVERNMENT", "HOSPITAL", "OTHER"];
 const INSTITUTIONAL_VEHICLE_TYPES = ["VAN", "MINIBUS", "BUS", "OTHER"];
 const PASSENGER_CATEGORIES = ["STUDENTS", "STAFF", "CHURCH_MEMBERS", "GENERAL_INSTITUTIONAL"];
@@ -1211,7 +1211,7 @@ export default function Rates() {
                   idPrefix={`band-${i}`}
                   band={b}
                   showPassengerLimits={selectedClass?.category === "psv" || isCommercialInstitutional(selectedClass)}
-                  showTonnageLimits={selectedClass?.category === "commercial"}
+                  showTonnageLimits={selectedClass?.category === "commercial" && selectedClass?.commercial_use !== "commercial_tuktuk"}
                   onChange={(nb) => setBands(bands.map((x, j) => (j === i ? nb : x)))}
                   onRemove={() => {
                     if (window.confirm(`Remove Band ${i + 1}? This cannot be undone until you save, but will apply once you do.`)) {
@@ -1236,7 +1236,7 @@ export default function Rates() {
                       idPrefix={`alt-band-${i}`}
                       band={b}
                       showPassengerLimits={selectedClass?.category === "psv"}
-                      showTonnageLimits={selectedClass?.category === "commercial"}
+                      showTonnageLimits={selectedClass?.category === "commercial" && selectedClass?.commercial_use !== "commercial_tuktuk"}
                       onChange={(nb) => setBandsAlt(bandsAlt.map((x, j) => (j === i ? nb : x)))}
                       onRemove={() => {
                         if (window.confirm(`Remove Alternative Band ${i + 1}?`)) {

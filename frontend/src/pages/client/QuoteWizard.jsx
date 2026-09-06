@@ -5,32 +5,37 @@ import QuoteShell from "../../components/wizard/QuoteShell";
 
 const CATEGORIES = [
   { value: "private", label: "Private Car" },
-  { value: "commercial", label: "Commercial (Own Goods / General Cartage / Institutional)" },
+  { value: "commercial", label: "Commercial" },
   { value: "psv", label: "PSV / Chauffeur Driven" },
-  { value: "tuktuk", label: "Tuk Tuk" },
+  { value: "tuktuk", label: "PSV Tuk Tuk" },
   { value: "motorcycle", label: "Motorcycle" },
   { value: "asset", label: "Asset (New Units)" },
   { value: "special", label: "Special Type (Farm / Construction)" },
 ];
 
-// The only 3 Commercial branches ever offered to a customer. Other
+// The only 4 Commercial branches ever offered to a customer. Other
 // insurer-internal commercial products (Hybrid, Private Hire, Online-
 // Hailed, Tanker) are admin-managed but never shown here.
 const COMMERCIAL_USES = [
   {
     value: "own_goods",
     label: "Own Goods",
-    desc: "Carries your own goods or cargo, not for hire or reward.",
+    desc: "Carries goods belonging to the vehicle owner or their business.",
   },
   {
     value: "general_cartage",
     label: "General Cartage",
-    desc: "Carries third-party goods for hire or reward.",
+    desc: "Carries other people's goods for hire or reward.",
   },
   {
     value: "commercial_institutional",
     label: "Commercial Institutional",
-    desc: "School, church, company, NGO, government or hospital vehicle carrying its own people.",
+    desc: "School, church, company, NGO, hospital or government vehicle carrying authorized passengers.",
+  },
+  {
+    value: "commercial_tuktuk",
+    label: "Commercial Tuk Tuk",
+    desc: "A Tuk Tuk used commercially for carrying goods or conducting commercial business.",
   },
 ];
 
@@ -209,7 +214,7 @@ export default function QuoteWizard() {
     if (coverType === "comprehensive" && isInstitutional && numPassengers) {
       return { pll_seats: Number(numPassengers) };
     }
-    if (coverType === "comprehensive" && category === "commercial" && !isInstitutional && tonnage) {
+    if (coverType === "comprehensive" && category === "commercial" && !isInstitutional && commercialUse !== "commercial_tuktuk" && tonnage) {
       return { tonnage: Number(tonnage) };
     }
     return {};
@@ -596,7 +601,7 @@ export default function QuoteWizard() {
           </>
         )}
 
-        {coverType === "comprehensive" && category === "commercial" && commercialUse && !isInstitutional && (
+        {coverType === "comprehensive" && category === "commercial" && commercialUse && !isInstitutional && commercialUse !== "commercial_tuktuk" && (
           <div className="field-group">
             <div className="field-label-row">
               <label htmlFor="wizard-tonnage-input">Vehicle Tonnage</label>

@@ -42,10 +42,8 @@ def quotation_id():
     return gen_resp.json()["id"]
 
 
-@pytest.fixture()
-def admin_token():
-    login = client.post("/api/auth/login", json={"email": "admin@imoth.co.ke", "password": "ChangeMe123!"})
-    return login.json()["access_token"]
+# admin_token comes from tests/conftest.py (session-scoped, shared across
+# the whole suite to stay under the login rate limit).
 
 
 def test_rejects_unsupported_file_type(quotation_id):

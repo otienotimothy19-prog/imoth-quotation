@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, dateTimeFmt, downloadBlob, errorMessage, money } from "../../api/client";
+import { api, commercialUseLabel, dateTimeFmt, downloadBlob, errorMessage, money } from "../../api/client";
 
 function titleCase(value) {
   if (!value) return "—";
@@ -164,6 +164,18 @@ export default function QuotationDetail() {
               Year of Manufacture: {q.vehicle.year_of_manufacture ?? "—"}<br />
               Vehicle Age at Quotation: {q.vehicle.age_years ?? "—"} years
             </p>
+            {q.snapshot?.options_used?.commercial_use && (
+              <>
+                <h3 style={{ fontSize: 13 }}>Commercial Details</h3>
+                <p>
+                  Vehicle Class: Commercial<br />
+                  Commercial Use: {commercialUseLabel(q.snapshot.options_used.commercial_use)}<br />
+                  Matched Insurer Class: {q.vehicle_class_label}<br />
+                  {q.snapshot.options_used.tonnage != null ? <>Tonnage: {q.snapshot.options_used.tonnage} tons<br /></> : null}
+                  {q.rate_version_no != null ? <>Applied Rate Version: v{q.rate_version_no}<br /></> : null}
+                </p>
+              </>
+            )}
             {q.snapshot?.options_used?.institution_type && (
               <>
                 <h3 style={{ fontSize: 13 }}>Institutional Details</h3>

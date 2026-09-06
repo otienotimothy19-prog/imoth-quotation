@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, dateTimeFmt, downloadBlob, errorMessage, money } from "../../api/client";
+import { api, commercialUseLabel, dateTimeFmt, downloadBlob, errorMessage, money } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 
 function titleCase(value) {
@@ -171,6 +171,12 @@ export default function RiskNoteDetail() {
               <tr><td>Cover Start</td><td>{dateTimeFmt(rn.cover_start_date)}</td></tr>
               <tr><td>Cover End</td><td>{dateTimeFmt(rn.cover_end_date)}</td></tr>
               <tr><td>Accepted On</td><td>{dateTimeFmt(rn.quotation_accepted_at)}</td></tr>
+              {rn.commercial_use && (
+                <>
+                  <tr><td>Commercial Use</td><td>{commercialUseLabel(rn.commercial_use)}</td></tr>
+                  {rn.tonnage != null && <tr><td>Tonnage</td><td>{rn.tonnage} tons</td></tr>}
+                </>
+              )}
               {rn.institution_type && (
                 <>
                   <tr><td>Institution Type</td><td>{titleCase(rn.institution_type)}</td></tr>
