@@ -5,13 +5,57 @@ import QuoteShell from "../../components/wizard/QuoteShell";
 
 const CATEGORIES = [
   { value: "private", label: "Private Car" },
-  { value: "commercial", label: "Commercial (Own Goods / General Cartage / Hybrid)" },
-  { value: "institutional", label: "Institutional / School Bus" },
+  { value: "commercial", label: "Commercial (Own Goods / General Cartage / Institutional)" },
   { value: "psv", label: "PSV / Chauffeur Driven" },
   { value: "tuktuk", label: "Tuk Tuk" },
   { value: "motorcycle", label: "Motorcycle" },
   { value: "asset", label: "Asset (New Units)" },
   { value: "special", label: "Special Type (Farm / Construction)" },
+];
+
+// The only 3 Commercial branches ever offered to a customer. Other
+// insurer-internal commercial products (Hybrid, Private Hire, Online-
+// Hailed, Tanker) are admin-managed but never shown here.
+const COMMERCIAL_USES = [
+  {
+    value: "own_goods",
+    label: "Own Goods",
+    desc: "Carries your own goods or cargo, not for hire or reward.",
+  },
+  {
+    value: "general_cartage",
+    label: "General Cartage",
+    desc: "Carries third-party goods for hire or reward.",
+  },
+  {
+    value: "commercial_institutional",
+    label: "Commercial Institutional",
+    desc: "School, church, company, NGO, government or hospital vehicle carrying its own people.",
+  },
+];
+
+const INSTITUTION_TYPES = [
+  { value: "SCHOOL", label: "School" },
+  { value: "CHURCH", label: "Church" },
+  { value: "COMPANY", label: "Company" },
+  { value: "NGO", label: "NGO" },
+  { value: "GOVERNMENT", label: "Government" },
+  { value: "HOSPITAL", label: "Hospital" },
+  { value: "OTHER", label: "Other" },
+];
+
+const INSTITUTIONAL_VEHICLE_TYPES = [
+  { value: "VAN", label: "Van" },
+  { value: "MINIBUS", label: "Minibus" },
+  { value: "BUS", label: "Bus" },
+  { value: "OTHER", label: "Other" },
+];
+
+const PASSENGER_CATEGORIES = [
+  { value: "STUDENTS", label: "Students" },
+  { value: "STAFF", label: "Staff" },
+  { value: "CHURCH_MEMBERS", label: "Church Members" },
+  { value: "GENERAL_INSTITUTIONAL", label: "General (Other Institutional Passengers)" },
 ];
 
 const emptyClient = { full_name: "", id_or_passport: "", phone: "", email: "" };
@@ -48,11 +92,31 @@ export default function QuoteWizard() {
   const [sumInsured, setSumInsured] = useState("");
   const [numPassengers, setNumPassengers] = useState("");
   const [tonnage, setTonnage] = useState("");
+  const [commercialUse, setCommercialUse] = useState("");
+  const [institutionType, setInstitutionType] = useState("");
+  const [institutionalVehicleType, setInstitutionalVehicleType] = useState("");
+  const [passengerCategory, setPassengerCategory] = useState("");
   const [options, setOptions] = useState([]);
   const [ineligibleOptions, setIneligibleOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selecting, setSelecting] = useState(null);
+  const [tonnagePromptId, setTonnagePromptId] = useState(null);
+  const [tonnagePromptValue, setTonnagePromptValue] = useState("");
+
+  const isInstitutional = category === "commercial" && commercialUse === "commercial_institutional";
+
+  function handleCategoryChange(value) {
+    setCategory(value);
+    setCommercialUse("");
+    setInstitutionType("");
+    setInstitutionalVehicleType("");
+    setPassengerCategory("");
+    setNumPassengers("");
+    setTonnage("");
+    setOptions([]);
+    setIneligibleOptions([]);
+  }
 
   const calculatedAge = calculateVehicleAge(vehicle.year_of_manufacture);
 
@@ -94,8 +158,20 @@ export default function QuoteWizard() {
     if (coverType === "comprehensive" && category === "psv" && (!numPassengers || Number(numPassengers) <= 0)) {
       return "Please enter the number of passengers.";
     }
-    if (coverType === "comprehensive" && category === "commercial" && tonnage && Number(tonnage) < 0) {
-      return "Tonnage cannot be negative.";
+    if (coverType === "comprehensive" && category === "commercial") {
+      if (!commercialUse) {
+        return "Please select what this commercial vehicle is used for.";
+      }
+      if (commercialUse === "commercial_institutional") {
+        if (!institutionType) return "Please select the institution type.";
+        if (!institutionalVehicleType) return "Please select the vehicle type.";
+        if (!passengerCategory) return "Please select the passenger category.";
+        if (!numPassengers || !Number.isInteger(Number(numPassengers)) || Number(numPassengers) <= 0) {
+          return "Please enter the number of passenger seats, excluding the driver.";
+        }
+      } else if (tonnage && Number(tonnage) < 0) {
+        return "Tonnage cannot be negative.";
+      }
     }
     return "";
   }
@@ -130,10 +206,25 @@ export default function QuoteWizard() {
     if (coverType === "comprehensive" && category === "psv" && numPassengers) {
       return { pll_seats: Number(numPassengers) };
     }
-    if (coverType === "comprehensive" && category === "commercial" && tonnage) {
+    if (coverType === "comprehensive" && isInstitutional && numPassengers) {
+      return { pll_seats: Number(numPassengers) };
+    }
+    if (coverType === "comprehensive" && category === "commercial" && !isInstitutional && tonnage) {
       return { tonnage: Number(tonnage) };
     }
     return {};
+  }
+
+  function institutionalFields() {
+    if (!isInstitutional) {
+      return { commercial_use: category === "commercial" ? commercialUse || null : null, institution_type: null, institutional_vehicle_type: null, passenger_category: null };
+    }
+    return {
+      commercial_use: commercialUse,
+      institution_type: institutionType,
+      institutional_vehicle_type: institutionalVehicleType,
+      passenger_category: passengerCategory,
+    };
   }
 
   async function goToCompare() {
@@ -148,6 +239,7 @@ export default function QuoteWizard() {
         category: effectiveCategory,
         sum_insured: si,
         options: cleanOptions(),
+        ...institutionalFields(),
       });
       setOptions(res.data.options);
       setIneligibleOptions(res.data.ineligible_options || []);
@@ -160,10 +252,19 @@ export default function QuoteWizard() {
     }
   }
 
-  async function selectOption(opt) {
+  // `tonnageOverride` is supplied when the selected option flagged
+  // `tonnage_required` -- the insurer's own class needs a tonnage figure
+  // to price this vehicle, prompted for inline on the result card.
+  async function selectOption(opt, tonnageOverride) {
     setError("");
+    if (opt.tonnage_required && !(Number(tonnageOverride) > 0)) {
+      setError("Please enter the vehicle tonnage required by this insurer.");
+      return;
+    }
     setSelecting(opt.motor_class_id);
     const si = coverType === "third_party_only" ? 0 : Number(sumInsured);
+    const generateOptions = { ...cleanOptions() };
+    if (tonnageOverride) generateOptions.tonnage = Number(tonnageOverride);
     try {
       const res = await api.post("/api/quotes/generate", {
         client: cleanClient(),
@@ -171,8 +272,9 @@ export default function QuoteWizard() {
         insurer_id: opt.insurer_id,
         motor_class_id: opt.motor_class_id,
         sum_insured: si,
-        options: cleanOptions(),
+        options: generateOptions,
         amount_paid: 0,
+        ...institutionalFields(),
       });
       navigate(`/quote/${res.data.id}`);
     } catch (err) {
@@ -367,7 +469,7 @@ export default function QuoteWizard() {
           <div className="row2">
             <div className="field-group">
               <label htmlFor="wizard-category-select">Vehicle Class</label>
-              <select id="wizard-category-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+              <select id="wizard-category-select" value={category} onChange={(e) => handleCategoryChange(e.target.value)}>
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}
@@ -407,6 +509,94 @@ export default function QuoteWizard() {
         )}
 
         {coverType === "comprehensive" && category === "commercial" && (
+          <div className="field-group">
+            <label className="first">What is this commercial vehicle used for?</label>
+            <div className="option-card-grid">
+              {COMMERCIAL_USES.map((u) => (
+                <button
+                  key={u.value}
+                  type="button"
+                  className={`option-card ${commercialUse === u.value ? "option-card-selected" : ""}`}
+                  onClick={() => {
+                    setCommercialUse(u.value);
+                    setInstitutionType("");
+                    setInstitutionalVehicleType("");
+                    setPassengerCategory("");
+                    setNumPassengers("");
+                    setTonnage("");
+                  }}
+                  aria-pressed={commercialUse === u.value}
+                >
+                  <div className="option-card-title">{u.label}</div>
+                  <div className="option-card-desc">{u.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {coverType === "comprehensive" && isInstitutional && (
+          <>
+            <div className="row2">
+              <div className="field-group">
+                <label htmlFor="wizard-institution-type-select">Institution Type</label>
+                <select
+                  id="wizard-institution-type-select"
+                  value={institutionType}
+                  onChange={(e) => setInstitutionType(e.target.value)}
+                >
+                  <option value="">Select...</option>
+                  {INSTITUTION_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field-group">
+                <label htmlFor="wizard-institutional-vehicle-type-select">Vehicle Type</label>
+                <select
+                  id="wizard-institutional-vehicle-type-select"
+                  value={institutionalVehicleType}
+                  onChange={(e) => setInstitutionalVehicleType(e.target.value)}
+                >
+                  <option value="">Select...</option>
+                  {INSTITUTIONAL_VEHICLE_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="row2">
+              <div className="field-group">
+                <label htmlFor="wizard-passenger-category-select">Passenger Category</label>
+                <select
+                  id="wizard-passenger-category-select"
+                  value={passengerCategory}
+                  onChange={(e) => setPassengerCategory(e.target.value)}
+                >
+                  <option value="">Select...</option>
+                  {PASSENGER_CATEGORIES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field-group">
+                <label htmlFor="wizard-institutional-seats-input">Passenger Seats (excluding the driver)</label>
+                <input
+                  id="wizard-institutional-seats-input"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={numPassengers}
+                  onChange={(e) => setNumPassengers(e.target.value)}
+                  placeholder="e.g. 32"
+                />
+                <div className="hint">Passenger Legal Liability is calculated from this insurer's rate for the selected passenger category.</div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {coverType === "comprehensive" && category === "commercial" && commercialUse && !isInstitutional && (
           <div className="field-group">
             <div className="field-label-row">
               <label htmlFor="wizard-tonnage-input">Vehicle Tonnage</label>
@@ -473,15 +663,59 @@ export default function QuoteWizard() {
                 <div className="insurer-card-details">
                   Basic premium {money(opt.basic_premium)} · Levies {money(opt.levies)} · Stamp duty {money(opt.stamp_duty)}
                 </div>
-                <div className="insurer-card-actions">
-                  <button
-                    className="btn btn-primary btn-sm"
-                    disabled={selecting !== null}
-                    onClick={() => selectOption(opt)}
-                  >
-                    {selecting === opt.motor_class_id ? <span className="spinner" /> : "Select this quote"}
-                  </button>
-                </div>
+                {opt.tonnage_required && tonnagePromptId === opt.motor_class_id ? (
+                  <div className="insurer-card-actions" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+                    <div className="field-group" style={{ margin: 0 }}>
+                      <label htmlFor={`tonnage-prompt-${opt.motor_class_id}`}>Vehicle Tonnage (required by this insurer)</label>
+                      <input
+                        id={`tonnage-prompt-${opt.motor_class_id}`}
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={tonnagePromptValue}
+                        onChange={(e) => setTonnagePromptValue(e.target.value)}
+                        placeholder="e.g. 5"
+                        autoFocus
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={selecting !== null}
+                        onClick={() => selectOption(opt, Number(tonnagePromptValue))}
+                      >
+                        {selecting === opt.motor_class_id ? <span className="spinner" /> : "Confirm & Generate"}
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        disabled={selecting !== null}
+                        onClick={() => {
+                          setTonnagePromptId(null);
+                          setTonnagePromptValue("");
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="insurer-card-actions">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      disabled={selecting !== null}
+                      onClick={() => {
+                        if (opt.tonnage_required) {
+                          setTonnagePromptId(opt.motor_class_id);
+                          setTonnagePromptValue("");
+                          return;
+                        }
+                        selectOption(opt);
+                      }}
+                    >
+                      {selecting === opt.motor_class_id ? <span className="spinner" /> : "Select this quote"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -45,3 +45,27 @@ class QuotationSource(str, enum.Enum):
     CLIENT_PORTAL = "CLIENT_PORTAL"
     ADMIN_PANEL = "ADMIN_PANEL"
     API = "API"
+
+
+class InstitutionType(str, enum.Enum):
+    SCHOOL = "SCHOOL"
+    CHURCH = "CHURCH"
+    COMPANY = "COMPANY"
+    NGO = "NGO"
+    GOVERNMENT = "GOVERNMENT"
+    HOSPITAL = "HOSPITAL"
+    OTHER = "OTHER"
+
+
+class InstitutionalVehicleType(str, enum.Enum):
+    VAN = "VAN"
+    MINIBUS = "MINIBUS"
+    BUS = "BUS"
+    OTHER = "OTHER"
+
+
+class PassengerCategory(str, enum.Enum):
+    STUDENTS = "STUDENTS"
+    STAFF = "STAFF"
+    CHURCH_MEMBERS = "CHURCH_MEMBERS"
+    GENERAL_INSTITUTIONAL = "GENERAL_INSTITUTIONAL"

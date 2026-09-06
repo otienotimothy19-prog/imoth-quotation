@@ -2,7 +2,19 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, dateTimeFmt, errorMessage } from "../../api/client";
 
-const CATEGORIES = ["private", "commercial", "institutional", "psv", "tuktuk", "motorcycle", "asset", "special", "tpo"];
+const CATEGORIES = ["private", "commercial", "psv", "tuktuk", "motorcycle", "asset", "special", "tpo"];
+
+// Sub-uses of category="commercial". Only the first 3 are ever offered to
+// a customer in the wizard; the rest are insurer-internal products an
+// admin can still configure here.
+const COMMERCIAL_USES = ["own_goods", "general_cartage", "commercial_institutional", "hybrid", "private_hire", "online_hailed", "tanker"];
+const INSTITUTION_TYPES = ["SCHOOL", "CHURCH", "COMPANY", "NGO", "GOVERNMENT", "HOSPITAL", "OTHER"];
+const INSTITUTIONAL_VEHICLE_TYPES = ["VAN", "MINIBUS", "BUS", "OTHER"];
+const PASSENGER_CATEGORIES = ["STUDENTS", "STAFF", "CHURCH_MEMBERS", "GENERAL_INSTITUTIONAL"];
+
+function isCommercialInstitutional(cls) {
+  return cls?.category === "commercial" && cls?.commercial_use === "commercial_institutional";
+}
 
 function emptyNewClassForm(kind) {
   return {
@@ -295,6 +307,7 @@ function PllEditor({ pllForm, setPllForm, reason, setReason, saving, onSave }) {
           ["none", "None (not charged)"],
           ["flat", "Flat rate per seat"],
           ["tiered", "Tiered options (e.g. school vs corporate)"],
+          ["included", "Included in base rate (never charged separately)"],
         ].map(([value, label]) => (
           <label key={value}>
             <input type="radio" name="pll-mode" checked={pllForm.mode === value} onChange={() => setPllForm({ ...pllForm, mode: value })} />
@@ -302,6 +315,13 @@ function PllEditor({ pllForm, setPllForm, reason, setReason, saving, onSave }) {
           </label>
         ))}
       </div>
+
+      {pllForm.mode === "included" && (
+        <p className="hint" style={{ marginTop: 10 }}>
+          Passenger Legal Liability is already bundled into this class's base rate. It will show on the quotation as
+          "Passenger Legal Liability — Included" (KES 0) and is never charged a second time.
+        </p>
+      )}
 
       {pllForm.mode === "flat" && (
         <div className="row2" style={{ marginTop: 10 }}>
@@ -363,6 +383,28 @@ function PllEditor({ pllForm, setPllForm, reason, setReason, saving, onSave }) {
                   }
                 />
               </div>
+              <div style={{ flex: "2 1 260px" }}>
+                <label>Applies to passenger category (blank = fallback/any)</label>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {PASSENGER_CATEGORIES.map((pc) => (
+                    <label key={pc} style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 400, fontSize: 12 }}>
+                      <input
+                        type="checkbox"
+                        checked={(opt.applies_to || []).includes(pc)}
+                        onChange={(e) => {
+                          const current = opt.applies_to || [];
+                          const next = e.target.checked ? [...current, pc] : current.filter((v) => v !== pc);
+                          setPllForm({
+                            ...pllForm,
+                            options: pllForm.options.map((o, j) => (j === i ? { ...o, applies_to: next } : o)),
+                          });
+                        }}
+                      />
+                      {pc.replace("_", " ")}
+                    </label>
+                  ))}
+                </div>
+              </div>
               <button
                 type="button"
                 className="btn btn-danger btn-sm"
@@ -376,7 +418,7 @@ function PllEditor({ pllForm, setPllForm, reason, setReason, saving, onSave }) {
           <button
             type="button"
             className="btn btn-secondary btn-sm"
-            onClick={() => setPllForm({ ...pllForm, options: [...pllForm.options, { key: "", label: "", rate: 0 }] })}
+            onClick={() => setPllForm({ ...pllForm, options: [...pllForm.options, { key: "", label: "", rate: 0, applies_to: [] }] })}
           >
             + Add Option
           </button>
@@ -390,6 +432,142 @@ function PllEditor({ pllForm, setPllForm, reason, setReason, saving, onSave }) {
           {saving ? <span className="spinner" /> : "Save Changes"}
         </button>
       </div>
+    </div>
+  );
+}
+
+// Commercial-only configuration: what this class is used for (customer-
+// facing branches vs insurer-internal products), and -- for Commercial
+// Institutional -- which institution/vehicle/passenger categories it's
+// eligible for (blank = no restriction, matching the same convention as
+// the band passenger/tonnage limits above), plus whether generating a
+// quote against this class requires a tonnage figure.
+function ClassConfigCard({ classId, selectedClass, onSaved }) {
+  const [commercialUse, setCommercialUse] = useState(selectedClass.commercial_use || "");
+  const [eligibleInstitutionTypes, setEligibleInstitutionTypes] = useState(selectedClass.eligible_institution_types || []);
+  const [eligibleVehicleTypes, setEligibleVehicleTypes] = useState(selectedClass.eligible_vehicle_types || []);
+  const [eligiblePassengerCategories, setEligiblePassengerCategories] = useState(selectedClass.eligible_passenger_categories || []);
+  const [tonnageRequired, setTonnageRequired] = useState(!!selectedClass.tonnage_required);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    setCommercialUse(selectedClass.commercial_use || "");
+    setEligibleInstitutionTypes(selectedClass.eligible_institution_types || []);
+    setEligibleVehicleTypes(selectedClass.eligible_vehicle_types || []);
+    setEligiblePassengerCategories(selectedClass.eligible_passenger_categories || []);
+    setTonnageRequired(!!selectedClass.tonnage_required);
+    setStatus("");
+    setError("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId]);
+
+  function toggle(list, setList, value) {
+    setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  }
+
+  async function save() {
+    setError("");
+    setStatus("");
+    setSaving(true);
+    try {
+      await api.patch(`/api/admin/motor-classes/${classId}`, {
+        commercial_use: commercialUse || null,
+        eligible_institution_types: eligibleInstitutionTypes.length ? eligibleInstitutionTypes : null,
+        eligible_vehicle_types: eligibleVehicleTypes.length ? eligibleVehicleTypes : null,
+        eligible_passenger_categories: eligiblePassengerCategories.length ? eligiblePassengerCategories : null,
+        tonnage_required: tonnageRequired,
+      });
+      setStatus("Class configuration saved.");
+      await onSaved();
+    } catch (err) {
+      setError(errorMessage(err, "Could not save this class's configuration."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const isInstitutional = commercialUse === "commercial_institutional";
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <h3 style={{ fontSize: 13 }}>Commercial Class Configuration</h3>
+      {error && <div className="alert alert-error">{error}</div>}
+      {status && <div className="alert alert-success">{status}</div>}
+
+      <label className="first" htmlFor="commercial-use-select">Commercial Use</label>
+      <select id="commercial-use-select" value={commercialUse} onChange={(e) => setCommercialUse(e.target.value)}>
+        <option value="">(not set)</option>
+        {COMMERCIAL_USES.map((u) => (
+          <option key={u} value={u}>{u.replace(/_/g, " ")}</option>
+        ))}
+      </select>
+      <div className="hint">
+        Only Own Goods, General Cartage and Commercial Institutional are ever offered to a customer in the wizard.
+        The others are insurer-internal products.
+      </div>
+
+      {isInstitutional && (
+        <>
+          <div style={{ marginTop: 14 }}>
+            <label>Eligible Institution Types (blank = any)</label>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {INSTITUTION_TYPES.map((t) => (
+                <label key={t} style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 400, fontSize: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={eligibleInstitutionTypes.includes(t)}
+                    onChange={() => toggle(eligibleInstitutionTypes, setEligibleInstitutionTypes, t)}
+                  />
+                  {t}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <label>Eligible Vehicle Types (blank = any)</label>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {INSTITUTIONAL_VEHICLE_TYPES.map((t) => (
+                <label key={t} style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 400, fontSize: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={eligibleVehicleTypes.includes(t)}
+                    onChange={() => toggle(eligibleVehicleTypes, setEligibleVehicleTypes, t)}
+                  />
+                  {t}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <label>Eligible Passenger Categories (blank = any)</label>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {PASSENGER_CATEGORIES.map((t) => (
+                <label key={t} style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 400, fontSize: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={eligiblePassengerCategories.includes(t)}
+                    onChange={() => toggle(eligiblePassengerCategories, setEligiblePassengerCategories, t)}
+                  />
+                  {t.replace("_", " ")}
+                </label>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      <div style={{ marginTop: 14 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 400 }}>
+          <input type="checkbox" checked={tonnageRequired} onChange={(e) => setTonnageRequired(e.target.checked)} />
+          Generating a quotation against this class requires a tonnage figure
+        </label>
+      </div>
+
+      <button type="button" className="btn btn-primary" style={{ marginTop: 14 }} disabled={saving} aria-busy={saving} onClick={save}>
+        {saving ? <span className="spinner" /> : "Save Configuration"}
+      </button>
     </div>
   );
 }
@@ -514,8 +692,10 @@ export default function Rates() {
   useEffect(() => {
     const cls = classes.find((c) => c.id === classId);
     if (!cls) return;
-    if (cls.pll_options && cls.pll_options.length > 0) {
-      setPllForm({ mode: "tiered", perSeat: "", options: cls.pll_options.map((o) => ({ ...o })) });
+    if (cls.pll_included) {
+      setPllForm({ mode: "included", perSeat: "", options: [] });
+    } else if (cls.pll_options && cls.pll_options.length > 0) {
+      setPllForm({ mode: "tiered", perSeat: "", options: cls.pll_options.map((o) => ({ ...o, applies_to: o.applies_to || [] })) });
     } else if (cls.pll_per_seat) {
       setPllForm({ mode: "flat", perSeat: cls.pll_per_seat, options: [] });
     } else {
@@ -678,7 +858,10 @@ export default function Rates() {
 
     let pll_per_seat = null;
     let pll_options = null;
-    if (pllForm.mode === "flat") {
+    let pll_included = false;
+    if (pllForm.mode === "included") {
+      pll_included = true;
+    } else if (pllForm.mode === "flat") {
       if (pllForm.perSeat === "" || pllForm.perSeat === null || Number(pllForm.perSeat) < 0) {
         return setError("Enter a non-negative Passenger Legal Liability rate per seat.");
       }
@@ -693,12 +876,12 @@ export default function Rates() {
       }
       const keys = pllForm.options.map((o) => o.key.trim());
       if (new Set(keys).size !== keys.length) return setError("Passenger Legal Liability option keys must be unique.");
-      pll_options = pllForm.options.map((o) => ({ key: o.key.trim(), label: o.label.trim(), rate: Number(o.rate) }));
+      pll_options = pllForm.options.map((o) => ({ key: o.key.trim(), label: o.label.trim(), rate: Number(o.rate), applies_to: o.applies_to || [] }));
     }
 
     setSavingPll(true);
     try {
-      await api.patch(`/api/admin/motor-classes/${classId}`, { pll_per_seat, pll_options, change_reason: pllReason });
+      await api.patch(`/api/admin/motor-classes/${classId}`, { pll_per_seat, pll_options, pll_included, change_reason: pllReason });
       setStatus("Passenger Legal Liability rates updated.");
       setPllReason("");
       const res = await api.get("/api/admin/motor-classes", { params: { insurer_id: insurerId } });
@@ -948,9 +1131,16 @@ export default function Rates() {
       {!resolvingDeepLink &&
         classId &&
         !loadingRates &&
-        (selectedClass?.category === "psv" || selectedClass?.category === "institutional") && (
+        (selectedClass?.category === "psv" || isCommercialInstitutional(selectedClass)) && (
           <PllEditor pllForm={pllForm} setPllForm={setPllForm} reason={pllReason} setReason={setPllReason} saving={savingPll} onSave={savePll} />
         )}
+
+      {!resolvingDeepLink && classId && !loadingRates && selectedClass?.category === "commercial" && (
+        <ClassConfigCard classId={classId} selectedClass={selectedClass} onSaved={async () => {
+          const res = await api.get("/api/admin/motor-classes", { params: { insurer_id: insurerId } });
+          setClasses(res.data);
+        }} />
+      )}
 
       {!resolvingDeepLink && classId && !loadingRates && flatOnly && flatForm && (
         <div className="card" style={{ marginBottom: 16 }}>
@@ -1020,7 +1210,7 @@ export default function Rates() {
                   index={i}
                   idPrefix={`band-${i}`}
                   band={b}
-                  showPassengerLimits={selectedClass?.category === "psv"}
+                  showPassengerLimits={selectedClass?.category === "psv" || isCommercialInstitutional(selectedClass)}
                   showTonnageLimits={selectedClass?.category === "commercial"}
                   onChange={(nb) => setBands(bands.map((x, j) => (j === i ? nb : x)))}
                   onRemove={() => {

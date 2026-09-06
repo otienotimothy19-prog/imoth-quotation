@@ -21,7 +21,15 @@ class QuoteServiceError(Exception):
     """Raised for business-rule violations (invalid state transitions, etc.)."""
 
 
-def _options_to_engine_dict(options: QuoteOptionsIn, age: float | None) -> dict:
+def _options_to_engine_dict(
+    options: QuoteOptionsIn,
+    age: float | None,
+    *,
+    commercial_use: str | None = None,
+    institution_type=None,
+    institutional_vehicle_type=None,
+    passenger_category=None,
+) -> dict:
     return {
         "ep": options.ep,
         "pvt": options.pvt,
@@ -31,6 +39,10 @@ def _options_to_engine_dict(options: QuoteOptionsIn, age: float | None) -> dict:
         "pll_option_key": options.pll_option_key,
         "tonnage": options.tonnage,
         "age": age,
+        "commercial_use": commercial_use,
+        "institution_type": institution_type.value if institution_type else None,
+        "institutional_vehicle_type": institutional_vehicle_type.value if institutional_vehicle_type else None,
+        "passenger_category": passenger_category.value if passenger_category else None,
     }
 
 
@@ -45,7 +57,16 @@ def _company_settings(db: Session) -> dict:
 
 
 def list_eligible_options(
-    db: Session, *, category: str, sum_insured: float, options: QuoteOptionsIn, year_of_manufacture: int
+    db: Session,
+    *,
+    category: str,
+    sum_insured: float,
+    options: QuoteOptionsIn,
+    year_of_manufacture: int,
+    commercial_use: str | None = None,
+    institution_type=None,
+    institutional_vehicle_type=None,
+    passenger_category=None,
 ) -> tuple[list[dict], list[dict]]:
     """Returns (eligible_options, ineligible_options). Each ineligible entry
     carries a clear human-readable reason (e.g. vehicle age beyond the
@@ -58,23 +79,30 @@ def list_eligible_options(
     levy_rate = get_setting(db, "levy.rate")
     stamp_duty = get_setting(db, "levy.stamp_duty")
 
-    motor_classes = (
-        db.execute(
-            select(MotorClass)
-            .join(Insurer)
-            .options(joinedload(MotorClass.insurer), joinedload(MotorClass.rate_bands))
-            .where(MotorClass.category == category, MotorClass.active == True, Insurer.active == True)  # noqa: E712
-        )
-        .unique()
-        .scalars()
-        .all()
+    query = (
+        select(MotorClass)
+        .join(Insurer)
+        .options(joinedload(MotorClass.insurer), joinedload(MotorClass.rate_bands))
+        .where(MotorClass.category == category, MotorClass.active == True, Insurer.active == True)  # noqa: E712
     )
+    if commercial_use is not None:
+        query = query.where(MotorClass.commercial_use == commercial_use)
+    motor_classes = db.execute(query).unique().scalars().all()
+
+    institution_type_value = institution_type.value if institution_type else None
+    institutional_vehicle_type_value = institutional_vehicle_type.value if institutional_vehicle_type else None
+    passenger_category_value = passenger_category.value if passenger_category else None
 
     results = []
     ineligible = []
     for mc in motor_classes:
         class_dict = motor_class_to_dict(mc)
-        reason = eligibility_reason(class_dict, sum_insured, age)
+        reason = eligibility_reason(
+            class_dict, sum_insured, age,
+            institution_type=institution_type_value,
+            vehicle_type=institutional_vehicle_type_value,
+            passenger_category=passenger_category_value,
+        )
         if reason is not None:
             ineligible.append(
                 {
@@ -89,7 +117,11 @@ def list_eligible_options(
                 }
             )
             continue
-        engine_opts = _options_to_engine_dict(options, age)
+        engine_opts = _options_to_engine_dict(
+            options, age,
+            commercial_use=commercial_use, institution_type=institution_type,
+            institutional_vehicle_type=institutional_vehicle_type, passenger_category=passenger_category,
+        )
         result = compute_premium(class_dict, sum_insured, engine_opts, levy_rate, stamp_duty)
         results.append(
             {
@@ -106,6 +138,7 @@ def list_eligible_options(
                 "levies": result.levies,
                 "stamp_duty": result.stamp_duty,
                 "total_premium": result.total,
+                "tonnage_required": bool(class_dict.get("tonnage_required")),
             }
         )
 
@@ -193,6 +226,10 @@ def generate_quotation(
     source: QuotationSource,
     created_by: uuid.UUID | None,
     actor_label: str,
+    commercial_use: str | None = None,
+    institution_type=None,
+    institutional_vehicle_type=None,
+    passenger_category=None,
 ) -> Quotation:
     mc = db.execute(
         select(MotorClass)
@@ -206,12 +243,27 @@ def generate_quotation(
     # Authoritative age calculation: derived from year_of_manufacture only.
     # A client-supplied age_years is never used for eligibility or pricing.
     age = calculate_vehicle_age(vehicle_in.year_of_manufacture)
-    if not is_eligible(class_dict, sum_insured, age):
+    institution_type_value = institution_type.value if institution_type else None
+    institutional_vehicle_type_value = institutional_vehicle_type.value if institutional_vehicle_type else None
+    passenger_category_value = passenger_category.value if passenger_category else None
+    if not is_eligible(
+        class_dict, sum_insured, age,
+        institution_type=institution_type_value, vehicle_type=institutional_vehicle_type_value,
+        passenger_category=passenger_category_value,
+    ):
         raise QuoteServiceError("This vehicle is not eligible for the selected insurer/class at this Sum Insured")
+    # Authoritative, backend-only check -- never trust the frontend to have
+    # asked for tonnage when this insurer's approved terms require it.
+    if class_dict.get("tonnage_required") and not options.tonnage:
+        raise QuoteServiceError("This insurer's product requires a tonnage (carrying capacity) figure to be quoted")
 
     levy_rate = get_setting(db, "levy.rate")
     stamp_duty = get_setting(db, "levy.stamp_duty")
-    engine_opts = _options_to_engine_dict(options, age)
+    engine_opts = _options_to_engine_dict(
+        options, age,
+        commercial_use=commercial_use, institution_type=institution_type,
+        institutional_vehicle_type=institutional_vehicle_type, passenger_category=passenger_category,
+    )
     result = compute_premium(class_dict, sum_insured, engine_opts, levy_rate, stamp_duty)
 
     client = get_or_create_client(db, client_in)
@@ -320,6 +372,11 @@ def generate_quotation(
             "total_premium": result.total,
             "year_of_manufacture": vehicle_in.year_of_manufacture,
             "calculated_age_years": age,
+            "commercial_use": commercial_use,
+            "institution_type": institution_type_value,
+            "institutional_vehicle_type": institutional_vehicle_type_value,
+            "passenger_category": passenger_category_value,
+            "pll_amount": result.pll_amount,
         },
     )
     db.commit()

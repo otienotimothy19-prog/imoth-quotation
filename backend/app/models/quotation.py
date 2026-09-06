@@ -117,7 +117,7 @@ class QuotationSnapshot(UUIDPKMixin, TimestampMixin, Base):
         index=True,
     )
     rate_version_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("rate_versions.id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("rate_versions.id", ondelete="SET NULL"), nullable=True
     )
     data: Mapped[dict] = mapped_column(JSONB, nullable=False)
 

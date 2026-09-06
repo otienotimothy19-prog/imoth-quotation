@@ -38,7 +38,29 @@ describe("QuoteWizard cover step", () => {
     expect(screen.queryByLabelText("Vehicle Tonnage")).not.toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
+    expect(screen.queryByLabelText("Vehicle Tonnage")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /own goods/i }));
     expect(screen.getByLabelText("Vehicle Tonnage")).toBeInTheDocument();
+  });
+
+  it("does not show the tonnage field for Commercial Institutional, only the institutional intake fields", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <QuoteWizard />
+      </MemoryRouter>
+    );
+    await fillDetailsAndContinue(user);
+
+    await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
+    await user.click(screen.getByRole("button", { name: /commercial institutional/i }));
+
+    expect(screen.queryByLabelText("Vehicle Tonnage")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Institution Type")).toBeInTheDocument();
+    expect(screen.getByLabelText("Vehicle Type")).toBeInTheDocument();
+    expect(screen.getByLabelText("Passenger Category")).toBeInTheDocument();
+    expect(screen.getByLabelText("Passenger Seats (excluding the driver)")).toBeInTheDocument();
   });
 
   it("does not show the tonnage field for PSV, only the passenger count", async () => {
@@ -66,6 +88,7 @@ describe("QuoteWizard cover step", () => {
     await fillDetailsAndContinue(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
+    await user.click(screen.getByRole("button", { name: /own goods/i }));
     await user.type(screen.getByPlaceholderText("e.g. 1500000"), "1500000");
     await user.type(screen.getByLabelText("Vehicle Tonnage"), "5");
     await user.click(screen.getByRole("button", { name: /get quotes/i }));
@@ -73,7 +96,7 @@ describe("QuoteWizard cover step", () => {
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(
         "/api/quotes/compare",
-        expect.objectContaining({ category: "commercial", options: { tonnage: 5 } })
+        expect.objectContaining({ category: "commercial", commercial_use: "own_goods", options: { tonnage: 5 } })
       )
     );
   });
@@ -89,9 +112,27 @@ describe("QuoteWizard cover step", () => {
     await fillDetailsAndContinue(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
+    await user.click(screen.getByRole("button", { name: /own goods/i }));
     await user.type(screen.getByPlaceholderText("e.g. 1500000"), "1500000");
     await user.click(screen.getByRole("button", { name: /get quotes/i }));
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith("/api/quotes/compare", expect.objectContaining({ options: {} })));
+  });
+
+  it("requires selecting a commercial use before comparing quotes", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <QuoteWizard />
+      </MemoryRouter>
+    );
+    await fillDetailsAndContinue(user);
+
+    await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
+    await user.type(screen.getByPlaceholderText("e.g. 1500000"), "1500000");
+    await user.click(screen.getByRole("button", { name: /get quotes/i }));
+
+    expect(screen.getByText(/select what this commercial vehicle is used for/i)).toBeInTheDocument();
+    expect(api.post).not.toHaveBeenCalled();
   });
 });

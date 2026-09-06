@@ -72,12 +72,18 @@ def create_motor_class(payload: MotorClassCreate, request: Request, db: Session 
         max_si=payload.max_si,
         has_lr_toggle=payload.has_lr_toggle,
         pll_per_seat=payload.pll_per_seat,
-        pll_options=[o.model_dump() for o in payload.pll_options] if payload.pll_options else None,
+        pll_options=[o.model_dump(mode="json") for o in payload.pll_options] if payload.pll_options else None,
+        pll_included=payload.pll_included,
         flat_only=payload.flat_only.model_dump() if payload.flat_only else None,
         excess=payload.excess,
         benefits=payload.benefits,
         limits=payload.limits,
         active=True,
+        commercial_use=payload.commercial_use,
+        eligible_institution_types=[t.value for t in payload.eligible_institution_types] if payload.eligible_institution_types else None,
+        eligible_vehicle_types=[t.value for t in payload.eligible_vehicle_types] if payload.eligible_vehicle_types else None,
+        eligible_passenger_categories=[t.value for t in payload.eligible_passenger_categories] if payload.eligible_passenger_categories else None,
+        tonnage_required=payload.tonnage_required,
     )
     db.add(mc)
     db.flush()
@@ -130,11 +136,9 @@ def update_motor_class(motor_class_id: uuid.UUID, payload: MotorClassUpdate, req
     if mc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Motor class not found")
 
-    data = payload.model_dump(exclude_unset=True)
+    data = payload.model_dump(exclude_unset=True, mode="json")
     change_reason = data.pop("change_reason", None)
     previous = {k: getattr(mc, k) for k in data if hasattr(mc, k)}
-    if "pll_options" in data and data["pll_options"] is not None:
-        data["pll_options"] = [o if isinstance(o, dict) else o.model_dump() for o in data["pll_options"]]
     if "flat_only" in data and data["flat_only"] is not None:
         data["flat_only"] = data["flat_only"] if isinstance(data["flat_only"], dict) else data["flat_only"].model_dump()
     for k, v in data.items():

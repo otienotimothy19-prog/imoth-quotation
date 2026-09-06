@@ -18,7 +18,8 @@ const COMMERCIAL_CLASS = { id: "cls4", label: "Commercial General Cartage", cate
 const INSTITUTIONAL_CLASS = {
   id: "cls5",
   label: "Commercial Institutional",
-  category: "institutional",
+  category: "commercial",
+  commercial_use: "commercial_institutional",
   active: true,
   flat_only: null,
   pll_options: [
@@ -483,7 +484,7 @@ describe("Rates admin page", () => {
         "/api/admin/motor-classes/cls3",
         expect.objectContaining({
           pll_per_seat: null,
-          pll_options: [{ key: "student", label: "School students", rate: 250 }],
+          pll_options: [{ key: "student", label: "School students", rate: 250, applies_to: [] }],
           change_reason: "add school rate",
         })
       )

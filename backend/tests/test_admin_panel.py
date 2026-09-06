@@ -539,9 +539,9 @@ def _get_an_institutional_motor_class(admin_headers):
     for insurer in insurers:
         classes = client.get("/api/admin/motor-classes", params={"insurer_id": insurer["id"]}, headers=admin_headers).json()
         for c in classes:
-            if c["category"] == "institutional":
+            if c["category"] == "commercial" and c.get("commercial_use") == "commercial_institutional":
                 return c
-    pytest.fail("No institutional motor class found in seed data")
+    pytest.fail("No Commercial Institutional motor class found in seed data")
 
 
 def test_update_pll_options_round_trip_and_versions(admin_headers):
@@ -797,6 +797,60 @@ def test_delete_motor_class_with_quotations_detaches_them_without_losing_history
     assert after["quotation_number"] == before["quotation_number"]
     assert after["vehicle_class_label"] == before["vehicle_class_label"] == "Delete Used Test Class"
     assert after["total_premium"] == before["total_premium"]
+
+
+def test_delete_banded_motor_class_with_versioned_rates_and_a_quotation_succeeds(admin_headers):
+    """A banded (non-flat) class that has both a RateVersion (created by
+    saving its bands through the versioned Rates screen) and a quotation
+    generated against it -- the normal lifecycle of any real class -- must
+    still delete cleanly. QuotationSnapshot.rate_version_id previously had
+    no ON DELETE action, so cascading the class's RateVersion rows away hit
+    a foreign-key violation and failed the whole deletion with a 500,
+    contradicting the "deletion always succeeds" guarantee."""
+    comprehensive = _get_a_banded_motor_class(admin_headers)
+    create_resp = client.post(
+        "/api/admin/motor-classes",
+        json={
+            "insurer_id": comprehensive["insurer_id"],
+            "code": f"delete_versioned_{uuid.uuid4().hex[:8]}",
+            "label": "Delete Versioned Test Class",
+            "category": "commercial",
+            "min_si": 500000,
+        },
+        headers=admin_headers,
+    )
+    new_id = create_resp.json()["id"]
+
+    bands_resp = client.put(
+        f"/api/admin/rates/{new_id}",
+        json={
+            "bands": [{"min_si": 500000, "max_si": None, "rate": 0.04, "min_premium": 30000}],
+            "change_reason": "initial rate card",
+        },
+        headers=admin_headers,
+    )
+    assert bands_resp.status_code == 200, bands_resp.text
+    versions = client.get(f"/api/admin/rates/{new_id}/versions", headers=admin_headers).json()
+    assert len(versions) == 1
+
+    reg = f"KDV {uuid.uuid4().hex[:3].upper()}Z"
+    phone = f"07{uuid.uuid4().int % 10**8:08d}"
+    gen_resp = client.post(
+        "/api/quotes/generate",
+        json={
+            "client": {"full_name": "Delete Versioned Test Client", "phone": phone, "email": "deleteversioned@example.com"},
+            "vehicle": {"registration_no": reg, "year_of_manufacture": CURRENT_YEAR - 3},
+            "insurer_id": comprehensive["insurer_id"],
+            "motor_class_id": new_id,
+            "commercial_use": "own_goods",
+            "sum_insured": 1000000,
+        },
+    )
+    assert gen_resp.status_code == 200, gen_resp.text
+
+    delete_resp = client.delete(f"/api/admin/motor-classes/{new_id}", headers=admin_headers)
+    assert delete_resp.status_code == 200, delete_resp.text
+    assert delete_resp.json()["quotations_detached"] == 1
 
 
 def test_delete_missing_motor_class_returns_404(admin_headers):

@@ -66,7 +66,7 @@ INSURERS = {
                 ],
             },
             "commercial_hybrid": {
-                "label": "Motor Commercial Hybrid (Own Goods / Gen. Cartage)", "category": "commercial", "max_age": 15, "min_si": 500000,
+                "label": "Motor Commercial Hybrid (Own Goods / Gen. Cartage)", "category": "commercial", "commercial_use": "hybrid", "max_age": 15, "min_si": 500000,
                 "excess": ["Own Damage/Partial Theft – 5% Min 30,000", "Theft with ATD – 10% Min 30,000", "Theft without ATD – 20% Min 30,000"],
                 "benefits": ["Excess Protector & PVT inclusive of the basic rate", "TPO by tonnage also available: up to 3T Kshs 7,500 / 4–8T Kshs 10,000 / 9–15T Kshs 15,000 / above 15T Kshs 20,000"],
                 "limits": ["Comprehensive on vehicle, standard commercial limits apply"],
@@ -111,14 +111,14 @@ INSURERS = {
                 "bands": [band(500000, None, 0.05, 40000)],
             },
             "school_bus": {
-                "label": "School Bus / Van", "category": "institutional", "max_age": 15, "min_si": 500000,
+                "label": "School Bus / Van", "category": "commercial", "commercial_use": "commercial_institutional", "max_age": 15, "min_si": 500000,
                 "excess": ["Standard Pioneer commercial excess schedule applies"],
                 "benefits": ["Excess Protector & PVT included in rate (PVT free up to Kshs 5,000,000; additional rate above this threshold not yet on file)", "PLL free for the school's own students; Kshs 250/seat for affiliated group hire; Kshs 500/head for non-affiliated hire"],
                 "limits": ["Comprehensive on vehicle"],
                 "pll_options": [
-                    {"key": "student", "label": "Own students (free)", "rate": 0},
-                    {"key": "affiliated", "label": "Affiliated group hire", "rate": 250},
-                    {"key": "nonaffiliated", "label": "Non-affiliated / general hire", "rate": 500},
+                    {"key": "student", "label": "Own students (free)", "rate": 0, "applies_to": ["STUDENTS"]},
+                    {"key": "affiliated", "label": "Affiliated group hire", "rate": 250, "applies_to": ["STAFF", "CHURCH_MEMBERS"]},
+                    {"key": "nonaffiliated", "label": "Non-affiliated / general hire", "rate": 500, "applies_to": ["GENERAL_INSTITUTIONAL"]},
                 ],
                 "bands": [band(500000, None, 0.035, 37500)],
             },
@@ -151,7 +151,7 @@ INSURERS = {
                 ],
             },
             "commercial": {
-                "label": "Motor Commercial (Own Goods & General Cartage)", "category": "commercial", "max_age": 20, "min_si": 500000,
+                "label": "Motor Commercial (Own Goods & General Cartage)", "category": "commercial", "commercial_use": "hybrid", "max_age": 20, "min_si": 500000,
                 "excess": ["Own Damage/Partial Theft – 5% Min 30,000", "Theft with ATD – 10% Min 30,000", "Theft without ATD – 20% Min 30,000", "Third Party Property Damage – Kshs 10,000", "Young Driver (<25) – Kshs 10,000 additional", "Novice Driver (<3yrs) – Kshs 10,000 additional"],
                 "benefits": ["General Cartage & Own Goods PVT 0.35% Min Kshs 3,000"], "limits": ["Third Party Property Damage – Kshs 5,000,000"],
                 "bands": [band(500000, None, 0.045, 60000, pvt_included=False, pvt_rate=0.0035, pvt_min=3000)],
@@ -189,7 +189,7 @@ INSURERS = {
                 "bands": [band(400000, None, 0.06, 30000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_rate=0.0025, pvt_min=2500)],
             },
             "commercial_own_goods": {
-                "label": "Commercial Own Goods", "category": "commercial", "max_age": 20, "min_si": 500000,
+                "label": "Commercial Own Goods", "category": "commercial", "commercial_use": "own_goods", "max_age": 20, "min_si": 500000,
                 "excess": [], "benefits": [], "limits": [],
                 "bands": [
                     band(500000, 2500000, 0.0325, 30000, ep_included=False, ep_rate=0.005, ep_min=5000, pvt_included=False, pvt_rate=0.0025, pvt_min=3500),
@@ -197,7 +197,7 @@ INSURERS = {
                 ],
             },
             "commercial_general_cartage": {
-                "label": "Commercial General Cartage", "category": "commercial", "max_age": 20, "min_si": 500000,
+                "label": "Commercial General Cartage", "category": "commercial", "commercial_use": "general_cartage", "max_age": 20, "min_si": 500000,
                 "excess": [], "benefits": [], "limits": [],
                 "bands": [
                     band(500000, 2500000, 0.0325, 30000, ep_included=False, ep_rate=0.005, ep_min=5000, pvt_included=False, pvt_rate=0.0025, pvt_min=3500),
@@ -205,11 +205,11 @@ INSURERS = {
                 ],
             },
             "commercial_institutional": {
-                "label": "Commercial Institutional", "category": "institutional", "max_age": 20, "min_si": 500000,
+                "label": "Commercial Institutional", "category": "commercial", "commercial_use": "commercial_institutional", "max_age": 20, "min_si": 500000,
                 "excess": [], "benefits": ["Passenger Legal Liability – Kshs 500/person (organised groups) or Kshs 250/student"], "limits": [],
                 "pll_options": [
-                    {"key": "organised", "label": "Organised group / general hire", "rate": 500},
-                    {"key": "student", "label": "Students", "rate": 250},
+                    {"key": "organised", "label": "Organised group / general hire", "rate": 500, "applies_to": ["STAFF", "CHURCH_MEMBERS", "GENERAL_INSTITUTIONAL"]},
+                    {"key": "student", "label": "Students", "rate": 250, "applies_to": ["STUDENTS"]},
                 ],
                 "bands": [
                     band(500000, 2500000, 0.0325, 30000, ep_included=False, ep_rate=0.005, ep_min=5000, pvt_included=False, pvt_rate=0.0025, pvt_min=3500),
@@ -266,24 +266,24 @@ INSURERS = {
                 ],
             },
             "institutional": {
-                "label": "Commercial – Institutional Vehicle (School/Religious/Company Bus)", "category": "institutional", "max_age": 20, "min_si": 500000,
+                "label": "Commercial – Institutional Vehicle (School/Religious/Company Bus)", "category": "commercial", "commercial_use": "commercial_institutional", "max_age": 20, "min_si": 500000,
                 "excess": ["Own Damage & Partial Theft – 5% Min 20,000 / Max 150,000", "Theft (alternators/starters) – 10% Min 20,000", "Third Party Property Damage – Kshs 10,000", "Young/New Drivers – Kshs 10,000 additional"],
                 "benefits": ["Alternators & starters covered free if fully reinforced", "PLL – Kshs 200/seat for organised groups; free for students & school employees"],
                 "limits": ["Third Party Property Damage – Kshs 20,000,000", "Passenger Liability – any one person Kshs 5,000,000 / any one event Kshs 50,000,000"],
                 "pll_options": [
-                    {"key": "organised", "label": "Organised groups", "rate": 200},
-                    {"key": "student", "label": "Students / school employees", "rate": 0},
+                    {"key": "organised", "label": "Organised groups", "rate": 200, "applies_to": ["STAFF", "CHURCH_MEMBERS", "GENERAL_INSTITUTIONAL"]},
+                    {"key": "student", "label": "Students / school employees", "rate": 0, "applies_to": ["STUDENTS"]},
                 ],
                 "bands": [band(500000, None, 0.035, 30000)],
             },
             "hybrid_zero_trucks": {
-                "label": "Commercial Hybrid – Zero Mileage Trucks (new units)", "category": "commercial", "max_age": None, "min_si": 500000,
+                "label": "Commercial Hybrid – Zero Mileage Trucks (new units)", "category": "commercial", "commercial_use": "hybrid", "max_age": None, "min_si": 500000,
                 "excess": ["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000", "Third Party Property Damage – up to 20t Kshs 20,000 / over 20t Kshs 30,000"],
                 "benefits": ["Inclusive Own Damage Excess Protection & Terrorism/Political Violence extension", "PLL Kshs 500/seat (optional – not for drivers & loaders)"], "limits": ["Passenger Liability any one event – Kshs 50,000,000"], "pll_per_seat": 500,
                 "bands": [band(500000, None, 0.045, 50000)],
             },
             "hybrid_nonzero_trucks": {
-                "label": "Commercial Hybrid – Non-Zero Mileage Trucks (1–15yrs)", "category": "commercial", "max_age": 15, "min_si": 500000,
+                "label": "Commercial Hybrid – Non-Zero Mileage Trucks (1–15yrs)", "category": "commercial", "commercial_use": "hybrid", "max_age": 15, "min_si": 500000,
                 "excess": ["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000", "Third Party Property Damage – up to 20t Kshs 20,000 / over 20t Kshs 30,000"],
                 "benefits": ["Rate depends on 3-yr Loss Ratio (LR): <60% = 5%, >60% = 6%"], "limits": ["Passenger Liability any one event – Kshs 50,000,000"],
                 "bands": [band(500000, None, 0.05, 50000)],
@@ -291,12 +291,12 @@ INSURERS = {
                 "has_lr_toggle": True,
             },
             "hybrid_zero_pickups": {
-                "label": "Commercial Hybrid – Zero Mileage Pick-Ups (new units)", "category": "commercial", "max_age": None, "min_si": 500000,
+                "label": "Commercial Hybrid – Zero Mileage Pick-Ups (new units)", "category": "commercial", "commercial_use": "hybrid", "max_age": None, "min_si": 500000,
                 "excess": ["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000"], "benefits": ["Inclusive Own Damage Excess Protection"], "limits": [],
                 "bands": [band(500000, None, 0.04, 50000)],
             },
             "hybrid_nonzero_pickups": {
-                "label": "Commercial Hybrid – Non-Zero Mileage Pick-Ups (1–15yrs)", "category": "commercial", "max_age": 15, "min_si": 500000,
+                "label": "Commercial Hybrid – Non-Zero Mileage Pick-Ups (1–15yrs)", "category": "commercial", "commercial_use": "hybrid", "max_age": 15, "min_si": 500000,
                 "excess": ["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000"], "benefits": ["Rate depends on 3-yr Loss Ratio (LR): <60% = 4.95%, >60% = 5%"], "limits": [],
                 "bands": [band(500000, None, 0.0495, 50000)],
                 "bands_alt": [band(500000, None, 0.05, 50000)],
@@ -320,7 +320,7 @@ INSURERS = {
                 "bands": [band(500000, None, 0.0325, 30000, ep_included=False, ep_rate=0.0025, ep_min=3000, pvt_included=True)],
             },
             "commercial_hybrid": {
-                "label": "Motor Commercial – Hybrid", "category": "commercial", "max_age": 15, "min_si": 500000,
+                "label": "Motor Commercial – Hybrid", "category": "commercial", "commercial_use": "hybrid", "max_age": 15, "min_si": 500000,
                 "excess": [], "benefits": ["No dedicated Excess Protector – flat 0.35% Min 5,000 charged instead"], "limits": [],
                 "bands": [
                     band(500000, 2000000, 0.0425, 35000, ep_included=False, ep_rate=0.0035, ep_min=5000, pvt_included=True),
@@ -328,7 +328,7 @@ INSURERS = {
                 ],
             },
             "commercial_institutional": {
-                "label": "Motor Commercial – Institutional", "category": "institutional", "max_age": 15, "min_si": 500000,
+                "label": "Motor Commercial – Institutional", "category": "commercial", "commercial_use": "commercial_institutional", "max_age": 15, "min_si": 500000,
                 "excess": [], "benefits": ["Excess Protector & PVT inclusive"], "limits": ["Passenger Legal Liability – Kshs 250/passenger"],
                 "pll_per_seat": 250,
                 "bands": [band(500000, None, 0.0325, 35000)],
@@ -403,7 +403,7 @@ INSURERS = {
                 ],
             },
             "commercial_own_goods": {
-                "label": "Motor Commercial (Own Goods, Retail)", "category": "commercial", "max_age": 15, "min_si": 600000,
+                "label": "Motor Commercial (Own Goods, Retail)", "category": "commercial", "commercial_use": "own_goods", "max_age": 15, "min_si": 600000,
                 "excess": ["Own Damage & Partial Theft – 5% Min 30,000", "Theft with ATD – 10% Min 30,000", "Theft without ATD – 20% Min 30,000", "Third Party Property Damage – Kshs 10,000", "Young(<25)/Novice(<1yr) Drivers – Kshs 10,000 additional each"],
                 "benefits": ["Excess Protector (Full) NOT COVERED under retail terms", "PLL charged at Kshs 500/passenger × permitted capacity"], "limits": ["Third Party Property Damage – up to Kshs 20,000,000"],
                 "bands": [
@@ -414,7 +414,7 @@ INSURERS = {
                 ],
             },
             "commercial_private_hire": {
-                "label": "Commercial – Private Hire (Chauffeur Driven, Retail)", "category": "commercial", "max_age": 12, "min_si": 1500000,
+                "label": "Commercial – Private Hire (Chauffeur Driven, Retail)", "category": "commercial", "commercial_use": "private_hire", "max_age": 12, "min_si": 1500000,
                 "excess": ["Same excess schedule as Commercial Own Goods"], "benefits": ["No TPO proposals accepted for this class"], "limits": [],
                 "bands": [
                     band(1500000, 2500000, 0.0575, 50000, ep_included=False, ep_rate=0.0025, ep_min=5000, pvt_included=True),
@@ -422,7 +422,7 @@ INSURERS = {
                 ],
             },
             "commercial_online_hailed": {
-                "label": "Commercial – Private Hire Online-Hailed (Uber/Bolt, Retail)", "category": "commercial", "max_age": 12, "min_si": 0,
+                "label": "Commercial – Private Hire Online-Hailed (Uber/Bolt, Retail)", "category": "commercial", "commercial_use": "online_hailed", "max_age": 12, "min_si": 0,
                 "excess": ["Same excess schedule as Commercial Own Goods"], "benefits": [], "limits": [],
                 "bands": [band(0, None, 0.0825, 75000, ep_included=False, ep_rate=0.0035, ep_min=5000, pvt_included=True)],
             },
@@ -456,13 +456,13 @@ INSURERS = {
                 ],
             },
             "commercial_general_cartage": {
-                "label": "Motor Commercial – General Cartage", "category": "commercial", "max_age": 15, "min_si": 0,
+                "label": "Motor Commercial – General Cartage", "category": "commercial", "commercial_use": "general_cartage", "max_age": 15, "min_si": 0,
                 "excess": ["Own Damage & Partial Theft – 5% Min 30,000 / Max 150,000", "Theft with ATD – 10% Min 30,000", "Theft without ATD – 20% Min 40,000", "Third Party Property Damage – Kshs 10,000", "New/Young Drivers – Kshs 10,000 additional"],
                 "benefits": ["Free: Forced ATM withdrawal Kshs 10,000", "Free: Fatal PA cover for named driver Kshs 150,000", "PLL optional Kshs 1,000/passenger", "EP and PVT are mandatory and always included in the premium (combined standard rate 5.5% before minimum-premium effects)"], "limits": ["Third Party Property Damage – Kshs 30,000,000"],
                 "bands": [band(0, None, 0.05, 75000, ep_included=False, ep_rate=0.0025, ep_min=5000, ep_mandatory=True, pvt_included=False, pvt_rate=0.0025, pvt_min=3000, pvt_mandatory=True)],
             },
             "commercial_own_goods": {
-                "label": "Motor Commercial – Own Goods", "category": "commercial", "max_age": 15, "min_si": 0,
+                "label": "Motor Commercial – Own Goods", "category": "commercial", "commercial_use": "own_goods", "max_age": 15, "min_si": 0,
                 "excess": ["Own Damage & Partial Theft – 5% Min 20,000 / Max 150,000", "Theft with ATD – 10% Min 20,000", "Theft without ATD – 20% Min 20,000", "Third Party Property Damage – Kshs 10,000", "New/Young Drivers – Kshs 10,000 additional"],
                 "benefits": ["Free: Forced ATM withdrawal Kshs 10,000", "Free: Fatal PA cover for named driver Kshs 150,000", "PLL optional Kshs 1,000/passenger", "EP and PVT are mandatory and always included in the premium"], "limits": ["Third Party Property Damage – Kshs 20,000,000"],
                 "bands": [band(0, None, 0.04, 50000, ep_included=False, ep_rate=0.0025, ep_min=5000, ep_mandatory=True, pvt_included=False, pvt_rate=0.0025, pvt_min=3000, pvt_mandatory=True)],
@@ -537,8 +537,7 @@ INSURERS = {
 
 CATEGORY_LABELS = {
     "private": "Private Car",
-    "commercial": "Commercial (Own Goods / Gen. Cartage / Hybrid)",
-    "institutional": "Institutional / School Bus",
+    "commercial": "Commercial (Own Goods / Gen. Cartage / Institutional)",
     "psv": "PSV / Chauffeur Driven",
     "tuktuk": "Tuk Tuk",
     "motorcycle": "Motorcycle",
