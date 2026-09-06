@@ -1678,6 +1678,17 @@ table tr:nth-child(even) td {
   padding: 20px 14px;
   display: flex;
   flex-direction: column;
+  /* Floating: detached from the viewport edges, pinned in place while the
+     main content scrolls, rather than flush against the edge and scrolling
+     away with the page. */
+  align-self: flex-start;
+  position: sticky;
+  top: 16px;
+  margin: 16px 0 16px 16px;
+  max-height: calc(100vh - 32px);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+  overflow-y: auto;
 }
 
 .admin-sidebar-toggle {
@@ -1714,6 +1725,11 @@ table tr:nth-child(even) td {
     align-items: center;
     padding: 12px 14px;
     position: relative;
+    margin: 0;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow-y: visible;
   }
   .admin-sidebar-toggle {
     display: inline-flex;
