@@ -4,12 +4,13 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.enums import InstitutionalVehicleType, InstitutionType, PassengerCategory, RiskNoteStatus
 
-# Sub-uses of category="commercial". Only "own_goods", "general_cartage" and
-# "commercial_institutional" are ever offered to a customer as a selectable
-# branch; "hybrid"/"private_hire"/"online_hailed"/"tanker" are
-# insurer-internal products an admin can still create/manage here.
+# Sub-uses of category="commercial". Only "own_goods", "general_cartage",
+# "commercial_institutional" and "commercial_tuktuk" are ever offered to a
+# customer as a selectable branch; "hybrid"/"private_hire"/"online_hailed"/
+# "tanker" are insurer-internal products an admin can still create/manage
+# here.
 COMMERCIAL_USES = (
-    "own_goods", "general_cartage", "commercial_institutional",
+    "own_goods", "general_cartage", "commercial_institutional", "commercial_tuktuk",
     "hybrid", "private_hire", "online_hailed", "tanker",
 )
 

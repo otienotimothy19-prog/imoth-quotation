@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, dateFmt, errorMessage, money } from "../../api/client";
+import { api, commercialUseLabel, dateFmt, errorMessage, money } from "../../api/client";
 import DocumentUploadSection from "../../components/DocumentUploadSection";
 import QuoteShell from "../../components/wizard/QuoteShell";
 
@@ -110,10 +110,38 @@ export default function QuoteDetail() {
         <div className="hint">Cover Type</div>
         <div className="quote-summary-value">{quote.cover_type === "comprehensive" ? "Comprehensive" : "Third Party Only"}</div>
       </div>
+      {quote.year_of_manufacture != null && (
+        <div className="quote-summary-item">
+          <div className="hint">Year of Manufacture</div>
+          <div className="quote-summary-value">{quote.year_of_manufacture}</div>
+        </div>
+      )}
+      {quote.calculated_age_years != null && (
+        <div className="quote-summary-item">
+          <div className="hint">Vehicle Age</div>
+          <div className="quote-summary-value">{quote.calculated_age_years} year{quote.calculated_age_years === 1 ? "" : "s"}</div>
+        </div>
+      )}
+      <div className="quote-summary-item">
+        <div className="hint">Sum Insured</div>
+        <div className="quote-summary-value">{money(quote.sum_insured)}</div>
+      </div>
       <div className="quote-summary-item">
         <div className="hint">Total Premium</div>
         <div className="quote-summary-value">{money(quote.total_premium)}</div>
       </div>
+      {quote.commercial_use && (
+        <div className="quote-summary-item">
+          <div className="hint">Commercial Use</div>
+          <div className="quote-summary-value">{commercialUseLabel(quote.commercial_use)}</div>
+        </div>
+      )}
+      {quote.tonnage != null && (
+        <div className="quote-summary-item">
+          <div className="hint">Tonnage</div>
+          <div className="quote-summary-value">{quote.tonnage} tons</div>
+        </div>
+      )}
       {quote.institution_type && (
         <>
           <div className="quote-summary-item">

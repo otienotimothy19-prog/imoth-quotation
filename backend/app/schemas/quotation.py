@@ -9,10 +9,12 @@ from app.services.vehicle_age import MIN_MANUFACTURE_YEAR, current_year
 # Sub-uses of category="commercial" a customer may actually select. Hybrid /
 # private_hire / online_hailed / tanker classes still exist and are
 # admin-manageable, but are never offered as a customer-facing branch.
-CUSTOMER_FACING_COMMERCIAL_USES = ("own_goods", "general_cartage", "commercial_institutional")
+CUSTOMER_FACING_COMMERCIAL_USES = ("own_goods", "general_cartage", "commercial_institutional", "commercial_tuktuk")
 
 
-def _require_institutional_intake(commercial_use: str | None, institution_type, institutional_vehicle_type, passenger_category, pll_seats: int) -> None:
+def _validate_commercial_use_intake(commercial_use: str | None, institution_type, institutional_vehicle_type, passenger_category, pll_seats: int) -> None:
+    if commercial_use is not None and commercial_use not in CUSTOMER_FACING_COMMERCIAL_USES:
+        raise ValueError(f"commercial_use must be one of: {', '.join(CUSTOMER_FACING_COMMERCIAL_USES)}")
     if commercial_use != "commercial_institutional":
         return
     missing = []
@@ -83,8 +85,8 @@ class CompareRequest(BaseModel):
     options: QuoteOptionsIn = QuoteOptionsIn()
 
     @model_validator(mode="after")
-    def _require_institutional_intake(self):
-        _require_institutional_intake(
+    def _validate_commercial_use_intake(self):
+        _validate_commercial_use_intake(
             self.commercial_use, self.institution_type, self.institutional_vehicle_type,
             self.passenger_category, self.options.pll_seats,
         )
@@ -144,8 +146,8 @@ class GenerateQuotationRequest(BaseModel):
     amount_paid: float = Field(default=0, ge=0)
 
     @model_validator(mode="after")
-    def _require_institutional_intake(self):
-        _require_institutional_intake(
+    def _validate_commercial_use_intake(self):
+        _validate_commercial_use_intake(
             self.commercial_use, self.institution_type, self.institutional_vehicle_type,
             self.passenger_category, self.options.pll_seats,
         )
@@ -180,6 +182,12 @@ class QuotationOut(BaseModel):
     limits: list[str]
     year_of_manufacture: int | None
     calculated_age_years: int | None
+    # Which customer-facing Commercial branch this is, present only when
+    # the vehicle class is Commercial (None otherwise).
+    commercial_use: str | None = None
+    # Carrying capacity in tonnes, present only when supplied (Own Goods /
+    # General Cartage, or any insurer whose class requires it).
+    tonnage: float | None = None
     # Institutional details, present only for Commercial Institutional
     # quotations (None otherwise).
     institution_type: str | None = None

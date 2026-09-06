@@ -10,7 +10,7 @@ const CATEGORIES = ["private", "commercial", "psv", "tuktuk", "motorcycle", "ass
 // (institution/vehicle/passenger-category restrictions), PLL rates and
 // tonnage_required are configured from Admin -> Rates once the class
 // exists, alongside its other pricing configuration.
-const COMMERCIAL_USES = ["own_goods", "general_cartage", "commercial_institutional", "hybrid", "private_hire", "online_hailed", "tanker"];
+const COMMERCIAL_USES = ["own_goods", "general_cartage", "commercial_institutional", "commercial_tuktuk", "hybrid", "private_hire", "online_hailed", "tanker"];
 
 function validateClassForm(form) {
   if (!form.code.trim()) return "Code is required.";

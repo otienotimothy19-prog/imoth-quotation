@@ -59,6 +59,8 @@ def _quotation_to_out(q) -> QuotationOut:
         limits=snapshot_data.get("limits", []),
         year_of_manufacture=snapshot_data.get("year_of_manufacture"),
         calculated_age_years=snapshot_data.get("calculated_age_years"),
+        commercial_use=options_used.get("commercial_use"),
+        tonnage=options_used.get("tonnage"),
         institution_type=options_used.get("institution_type"),
         institutional_vehicle_type=options_used.get("institutional_vehicle_type"),
         passenger_category=options_used.get("passenger_category"),

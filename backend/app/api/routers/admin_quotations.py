@@ -14,7 +14,7 @@ from app.models.client_document import ClientDocumentUpload, ClientUploadStatus,
 from app.models.client_vehicle import Client, Vehicle
 from app.models.documents_email_audit import AuditLog, Document, EmailLog
 from app.models.enums import ActorType, QuotationStatus
-from app.models.insurer_rate import Insurer
+from app.models.insurer_rate import Insurer, RateVersion
 from app.models.quotation import Quotation
 from app.models.user import User
 from app.schemas.quotation import EmailSendRequest
@@ -112,6 +112,8 @@ def _get_full(db: Session, quotation_id: uuid.UUID) -> Quotation:
 @router.get("/{quotation_id}")
 def get_quotation_detail(quotation_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     quotation = _get_full(db, quotation_id)
+    rate_version_id = quotation.snapshot.rate_version_id if quotation.snapshot else None
+    rate_version = db.get(RateVersion, rate_version_id) if rate_version_id else None
     return {
         **_summary(quotation),
         "client": {
@@ -139,6 +141,7 @@ def get_quotation_detail(quotation_id: uuid.UUID, db: Session = Depends(get_db),
         "balance": float(quotation.balance),
         "items": [{"label": i.label, "amount": float(i.amount)} for i in sorted(quotation.items, key=lambda x: x.sort_order)],
         "snapshot": quotation.snapshot.data if quotation.snapshot else None,
+        "rate_version_no": rate_version.version_no if rate_version else None,
         "accepted_at": quotation.accepted_at,
         "rejected_at": quotation.rejected_at,
         "expires_at": quotation.expires_at,

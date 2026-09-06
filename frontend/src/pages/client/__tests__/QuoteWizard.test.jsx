@@ -119,6 +119,78 @@ describe("QuoteWizard cover step", () => {
     await waitFor(() => expect(api.post).toHaveBeenCalledWith("/api/quotes/compare", expect.objectContaining({ options: {} })));
   });
 
+  it("shows only 'Commercial' as the Vehicle Class label, with no sub-branches enumerated", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <QuoteWizard />
+      </MemoryRouter>
+    );
+    await fillDetailsAndContinue(user);
+
+    const option = screen.getByRole("option", { name: "Commercial" });
+    expect(option).toBeInTheDocument();
+    expect(option.textContent).toBe("Commercial");
+  });
+
+  it("shows exactly 4 Commercial sub-branch cards, including Commercial Tuk Tuk", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <QuoteWizard />
+      </MemoryRouter>
+    );
+    await fillDetailsAndContinue(user);
+
+    await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
+
+    expect(screen.getByRole("button", { name: /^Own Goods/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^General Cartage/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Commercial Institutional/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Commercial Tuk Tuk/ })).toBeInTheDocument();
+  });
+
+  it("Commercial Tuk Tuk shows neither a tonnage nor a passenger-count field", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <QuoteWizard />
+      </MemoryRouter>
+    );
+    await fillDetailsAndContinue(user);
+
+    await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
+    await user.click(screen.getByRole("button", { name: /^Commercial Tuk Tuk/ }));
+
+    expect(screen.queryByLabelText("Vehicle Tonnage")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Number of Passengers")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Passenger Seats/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Institution Type")).not.toBeInTheDocument();
+  });
+
+  it("sends commercial_use: commercial_tuktuk with empty options when comparing", async () => {
+    const user = userEvent.setup();
+    api.post.mockResolvedValue({ data: { options: [], ineligible_options: [] } });
+    render(
+      <MemoryRouter>
+        <QuoteWizard />
+      </MemoryRouter>
+    );
+    await fillDetailsAndContinue(user);
+
+    await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
+    await user.click(screen.getByRole("button", { name: /^Commercial Tuk Tuk/ }));
+    await user.type(screen.getByPlaceholderText("e.g. 1500000"), "300000");
+    await user.click(screen.getByRole("button", { name: /get quotes/i }));
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        "/api/quotes/compare",
+        expect.objectContaining({ category: "commercial", commercial_use: "commercial_tuktuk", options: {} })
+      )
+    );
+  });
+
   it("requires selecting a commercial use before comparing quotes", async () => {
     const user = userEvent.setup();
     render(

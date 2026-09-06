@@ -115,6 +115,8 @@ def get_detail(risk_note_id: uuid.UUID, db: Session = Depends(get_db), user: Use
     return {
         **_summary(rn),
         "quotation_accepted_at": rn.quotation_accepted_at,
+        "commercial_use": options_used.get("commercial_use"),
+        "tonnage": options_used.get("tonnage"),
         "institution_type": options_used.get("institution_type"),
         "institutional_vehicle_type": options_used.get("institutional_vehicle_type"),
         "passenger_category": options_used.get("passenger_category"),

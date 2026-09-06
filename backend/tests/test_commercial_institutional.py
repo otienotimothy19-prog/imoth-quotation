@@ -24,16 +24,8 @@ client = TestClient(app)
 
 CURRENT_YEAR = datetime.now(timezone.utc).year
 
-
-@pytest.fixture(scope="module")
-def admin_token():
-    login = client.post("/api/auth/login", json={"email": "admin@imoth.co.ke", "password": "ChangeMe123!"})
-    return login.json()["access_token"]
-
-
-@pytest.fixture(scope="module")
-def admin_headers(admin_token):
-    return {"Authorization": f"Bearer {admin_token}"}
+# admin_token / admin_headers come from tests/conftest.py (session-scoped,
+# shared across the whole suite to stay under the login rate limit).
 
 
 def _unique_reg():
@@ -344,12 +336,10 @@ def test_general_cartage_compare_succeeds_without_institutional_fields():
     assert len(resp.json()["options"]) > 0
 
 
-def _generate_institutional_quotation(insurer_code, class_code, *, passenger_category, seats=10, sum_insured=1000000):
-    admin_login = client.post("/api/auth/login", json={"email": "admin@imoth.co.ke", "password": "ChangeMe123!"})
-    headers = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
-    insurers = client.get("/api/admin/insurers", headers=headers).json()
+def _generate_institutional_quotation(admin_headers, insurer_code, class_code, *, passenger_category, seats=10, sum_insured=1000000):
+    insurers = client.get("/api/admin/insurers", headers=admin_headers).json()
     insurer = next(i for i in insurers if i["code"] == insurer_code)
-    classes = client.get("/api/admin/motor-classes", params={"insurer_id": insurer["id"]}, headers=headers).json()
+    classes = client.get("/api/admin/motor-classes", params={"insurer_id": insurer["id"]}, headers=admin_headers).json()
     cls = next(c for c in classes if c["code"] == class_code)
 
     payload = {
@@ -370,12 +360,12 @@ def _generate_institutional_quotation(insurer_code, class_code, *, passenger_cat
     return resp.json()
 
 
-def test_monarch_commercial_institutional_students_get_tagged_rate():
+def test_monarch_commercial_institutional_students_get_tagged_rate(admin_headers):
     # Monarch's Commercial Institutional class rates Students at
     # KES 250/seat and everyone else (organised groups) at KES 500/seat --
     # exactly the rates that must never be hard-coded as universal, only
     # ever read from this insurer's own configured pll_options.
-    q = _generate_institutional_quotation("monarch", "commercial_institutional", passenger_category="STUDENTS", seats=32)
+    q = _generate_institutional_quotation(admin_headers, "monarch", "commercial_institutional", passenger_category="STUDENTS", seats=32)
     assert q["pll_rate"] == 250
     assert q["pll_amount"] == 250 * 32
     assert q["passenger_category"] == "STUDENTS"
@@ -384,8 +374,8 @@ def test_monarch_commercial_institutional_students_get_tagged_rate():
     assert q["passenger_seats"] == 32
 
 
-def test_monarch_commercial_institutional_staff_get_organised_group_rate():
-    q = _generate_institutional_quotation("monarch", "commercial_institutional", passenger_category="STAFF", seats=10)
+def test_monarch_commercial_institutional_staff_get_organised_group_rate(admin_headers):
+    q = _generate_institutional_quotation(admin_headers, "monarch", "commercial_institutional", passenger_category="STAFF", seats=10)
     assert q["pll_rate"] == 500
     assert q["pll_amount"] == 500 * 10
 

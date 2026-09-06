@@ -128,7 +128,7 @@ INSURERS = {
                 "bands": [band(0, None, 0.03, 5000)],
             },
             "tuktuk_corporate": {
-                "label": "Tuk Tuk – Corporate & Delivery", "category": "tuktuk", "max_age": None, "min_si": 0,
+                "label": "Tuk Tuk – Corporate & Delivery", "category": "commercial", "commercial_use": "commercial_tuktuk", "max_age": None, "min_si": 0,
                 "excess": [], "benefits": ["TPO flat premium also available at Kshs 5,000/yr"], "limits": [],
                 "bands": [band(0, None, 0.03, 10000)],
             },
@@ -222,7 +222,7 @@ INSURERS = {
                 "bands": [band(500000, None, 0.05, 35000, ep_included=False, ep_rate=0.005, ep_min=10000, pvt_included=False, pvt_rate=0.0035, pvt_min=3500)],
             },
             "tuktuk_commercial": {
-                "label": "Tuk Tuk – Commercial", "category": "tuktuk", "max_age": 10, "min_si": 250000,
+                "label": "Tuk Tuk – Commercial", "category": "commercial", "commercial_use": "commercial_tuktuk", "max_age": 10, "min_si": 250000,
                 "excess": [], "benefits": [], "limits": [],
                 "bands": [band(250000, None, 0.04, 10000, ep_included=False, ep_rate=0.005, ep_min=5000, pvt_included=False, pvt_rate=0.0035, pvt_min=3500)],
             },
@@ -344,7 +344,7 @@ INSURERS = {
             # -- rather than invent unstated cover, these are stored as not
             # offered on this product. See the completion report.
             "tuktuk_commercial": {
-                "label": "Tuk Tuk – Commercial", "category": "tuktuk", "max_age": 10, "min_si": 250000,
+                "label": "Tuk Tuk – Commercial", "category": "commercial", "commercial_use": "commercial_tuktuk", "max_age": 10, "min_si": 250000,
                 "excess": [], "benefits": [], "limits": [],
                 "bands": [band(250000, None, 0.04, 15000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_not_offered=True)],
             },
@@ -494,7 +494,7 @@ INSURERS = {
             "tpo_psv_taxi_4": {"label": "PSV Taxi 4 PAX – TPO", "category": "tpo", "max_age": None, "min_si": 0, "excess": [], "benefits": [], "limits": [], "flat_only": flat(8721, "Annual premium")},
             "tpo_psv_tsv_9": {"label": "PSV Unmarked TSV 9 PAX – TPO", "category": "tpo", "max_age": None, "min_si": 0, "excess": [], "benefits": [], "limits": [], "flat_only": flat(11006, "Annual premium")},
             "tpo_psv_tsv_8": {"label": "PSV Unmarked TSV 8 PAX – TPO", "category": "tpo", "max_age": None, "min_si": 0, "excess": [], "benefits": [], "limits": [], "flat_only": flat(10512, "Annual premium")},
-            "tpo_tuktuk_commercial": {"label": "Tuk Tuk – Commercial – TPO", "category": "tpo", "max_age": None, "min_si": 0, "excess": [], "benefits": [], "limits": [], "flat_only": flat(2784, "Annual premium")},
+            "tpo_tuktuk_commercial": {"label": "Tuk Tuk – Commercial – TPO", "category": "tpo", "commercial_use": "commercial_tuktuk", "max_age": None, "min_si": 0, "excess": [], "benefits": [], "limits": [], "flat_only": flat(2784, "Annual premium")},
             "tpo_psv_tuktuk": {"label": "PSV Tuk Tuk – TPO", "category": "tpo", "max_age": None, "min_si": 0, "excess": [], "benefits": [], "limits": [], "flat_only": flat(4000, "Annual premium")},
         },
     },
@@ -537,9 +537,9 @@ INSURERS = {
 
 CATEGORY_LABELS = {
     "private": "Private Car",
-    "commercial": "Commercial (Own Goods / Gen. Cartage / Institutional)",
+    "commercial": "Commercial",
     "psv": "PSV / Chauffeur Driven",
-    "tuktuk": "Tuk Tuk",
+    "tuktuk": "PSV Tuk Tuk",
     "motorcycle": "Motorcycle",
     "asset": "Asset (New Units)",
     "special": "Special Type (Farm/Construction)",

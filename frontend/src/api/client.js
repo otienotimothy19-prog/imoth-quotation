@@ -92,3 +92,21 @@ export const dateTimeFmt = (iso) => {
   const d = new Date(iso);
   return d.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 };
+
+// Display labels for commercial_use values -- generic title-casing would
+// wrongly render "commercial_tuktuk" as "Commercial Tuktuk".
+export const COMMERCIAL_USE_LABELS = {
+  own_goods: "Own Goods",
+  general_cartage: "General Cartage",
+  commercial_institutional: "Commercial Institutional",
+  commercial_tuktuk: "Commercial Tuk Tuk",
+  hybrid: "Hybrid",
+  private_hire: "Private Hire",
+  online_hailed: "Online-Hailed",
+  tanker: "Tanker",
+};
+
+export function commercialUseLabel(value) {
+  if (!value) return "";
+  return COMMERCIAL_USE_LABELS[value] || value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
