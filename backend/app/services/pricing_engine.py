@@ -32,6 +32,9 @@ class PremiumResult:
     total: float
     band_used: dict | None
     options_used: dict = field(default_factory=dict)
+    pll_rate: float | None = None
+    pll_amount: float | None = None
+    pll_included: bool = False
 
     def as_dict(self) -> dict:
         return {
@@ -42,6 +45,9 @@ class PremiumResult:
             "total": self.total,
             "band_used": self.band_used,
             "options_used": self.options_used,
+            "pll_rate": self.pll_rate,
+            "pll_amount": self.pll_amount,
+            "pll_included": self.pll_included,
         }
 
 
@@ -182,18 +188,37 @@ def compute_premium(
         band_used = b
 
     pll_seats = options.get("pll_seats") or 0
-    if motor_class.get("pll_options") and pll_seats > 0:
-        opt = next(
-            (o for o in motor_class["pll_options"] if o["key"] == options.get("pll_option_key")),
-            motor_class["pll_options"][0],
+    passenger_category = options.get("passenger_category")
+    pll_rate: float | None = None
+    pll_amount: float | None = None
+    pll_included = bool(motor_class.get("pll_included"))
+    if pll_included:
+        # PLL is bundled into the base rate -- show it, but never charge it
+        # again on top.
+        if pll_seats > 0:
+            lines.append(PremiumLine("Passenger Legal Liability — Included", 0.0))
+        pll_rate = 0.0
+        pll_amount = 0.0
+    elif motor_class.get("pll_options") and pll_seats > 0:
+        pll_options = motor_class["pll_options"]
+        # Prefer the option explicitly tagged for this passenger category
+        # (e.g. a "Students" tier vs an "Organised group / general hire"
+        # tier); fall back to the legacy pll_option_key match, then to the
+        # first option -- the exact pre-existing behaviour for any class
+        # that hasn't tagged its options with applies_to.
+        opt = (
+            next((o for o in pll_options if passenger_category and passenger_category in (o.get("applies_to") or [])), None)
+            or next((o for o in pll_options if o["key"] == options.get("pll_option_key")), pll_options[0])
         )
-        pll = opt["rate"] * pll_seats
-        lines.append(PremiumLine(f"Passenger Legal Liability ({pll_seats} seats, {opt['label']} @ {opt['rate']:,.0f})", pll))
-        subtotal += pll
+        pll_amount = opt["rate"] * pll_seats
+        pll_rate = opt["rate"]
+        lines.append(PremiumLine(f"Passenger Legal Liability ({pll_seats} seats, {opt['label']} @ {opt['rate']:,.0f})", pll_amount))
+        subtotal += pll_amount
     elif motor_class.get("pll_per_seat") and pll_seats > 0:
-        pll = motor_class["pll_per_seat"] * pll_seats
-        lines.append(PremiumLine(f"Passenger Legal Liability ({pll_seats} seats @ {motor_class['pll_per_seat']:,.0f})", pll))
-        subtotal += pll
+        pll_rate = motor_class["pll_per_seat"]
+        pll_amount = pll_rate * pll_seats
+        lines.append(PremiumLine(f"Passenger Legal Liability ({pll_seats} seats @ {motor_class['pll_per_seat']:,.0f})", pll_amount))
+        subtotal += pll_amount
 
     levies = subtotal * levy_rate
     total = subtotal + levies + stamp_duty
@@ -206,18 +231,30 @@ def compute_premium(
         total=total,
         band_used=band_used,
         options_used=options,
+        pll_rate=pll_rate,
+        pll_amount=pll_amount,
+        pll_included=pll_included,
     )
 
 
-def eligibility_reason(motor_class: dict, sum_insured: float, age: int | None) -> str | None:
+def eligibility_reason(
+    motor_class: dict,
+    sum_insured: float,
+    age: int | None,
+    *,
+    institution_type: str | None = None,
+    vehicle_type: str | None = None,
+    passenger_category: str | None = None,
+) -> str | None:
     """None if the motor class is eligible for this Sum Insured / vehicle
-    age; otherwise a human-readable explanation of why not. Vehicles beyond
-    a motor class's configured maximum age are excluded outright rather
-    than shown with a warning: there is no approved manual-underwriting
-    referral workflow in this system to route an over-age option to
-    instead, so it must not appear as an immediately eligible quotation --
-    but the reason must still be surfaced clearly rather than the option
-    simply vanishing."""
+    age (and, for Commercial Institutional classes, institution/vehicle/
+    passenger-category restrictions); otherwise a human-readable
+    explanation of why not. Vehicles beyond a motor class's configured
+    maximum age are excluded outright rather than shown with a warning:
+    there is no approved manual-underwriting referral workflow in this
+    system to route an over-age option to instead, so it must not appear
+    as an immediately eligible quotation -- but the reason must still be
+    surfaced clearly rather than the option simply vanishing."""
     max_age = motor_class.get("max_age")
     if max_age is not None and age is not None and age > max_age:
         return (
@@ -225,8 +262,26 @@ def eligibility_reason(motor_class: dict, sum_insured: float, age: int | None) -
             f"Maximum eligible age: {max_age} years\n"
             "Not eligible for this insurer's product"
         )
+    eligible_institutions = motor_class.get("eligible_institution_types")
+    if eligible_institutions and institution_type not in eligible_institutions:
+        return f"This insurer's product is not offered for institution type '{institution_type}'."
+    eligible_vehicles = motor_class.get("eligible_vehicle_types")
+    if eligible_vehicles and vehicle_type not in eligible_vehicles:
+        return f"This insurer's product is not offered for vehicle type '{vehicle_type}'."
+    eligible_passenger_categories = motor_class.get("eligible_passenger_categories")
+    if eligible_passenger_categories and passenger_category not in eligible_passenger_categories:
+        return f"This insurer's product is not offered for passenger category '{passenger_category}'."
     if motor_class.get("flat_only"):
         return None
+    # "bands" is always present (possibly []) on a real class_dict built by
+    # motor_class_to_dict -- a class with none configured yet must be
+    # excluded with a clear reason rather than crash `find_band` on an
+    # empty list. A caller that omits the key entirely (e.g. a minimal
+    # synthetic dict in a unit test that only cares about age/SI checks)
+    # is treated as not applicable, so this doesn't require every existing
+    # test fixture to add a "bands" key it doesn't otherwise need.
+    if "bands" in motor_class and not motor_class["bands"]:
+        return "This insurer's product has not yet been configured with rate bands."
     min_si = motor_class.get("min_si", 0)
     if sum_insured < min_si:
         return f"Sum Insured of KES {sum_insured:,.0f} is below this product's minimum vehicle value of KES {min_si:,.0f}."
@@ -236,6 +291,21 @@ def eligibility_reason(motor_class: dict, sum_insured: float, age: int | None) -
     return None
 
 
-def is_eligible(motor_class: dict, sum_insured: float, age: int | None) -> bool:
-    """Whether a motor class can be quoted for the given SI / vehicle age."""
-    return eligibility_reason(motor_class, sum_insured, age) is None
+def is_eligible(
+    motor_class: dict,
+    sum_insured: float,
+    age: int | None,
+    *,
+    institution_type: str | None = None,
+    vehicle_type: str | None = None,
+    passenger_category: str | None = None,
+) -> bool:
+    """Whether a motor class can be quoted for the given SI / vehicle age
+    (and institution/vehicle/passenger-category restrictions, if any)."""
+    return (
+        eligibility_reason(
+            motor_class, sum_insured, age,
+            institution_type=institution_type, vehicle_type=vehicle_type, passenger_category=passenger_category,
+        )
+        is None
+    )

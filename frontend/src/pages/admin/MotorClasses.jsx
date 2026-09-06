@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 
-const CATEGORIES = ["private", "commercial", "institutional", "psv", "tuktuk", "motorcycle", "asset", "special", "tpo"];
+const CATEGORIES = ["private", "commercial", "psv", "tuktuk", "motorcycle", "asset", "special", "tpo"];
+
+// Sub-uses of category="commercial". Only the first 3 are ever offered to
+// a customer in the wizard; the rest are insurer-internal products an
+// admin can still create/manage here. Detailed institutional eligibility
+// (institution/vehicle/passenger-category restrictions), PLL rates and
+// tonnage_required are configured from Admin -> Rates once the class
+// exists, alongside its other pricing configuration.
+const COMMERCIAL_USES = ["own_goods", "general_cartage", "commercial_institutional", "hybrid", "private_hire", "online_hailed", "tanker"];
 
 function validateClassForm(form) {
   if (!form.code.trim()) return "Code is required.";
@@ -44,6 +52,7 @@ function emptyForm() {
   return {
     code: "", label: "", category: "private", max_age: "", min_si: 0, max_si: "",
     flatOnly: false, flatPremium: "", flatRateOnSi: "", flatMinPremium: "", flatNote: "",
+    commercial_use: "",
   };
 }
 
@@ -190,6 +199,7 @@ export default function MotorClasses() {
         max_age: form.max_age === "" ? null : Number(form.max_age),
         min_si: form.flatOnly ? 0 : Number(form.min_si) || 0,
         max_si: form.flatOnly ? null : form.max_si === "" ? null : Number(form.max_si),
+        commercial_use: form.category === "commercial" && form.commercial_use ? form.commercial_use : null,
         flat_only: form.flatOnly
           ? {
               premium: form.flatPremium === "" ? null : Number(form.flatPremium),
@@ -270,6 +280,28 @@ export default function MotorClasses() {
               <input type="number" value={form.max_age} onChange={(e) => setForm({ ...form, max_age: e.target.value })} />
             </div>
           </div>
+          {form.category === "commercial" && (
+            <div className="row2">
+              <div>
+                <label htmlFor="new-class-commercial-use">Commercial Use</label>
+                <select
+                  id="new-class-commercial-use"
+                  value={form.commercial_use}
+                  onChange={(e) => setForm({ ...form, commercial_use: e.target.value })}
+                >
+                  <option value="">(not set)</option>
+                  {COMMERCIAL_USES.map((u) => (
+                    <option key={u} value={u}>{u.replace(/_/g, " ")}</option>
+                  ))}
+                </select>
+                <div className="hint">
+                  Only Own Goods, General Cartage and Commercial Institutional are offered to customers. Eligibility
+                  restrictions, tonnage requirements and Passenger Legal Liability rates are configured from Admin →
+                  Rates after creating this class.
+                </div>
+              </div>
+            </div>
+          )}
           <div style={{ margin: "10px 0" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 400 }}>
               <input
@@ -431,7 +463,10 @@ export default function MotorClasses() {
                       {c.label}
                       {!c.active && <span className="hint" style={{ marginLeft: 6 }}>(inactive)</span>}
                     </td>
-                    <td>{c.category}</td>
+                    <td>
+                      {c.category}
+                      {c.commercial_use && <div className="hint">{c.commercial_use.replace(/_/g, " ")}</div>}
+                    </td>
                     <td>{c.max_age ?? "—"}</td>
                     <td>
                       {c.flat_only

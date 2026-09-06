@@ -34,6 +34,8 @@ router = APIRouter(prefix="/api/quotes", tags=["client-quotations"])
 
 def _quotation_to_out(q) -> QuotationOut:
     snapshot_data = q.snapshot.data if q.snapshot else {}
+    options_used = snapshot_data.get("options_used") or {}
+    calculation = snapshot_data.get("calculation") or {}
     return QuotationOut(
         id=q.id,
         quotation_number=q.quotation_number,
@@ -57,6 +59,13 @@ def _quotation_to_out(q) -> QuotationOut:
         limits=snapshot_data.get("limits", []),
         year_of_manufacture=snapshot_data.get("year_of_manufacture"),
         calculated_age_years=snapshot_data.get("calculated_age_years"),
+        institution_type=options_used.get("institution_type"),
+        institutional_vehicle_type=options_used.get("institutional_vehicle_type"),
+        passenger_category=options_used.get("passenger_category"),
+        passenger_seats=options_used.get("pll_seats") or None,
+        pll_rate=calculation.get("pll_rate"),
+        pll_amount=calculation.get("pll_amount"),
+        pll_included=bool(calculation.get("pll_included")),
         generated_at=q.generated_at,
         accepted_at=q.accepted_at,
         rejected_at=q.rejected_at,
@@ -76,6 +85,10 @@ def compare_insurers(request: Request, payload: CompareRequest, db: Session = De
         sum_insured=payload.sum_insured,
         options=payload.options,
         year_of_manufacture=payload.vehicle.year_of_manufacture,
+        commercial_use=payload.commercial_use,
+        institution_type=payload.institution_type,
+        institutional_vehicle_type=payload.institutional_vehicle_type,
+        passenger_category=payload.passenger_category,
     )
     if not options:
         detail = "No insurer currently offers this vehicle class at the given Sum Insured and vehicle age. Try adjusting the Sum Insured or vehicle class."
@@ -107,6 +120,10 @@ def generate(request: Request, payload: GenerateQuotationRequest, db: Session = 
             source=QuotationSource.CLIENT_PORTAL,
             created_by=None,
             actor_label=payload.client.email or payload.client.phone,
+            commercial_use=payload.commercial_use,
+            institution_type=payload.institution_type,
+            institutional_vehicle_type=payload.institutional_vehicle_type,
+            passenger_category=payload.passenger_category,
         )
     except QuoteServiceError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

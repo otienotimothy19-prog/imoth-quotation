@@ -2,7 +2,16 @@ import uuid
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.models.enums import RiskNoteStatus
+from app.models.enums import InstitutionalVehicleType, InstitutionType, PassengerCategory, RiskNoteStatus
+
+# Sub-uses of category="commercial". Only "own_goods", "general_cartage" and
+# "commercial_institutional" are ever offered to a customer as a selectable
+# branch; "hybrid"/"private_hire"/"online_hailed"/"tanker" are
+# insurer-internal products an admin can still create/manage here.
+COMMERCIAL_USES = (
+    "own_goods", "general_cartage", "commercial_institutional",
+    "hybrid", "private_hire", "online_hailed", "tanker",
+)
 
 
 class InsurerCreate(BaseModel):
@@ -58,6 +67,11 @@ class PllOption(BaseModel):
     key: str = Field(min_length=1, max_length=50)
     label: str = Field(min_length=1, max_length=255)
     rate: float = Field(ge=0)
+    # Which passenger categories this rate applies to (Commercial
+    # Institutional classes only). Empty/omitted = matches any category
+    # that no other option is explicitly tagged for -- the pre-existing
+    # untagged behaviour, preserved for backward compatibility.
+    applies_to: list[PassengerCategory] = []
 
 
 def _validate_pll_options(options: list[PllOption] | None) -> list[PllOption] | None:
@@ -84,6 +98,12 @@ class FlatOnly(BaseModel):
         return self
 
 
+def _validate_commercial_use(v: str | None) -> str | None:
+    if v is not None and v not in COMMERCIAL_USES:
+        raise ValueError(f"commercial_use must be one of: {', '.join(COMMERCIAL_USES)}")
+    return v
+
+
 class MotorClassCreate(BaseModel):
     insurer_id: uuid.UUID
     code: str = Field(min_length=1, max_length=80)
@@ -95,15 +115,30 @@ class MotorClassCreate(BaseModel):
     has_lr_toggle: bool = False
     pll_per_seat: float | None = Field(default=None, ge=0)
     pll_options: list[PllOption] | None = None
+    pll_included: bool = False
     flat_only: FlatOnly | None = None
     excess: list[str] = []
     benefits: list[str] = []
     limits: list[str] = []
+    # Only meaningful when category == "commercial" -- see COMMERCIAL_USES.
+    commercial_use: str | None = Field(default=None, max_length=30)
+    # Eligibility restrictions for Commercial Institutional classes. Blank/
+    # omitted = no restriction on that dimension (matches the existing
+    # leave-blank-for-any convention used by band passenger/tonnage limits).
+    eligible_institution_types: list[InstitutionType] | None = None
+    eligible_vehicle_types: list[InstitutionalVehicleType] | None = None
+    eligible_passenger_categories: list[PassengerCategory] | None = None
+    tonnage_required: bool = False
 
     @field_validator("pll_options")
     @classmethod
     def _pll_options_unique_create(cls, v):
         return _validate_pll_options(v)
+
+    @field_validator("commercial_use")
+    @classmethod
+    def _commercial_use_create(cls, v):
+        return _validate_commercial_use(v)
 
     @model_validator(mode="after")
     def _si_range(self):
@@ -121,11 +156,17 @@ class MotorClassUpdate(BaseModel):
     has_lr_toggle: bool | None = None
     pll_per_seat: float | None = Field(default=None, ge=0)
     pll_options: list[PllOption] | None = None
+    pll_included: bool | None = None
     flat_only: FlatOnly | None = None
     excess: list[str] | None = None
     benefits: list[str] | None = None
     limits: list[str] | None = None
     active: bool | None = None
+    commercial_use: str | None = Field(default=None, max_length=30)
+    eligible_institution_types: list[InstitutionType] | None = None
+    eligible_vehicle_types: list[InstitutionalVehicleType] | None = None
+    eligible_passenger_categories: list[PassengerCategory] | None = None
+    tonnage_required: bool | None = None
     # Optional: when set, this update is also recorded as a new RateVersion
     # (used by the Rates screen when editing a flat-rate product's premium
     # or its Passenger Legal Liability rates, so those changes get the same
@@ -136,6 +177,11 @@ class MotorClassUpdate(BaseModel):
     @classmethod
     def _pll_options_unique_update(cls, v):
         return _validate_pll_options(v)
+
+    @field_validator("commercial_use")
+    @classmethod
+    def _commercial_use_update(cls, v):
+        return _validate_commercial_use(v)
 
     @model_validator(mode="after")
     def _si_range(self):

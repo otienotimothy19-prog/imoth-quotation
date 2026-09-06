@@ -96,6 +96,7 @@ def _get_full(db: Session, risk_note_id: uuid.UUID) -> RiskNote:
             joinedload(RiskNote.quotation).joinedload(Quotation.client),
             joinedload(RiskNote.quotation).joinedload(Quotation.vehicle),
             joinedload(RiskNote.quotation).joinedload(Quotation.insurer),
+            joinedload(RiskNote.quotation).joinedload(Quotation.snapshot),
             joinedload(RiskNote.status_history),
         )
         .filter(RiskNote.id == risk_note_id)
@@ -109,9 +110,15 @@ def _get_full(db: Session, risk_note_id: uuid.UUID) -> RiskNote:
 @router.get("/{risk_note_id}")
 def get_detail(risk_note_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     rn = _get_full(db, risk_note_id)
+    snapshot_data = rn.quotation.snapshot.data if rn.quotation.snapshot else {}
+    options_used = snapshot_data.get("options_used") or {}
     return {
         **_summary(rn),
         "quotation_accepted_at": rn.quotation_accepted_at,
+        "institution_type": options_used.get("institution_type"),
+        "institutional_vehicle_type": options_used.get("institutional_vehicle_type"),
+        "passenger_category": options_used.get("passenger_category"),
+        "passenger_seats": options_used.get("pll_seats") or None,
         "status_history": [
             {
                 "previous_status": h.previous_status, "new_status": h.new_status, "reason": h.reason,

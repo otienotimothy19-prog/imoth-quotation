@@ -4,6 +4,11 @@ import { api, dateFmt, errorMessage, money } from "../../api/client";
 import DocumentUploadSection from "../../components/DocumentUploadSection";
 import QuoteShell from "../../components/wizard/QuoteShell";
 
+function titleCase(value) {
+  if (!value) return "";
+  return String(value).replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function QuoteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -109,6 +114,28 @@ export default function QuoteDetail() {
         <div className="hint">Total Premium</div>
         <div className="quote-summary-value">{money(quote.total_premium)}</div>
       </div>
+      {quote.institution_type && (
+        <>
+          <div className="quote-summary-item">
+            <div className="hint">Institution Type</div>
+            <div className="quote-summary-value">{titleCase(quote.institution_type)}</div>
+          </div>
+          <div className="quote-summary-item">
+            <div className="hint">Vehicle Type</div>
+            <div className="quote-summary-value">{titleCase(quote.institutional_vehicle_type)}</div>
+          </div>
+          <div className="quote-summary-item">
+            <div className="hint">Passenger Category</div>
+            <div className="quote-summary-value">{titleCase(quote.passenger_category)}</div>
+          </div>
+          {quote.passenger_seats != null && (
+            <div className="quote-summary-item">
+              <div className="hint">Passenger Seats (excl. driver)</div>
+              <div className="quote-summary-value">{quote.passenger_seats}</div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 

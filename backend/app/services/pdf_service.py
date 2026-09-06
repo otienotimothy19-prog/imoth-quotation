@@ -147,6 +147,20 @@ def render_quotation_pdf(*, quotation, company: dict, footer_text: str, conditio
     )
     story.append(Spacer(1, 8))
 
+    options_used = quotation.snapshot.data.get("options_used") or {}
+    if options_used.get("institution_type"):
+        seats = options_used.get("pll_seats")
+        institutional_bits = [
+            f"<b>Institution Type:</b> {options_used['institution_type'].title()}",
+            f"<b>Vehicle Type:</b> {(options_used.get('institutional_vehicle_type') or '').title()}",
+            f"<b>Passenger Category:</b> {(options_used.get('passenger_category') or '').replace('_', ' ').title()}",
+        ]
+        if seats:
+            institutional_bits.append(f"<b>Passenger Seats (excl. driver):</b> {seats}")
+        story.append(Paragraph("Institutional Details", STYLE_H3))
+        story.append(Paragraph(" &nbsp;&nbsp; ".join(institutional_bits), STYLE_LI))
+        story.append(Spacer(1, 8))
+
     rows = [["Item", "Sum Insured (Kshs)", "Premium (Kshs)"]]
     rows.append(["CLASS: " + quotation.vehicle_class_label, "", ""])
     section_rows = {1}
@@ -237,6 +251,14 @@ def render_risk_note_pdf(*, risk_note, quotation, company: dict, conditions: lis
         ["Quotation Accepted On", risk_note.quotation_accepted_at.strftime("%d %B %Y, %H:%M")],
         ["Status", risk_note.status.value],
     ]
+    options_used = (quotation.snapshot.data.get("options_used") if quotation.snapshot else None) or {}
+    if options_used.get("institution_type"):
+        rows.append(["Institution Type", options_used["institution_type"].title()])
+        rows.append(["Vehicle Type", (options_used.get("institutional_vehicle_type") or "").title()])
+        rows.append(["Passenger Category", (options_used.get("passenger_category") or "").replace("_", " ").title()])
+        if options_used.get("pll_seats"):
+            rows.append(["Passenger Seats (excl. driver)", str(options_used["pll_seats"])])
+
     tbl = Table(rows, colWidths=[55 * mm, 130 * mm])
     tbl.setStyle(
         TableStyle(

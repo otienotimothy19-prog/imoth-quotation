@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, dateTimeFmt, downloadBlob, errorMessage, money } from "../../api/client";
 
+function titleCase(value) {
+  if (!value) return "—";
+  return String(value).replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function QuotationDetail() {
   const { id } = useParams();
   const [q, setQ] = useState(null);
@@ -159,6 +164,17 @@ export default function QuotationDetail() {
               Year of Manufacture: {q.vehicle.year_of_manufacture ?? "—"}<br />
               Vehicle Age at Quotation: {q.vehicle.age_years ?? "—"} years
             </p>
+            {q.snapshot?.options_used?.institution_type && (
+              <>
+                <h3 style={{ fontSize: 13 }}>Institutional Details</h3>
+                <p>
+                  Institution Type: {titleCase(q.snapshot.options_used.institution_type)}<br />
+                  Vehicle Type: {titleCase(q.snapshot.options_used.institutional_vehicle_type)}<br />
+                  Passenger Category: {titleCase(q.snapshot.options_used.passenger_category)}<br />
+                  {q.snapshot.options_used.pll_seats ? `Passenger Seats (excl. driver): ${q.snapshot.options_used.pll_seats}` : null}
+                </p>
+              </>
+            )}
           </div>
           <div className="card">
             <h3 style={{ fontSize: 13 }}>Premium Breakdown</h3>

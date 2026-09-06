@@ -43,7 +43,32 @@ class MotorClass(UUIDPKMixin, TimestampMixin, Base):
     has_lr_toggle: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     pll_per_seat: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     pll_options: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # True when Passenger Legal Liability is already bundled into the base
+    # rate for this class -- pricing shows a zero-amount "Included" line
+    # instead of charging from pll_options/pll_per_seat.
+    pll_included: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     flat_only: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    # Sub-use within category == "commercial" -- distinguishes goods-carrying
+    # uses (own_goods, general_cartage) and passenger-carrying institutional
+    # use from insurer-internal-only products (hybrid, private_hire,
+    # online_hailed, tanker) that admins manage but customers never see as a
+    # selectable branch. Null/unused for every other category.
+    commercial_use: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
+    # Optional eligibility restrictions for Commercial Institutional classes.
+    # Null/empty means "no restriction" -- every value is eligible, matching
+    # the same convention used by the optional band-level passenger/tonnage
+    # ranges below.
+    eligible_institution_types: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    eligible_vehicle_types: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    eligible_passenger_categories: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+
+    # True when this class's approved terms require a tonnage figure before
+    # a quote can be generated against it (rare for passenger-carrying
+    # institutional products; enforced at generate time regardless of
+    # category).
+    tonnage_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     excess: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     benefits: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)

@@ -3,6 +3,11 @@ import { Link, useParams } from "react-router-dom";
 import { api, dateTimeFmt, downloadBlob, errorMessage, money } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 
+function titleCase(value) {
+  if (!value) return "—";
+  return String(value).replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function RiskNoteDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -166,6 +171,16 @@ export default function RiskNoteDetail() {
               <tr><td>Cover Start</td><td>{dateTimeFmt(rn.cover_start_date)}</td></tr>
               <tr><td>Cover End</td><td>{dateTimeFmt(rn.cover_end_date)}</td></tr>
               <tr><td>Accepted On</td><td>{dateTimeFmt(rn.quotation_accepted_at)}</td></tr>
+              {rn.institution_type && (
+                <>
+                  <tr><td>Institution Type</td><td>{titleCase(rn.institution_type)}</td></tr>
+                  <tr><td>Vehicle Type</td><td>{titleCase(rn.institutional_vehicle_type)}</td></tr>
+                  <tr><td>Passenger Category</td><td>{titleCase(rn.passenger_category)}</td></tr>
+                  {rn.passenger_seats != null && (
+                    <tr><td>Passenger Seats (excl. driver)</td><td>{rn.passenger_seats}</td></tr>
+                  )}
+                </>
+              )}
             </tbody>
           </table>
 

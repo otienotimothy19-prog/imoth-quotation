@@ -1,10 +1,31 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
-from app.models.enums import QuotationStatus, RiskNoteStatus
+from app.models.enums import InstitutionalVehicleType, InstitutionType, PassengerCategory, QuotationStatus, RiskNoteStatus
 from app.services.vehicle_age import MIN_MANUFACTURE_YEAR, current_year
+
+# Sub-uses of category="commercial" a customer may actually select. Hybrid /
+# private_hire / online_hailed / tanker classes still exist and are
+# admin-manageable, but are never offered as a customer-facing branch.
+CUSTOMER_FACING_COMMERCIAL_USES = ("own_goods", "general_cartage", "commercial_institutional")
+
+
+def _require_institutional_intake(commercial_use: str | None, institution_type, institutional_vehicle_type, passenger_category, pll_seats: int) -> None:
+    if commercial_use != "commercial_institutional":
+        return
+    missing = []
+    if institution_type is None:
+        missing.append("institution_type")
+    if institutional_vehicle_type is None:
+        missing.append("institutional_vehicle_type")
+    if passenger_category is None:
+        missing.append("passenger_category")
+    if missing:
+        raise ValueError(f"Commercial Institutional requires: {', '.join(missing)}")
+    if pll_seats <= 0:
+        raise ValueError("Commercial Institutional requires a positive number of passenger seats")
 
 
 class ClientIn(BaseModel):
@@ -51,8 +72,23 @@ class CompareRequest(BaseModel):
     client: ClientIn
     vehicle: VehicleIn
     category: str
+    # Only meaningful when category == "commercial" -- selects which
+    # customer-facing branch (own_goods / general_cartage /
+    # commercial_institutional) is being quoted.
+    commercial_use: str | None = None
+    institution_type: InstitutionType | None = None
+    institutional_vehicle_type: InstitutionalVehicleType | None = None
+    passenger_category: PassengerCategory | None = None
     sum_insured: float = Field(ge=0)
     options: QuoteOptionsIn = QuoteOptionsIn()
+
+    @model_validator(mode="after")
+    def _require_institutional_intake(self):
+        _require_institutional_intake(
+            self.commercial_use, self.institution_type, self.institutional_vehicle_type,
+            self.passenger_category, self.options.pll_seats,
+        )
+        return self
 
 
 class CompareOption(BaseModel):
@@ -69,6 +105,10 @@ class CompareOption(BaseModel):
     levies: float
     stamp_duty: float
     total_premium: float
+    # True if a tonnage figure must be supplied before this specific option
+    # can be generated (rare -- most classes, including every Commercial
+    # Institutional product today, don't require it).
+    tonnage_required: bool = False
 
 
 class IneligibleOption(BaseModel):
@@ -95,9 +135,21 @@ class GenerateQuotationRequest(BaseModel):
     vehicle: VehicleIn
     insurer_id: uuid.UUID
     motor_class_id: uuid.UUID
+    commercial_use: str | None = None
+    institution_type: InstitutionType | None = None
+    institutional_vehicle_type: InstitutionalVehicleType | None = None
+    passenger_category: PassengerCategory | None = None
     sum_insured: float = Field(ge=0)
     options: QuoteOptionsIn = QuoteOptionsIn()
     amount_paid: float = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def _require_institutional_intake(self):
+        _require_institutional_intake(
+            self.commercial_use, self.institution_type, self.institutional_vehicle_type,
+            self.passenger_category, self.options.pll_seats,
+        )
+        return self
 
 
 class QuotationLineOut(BaseModel):
@@ -128,6 +180,15 @@ class QuotationOut(BaseModel):
     limits: list[str]
     year_of_manufacture: int | None
     calculated_age_years: int | None
+    # Institutional details, present only for Commercial Institutional
+    # quotations (None otherwise).
+    institution_type: str | None = None
+    institutional_vehicle_type: str | None = None
+    passenger_category: str | None = None
+    passenger_seats: int | None = None
+    pll_rate: float | None = None
+    pll_amount: float | None = None
+    pll_included: bool = False
     generated_at: datetime | None
     accepted_at: datetime | None
     rejected_at: datetime | None
