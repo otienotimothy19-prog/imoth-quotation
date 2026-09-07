@@ -31,7 +31,8 @@ export default function QuoteOfferActions({ offer, children }) {
     try {
       const res = await api.get(`${path}/pdf`, { ...config, responseType: 'blob' });
       const insurer = offer.insurer_name.replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-|-$/g, '');
-      downloadBlob(res.data, `Imoth-Motor-Quote-${insurer}-${offer.offer_id}.pdf`);
+      const serverFilename = res.headers?.['content-disposition']?.match(/filename="([^"]+)"/)?.[1];
+      downloadBlob(res.data, serverFilename || `Imoth-Motor-Quote-${insurer}.pdf`);
     } catch (err) {
       if (err.response?.data instanceof Blob) {
         try { err.response.data = JSON.parse(await err.response.data.text()); } catch { /* use fallback */ }

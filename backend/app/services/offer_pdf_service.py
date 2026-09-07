@@ -17,7 +17,8 @@ OFFER_NOTICE = 'This quotation has not yet been accepted and does not constitute
 
 def filename(offer):
     insurer = re.sub(r"[^A-Za-z0-9-]+", "-", offer.snapshot_data["insurer_name"]).strip("-")
-    return f"Imoth-Motor-Quote-{insurer}-{offer.id}.pdf"
+    plate = re.sub(r'[^A-Z0-9]', '', offer.registration_no.upper())
+    return f"Imoth-Motor-Quote-{plate}-{insurer}.pdf"
 
 
 def render_offer_pdf(offer, company):
@@ -71,7 +72,7 @@ def render_offer_pdf(offer, company):
     hero.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,-1),blue), ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
                              ('LEFTPADDING',(0,0),(-1,-1),12), ('RIGHTPADDING',(0,0),(-1,-1),12),
                              ('TOPPADDING',(0,0),(-1,-1),12), ('BOTTOMPADDING',(0,0),(-1,-1),12)]))
-    story += [hero, Spacer(1, 8), p(f'Quote reference: {offer.id}', 'Small'),
+    story += [hero, Spacer(1, 8), p(f'Quotation for vehicle: {offer.registration_no}', 'Small'),
               p('Prepared for: Prospective Client', 'Small')]
     dates = Table([[[p('DATE GENERATED', 'Label'), p(offer.created_at.astimezone(timezone.utc).strftime('%d %b %Y, %H:%M UTC'))],
                     [p('VALID UNTIL', 'Label'), p(offer.expires_at.astimezone(timezone.utc).strftime('%d %b %Y, %H:%M UTC'))]]],
