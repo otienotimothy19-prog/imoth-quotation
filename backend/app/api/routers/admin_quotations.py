@@ -18,7 +18,9 @@ from app.models.insurer_rate import Insurer, RateVersion
 from app.models.quotation import Quotation
 from app.models.user import User
 from app.schemas.quotation import EmailSendRequest
-from app.services import audit_service, client_document_service, email_service, storage_service
+from app.services import audit_service, client_document_service, email_service, storage_service, pdf_service
+from app.services.quote_service import _company_settings
+from app.services.settings_service import get_setting
 from app.services.client_document_service import DOCUMENT_LABELS
 
 router = APIRouter(prefix="/api/admin/quotations", tags=["admin-quotations"])
@@ -172,17 +174,32 @@ def get_quotation_detail(quotation_id: uuid.UUID, db: Session = Depends(get_db),
 @router.get("/{quotation_id}/pdf")
 def download_pdf(quotation_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     quotation = _get_full(db, quotation_id)
-    if quotation.pdf_document_id is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDF not available")
-    document = db.get(Document, quotation.pdf_document_id)
-    content = storage_service.read_bytes(document.storage_path)
+    document = db.get(Document, quotation.pdf_document_id) if quotation.pdf_document_id else None
+    content = None
+    if document is not None:
+        try:
+            content = storage_service.read_bytes(document.storage_path)
+        except FileNotFoundError:
+            # Local files may disappear while their database records survive.
+            # Rebuild only generated PDFs, never customer-uploaded documents.
+            pass
+    if content is None:
+        if quotation.snapshot is None:
+            raise HTTPException(status_code=404, detail="The saved PDF and quotation snapshot are unavailable. Please contact support.")
+        content = pdf_service.render_quotation_pdf(
+            quotation=quotation, company=_company_settings(db),
+            footer_text=get_setting(db, "pdf.footer_text"),
+            conditions=get_setting(db, "quotation.conditions"),
+        )
+    filename = storage_service.sanitize_filename(f"{quotation.vehicle.registration_no}-{quotation.quotation_number}.pdf")
 
     audit_service.record(
         db, actor_type=ActorType.ADMIN, actor_label=user.email, actor_id=user.id,
         action="quotation_downloaded", entity_type="quotation", entity_id=str(quotation.id),
     )
     db.commit()
-    return Response(content=content, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{document.filename}"'})
+    return Response(content=content, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"})
 
 
 @router.post("/{quotation_id}/email")

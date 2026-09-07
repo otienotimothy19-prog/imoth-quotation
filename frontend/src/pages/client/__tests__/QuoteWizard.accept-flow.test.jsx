@@ -49,6 +49,21 @@ describe("QuoteWizard (Vehicle & Cover -> Compare Quotes)", () => {
     expect(screen.queryByText(/kra pin/i)).not.toBeInTheDocument();
   });
 
+  it("sends checked optional protections to the pricing API", async () => {
+    api.post.mockResolvedValue({ data: { options: [], ineligible_options: [] } });
+    renderWizard();
+    fillVehicleAndCover();
+    const pvt = screen.getByRole('checkbox', { name: /PVT/ });
+    const ep = screen.getByRole('checkbox', { name: /Excess Protector/ });
+    expect(pvt).not.toBeChecked();
+    expect(ep).not.toBeChecked();
+    fireEvent.click(pvt);
+    fireEvent.click(ep);
+    fireEvent.click(screen.getByRole('button', { name: /compare quotes/i }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/quotes/compare',
+      expect.objectContaining({ options: { pvt: true, ep: true } })));
+  });
+
   it("compares quotes with no client field in the request body", async () => {
     api.post.mockResolvedValueOnce({
       data: {
