@@ -214,7 +214,7 @@ export default function QuoteWizard() {
     if (coverType === "comprehensive" && isInstitutional && numPassengers) {
       return { pll_seats: Number(numPassengers) };
     }
-    if (coverType === "comprehensive" && category === "commercial" && !isInstitutional && commercialUse !== "commercial_tuktuk" && tonnage) {
+    if (coverType === "comprehensive" && category === "commercial" && !isInstitutional && tonnage) {
       return { tonnage: Number(tonnage) };
     }
     return {};
@@ -601,7 +601,7 @@ export default function QuoteWizard() {
           </>
         )}
 
-        {coverType === "comprehensive" && category === "commercial" && commercialUse && !isInstitutional && commercialUse !== "commercial_tuktuk" && (
+        {coverType === "comprehensive" && category === "commercial" && commercialUse && !isInstitutional && (
           <div className="field-group">
             <div className="field-label-row">
               <label htmlFor="wizard-tonnage-input">Vehicle Tonnage</label>
@@ -616,7 +616,7 @@ export default function QuoteWizard() {
               onChange={(e) => setTonnage(e.target.value)}
               placeholder="e.g. 5"
             />
-            <div className="hint">Some insurers price goods-carrying vehicles by carrying capacity as well as Sum Insured. Leave blank if unsure.</div>
+            <div className="hint">Some insurers price goods-carrying vehicles (including Tuk Tuks) by carrying capacity as well as Sum Insured. Leave blank if unsure.</div>
           </div>
         )}
 

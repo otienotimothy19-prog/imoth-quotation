@@ -1211,7 +1211,7 @@ export default function Rates() {
                   idPrefix={`band-${i}`}
                   band={b}
                   showPassengerLimits={selectedClass?.category === "psv" || isCommercialInstitutional(selectedClass)}
-                  showTonnageLimits={selectedClass?.category === "commercial" && selectedClass?.commercial_use !== "commercial_tuktuk"}
+                  showTonnageLimits={selectedClass?.category === "commercial"}
                   onChange={(nb) => setBands(bands.map((x, j) => (j === i ? nb : x)))}
                   onRemove={() => {
                     if (window.confirm(`Remove Band ${i + 1}? This cannot be undone until you save, but will apply once you do.`)) {
@@ -1236,7 +1236,7 @@ export default function Rates() {
                       idPrefix={`alt-band-${i}`}
                       band={b}
                       showPassengerLimits={selectedClass?.category === "psv"}
-                      showTonnageLimits={selectedClass?.category === "commercial" && selectedClass?.commercial_use !== "commercial_tuktuk"}
+                      showTonnageLimits={selectedClass?.category === "commercial"}
                       onChange={(nb) => setBandsAlt(bandsAlt.map((x, j) => (j === i ? nb : x)))}
                       onRemove={() => {
                         if (window.confirm(`Remove Alternative Band ${i + 1}?`)) {

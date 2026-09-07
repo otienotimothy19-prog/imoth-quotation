@@ -150,7 +150,7 @@ describe("QuoteWizard cover step", () => {
     expect(screen.getByRole("button", { name: /^Commercial Tuk Tuk/ })).toBeInTheDocument();
   });
 
-  it("Commercial Tuk Tuk shows neither a tonnage nor a passenger-count field", async () => {
+  it("Commercial Tuk Tuk shows an optional tonnage field but no passenger-count field", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -162,13 +162,13 @@ describe("QuoteWizard cover step", () => {
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
     await user.click(screen.getByRole("button", { name: /^Commercial Tuk Tuk/ }));
 
-    expect(screen.queryByLabelText("Vehicle Tonnage")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Vehicle Tonnage")).toBeInTheDocument();
     expect(screen.queryByLabelText("Number of Passengers")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Passenger Seats/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Institution Type")).not.toBeInTheDocument();
   });
 
-  it("sends commercial_use: commercial_tuktuk with empty options when comparing", async () => {
+  it("sends commercial_use: commercial_tuktuk with empty options when tonnage is left blank", async () => {
     const user = userEvent.setup();
     api.post.mockResolvedValue({ data: { options: [], ineligible_options: [] } });
     render(
@@ -187,6 +187,30 @@ describe("QuoteWizard cover step", () => {
       expect(api.post).toHaveBeenCalledWith(
         "/api/quotes/compare",
         expect.objectContaining({ category: "commercial", commercial_use: "commercial_tuktuk", options: {} })
+      )
+    );
+  });
+
+  it("sends the entered tonnage for Commercial Tuk Tuk too, since it's also rated by carrying capacity", async () => {
+    const user = userEvent.setup();
+    api.post.mockResolvedValue({ data: { options: [], ineligible_options: [] } });
+    render(
+      <MemoryRouter>
+        <QuoteWizard />
+      </MemoryRouter>
+    );
+    await fillDetailsAndContinue(user);
+
+    await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
+    await user.click(screen.getByRole("button", { name: /^Commercial Tuk Tuk/ }));
+    await user.type(screen.getByPlaceholderText("e.g. 1500000"), "300000");
+    await user.type(screen.getByLabelText("Vehicle Tonnage"), "0.5");
+    await user.click(screen.getByRole("button", { name: /get quotes/i }));
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        "/api/quotes/compare",
+        expect.objectContaining({ category: "commercial", commercial_use: "commercial_tuktuk", options: { tonnage: 0.5 } })
       )
     );
   });
