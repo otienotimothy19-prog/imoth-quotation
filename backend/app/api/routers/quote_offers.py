@@ -1,10 +1,11 @@
 """Secured anonymous offers reuse the locked QuoteSelection snapshot and audit store."""
 import uuid
+import re
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_quote_access_subject, require_quote_subject_match
@@ -21,6 +22,42 @@ from app.services.quote_service import _company_settings
 router = APIRouter(prefix='/api/quote-offers', tags=['quote-offers'])
 
 
+class PlateLookup(BaseModel):
+    registration_no: str
+
+    @field_validator('registration_no')
+    @classmethod
+    def normalize(cls, value):
+        value = re.sub(r'[\s-]', '', value.upper())
+        if not re.fullmatch(r'[A-Z0-9]{4,15}', value):
+            raise ValueError('Enter a valid vehicle number plate.')
+        return value
+
+
+@router.post('/retrieve')
+@limiter.limit('10/minute')
+def retrieve(request: Request, payload: PlateLookup, db: Session = Depends(get_db)):
+    # Number plates retrieve only anonymous, unaccepted offers, never customer records.
+    offers = db.execute(select(QuoteSelection).where(
+        func.regexp_replace(func.upper(QuoteSelection.registration_no), '[^A-Z0-9]', '', 'g') == payload.registration_no,
+        QuoteSelection.status == QuoteSelectionStatus.OFFERED,
+        QuoteSelection.expires_at > datetime.now(timezone.utc),
+    ).order_by(QuoteSelection.created_at.desc()).limit(100)).scalars().all()
+    results = []
+    seen = set()
+    for offer in offers:
+        key = (offer.insurer_id, offer.motor_class_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        data = summary(offer)
+        minutes = max(1, int((offer.expires_at-datetime.now(timezone.utc)).total_seconds()/60))
+        # Retrieval grants offer access only, not access to personal details.
+        data['access_token'] = create_quote_access_token(f'offer:{offer.id}', minutes)
+        results.append(data)
+    return {'offers': results}
+
+
 class EmailRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     email: EmailStr
@@ -34,7 +71,7 @@ class EmailRequest(BaseModel):
 
 
 def authorized_offer(offer_id: uuid.UUID, db: Session = Depends(get_db), subject: str = Depends(get_quote_access_subject)):
-    require_quote_subject_match(subject, offer_id)
+    require_quote_subject_match(subject.removeprefix('offer:'), offer_id)
     offer = db.execute(select(QuoteSelection).where(QuoteSelection.id == offer_id).with_for_update()).scalar_one_or_none()
     if offer is None:
         raise HTTPException(404, 'Quotation offer not found.')
@@ -54,10 +91,11 @@ def record(db, offer, request, action, **values):
     return entry
 
 
-def summary(offer):
+def summary(offer, *, offer_only=True):
     # Token lifetime is bounded by the persisted expiry on every endpoint.
     minutes = max(1, int((offer.expires_at-datetime.now(timezone.utc)).total_seconds()/60))
-    return dict(selection_id=str(offer.id), status=offer.status.value, access_token=create_quote_access_token(str(offer.id), minutes),
+    subject = f'offer:{offer.id}' if offer_only else str(offer.id)
+    return dict(selection_id=str(offer.id), status=offer.status.value, access_token=create_quote_access_token(subject, minutes),
         expires_at=offer.expires_at, insurer_name=offer.snapshot_data['insurer_name'], vehicle_class_label=offer.vehicle_class_label,
         cover_type=offer.cover_type, items=offer.items,
         **{key: float(getattr(offer,key)) for key in ('sum_insured','basic_premium','subtotal','levies','stamp_duty','total_premium')})
@@ -69,12 +107,15 @@ def get_offer(offer: QuoteSelection = Depends(authorized_offer)):
 
 
 @router.post('/{offer_id}/select')
-def select_offer(request: Request, offer: QuoteSelection = Depends(authorized_offer), db: Session = Depends(get_db)):
+def select_offer(request: Request, offer: QuoteSelection = Depends(authorized_offer), db: Session = Depends(get_db),
+                 subject: str = Depends(get_quote_access_subject)):
+    if subject.startswith('offer:') and offer.status != QuoteSelectionStatus.OFFERED:
+        raise HTTPException(409, 'Acceptance has already started. Please use your existing acceptance session.')
     if offer.status == QuoteSelectionStatus.OFFERED:
         offer.status = QuoteSelectionStatus.SELECTED_PENDING_DETAILS
         offer.snapshot_data = {**offer.snapshot_data, 'offer_selected': True}
         record(db, offer, request, 'quote_selected', status=offer.status.value)
-    return summary(offer)
+    return summary(offer, offer_only=False)
 
 
 @router.get('/{offer_id}/pdf')

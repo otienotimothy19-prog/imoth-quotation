@@ -25,9 +25,9 @@ it('downloads the selected offer through an authenticated blob and blocks repeat
   expect(button).toBeDisabled(); expect(screen.getByText('Preparing PDF…')).toBeInTheDocument();
   expect(api.get).toHaveBeenCalledTimes(1);
   expect(api.get).toHaveBeenCalledWith('/api/quote-offers/offer-1/pdf', { headers: { Authorization: 'Bearer token-1' }, responseType: 'blob' });
-  const blob = new Blob(['PDF']); resolve({ data: blob });
+  const blob = new Blob(['PDF']); resolve({ data: blob, headers: { 'content-disposition': 'attachment; filename="Imoth-Motor-Quote-KAA123A-Insurer-One.pdf"' } });
   await waitFor(() => expect(button).toBeEnabled());
-  expect(downloadBlob).toHaveBeenCalledWith(blob, 'Imoth-Motor-Quote-Insurer-One-offer-1.pdf');
+  expect(downloadBlob).toHaveBeenCalledWith(blob, 'Imoth-Motor-Quote-KAA123A-Insurer-One.pdf');
   expect(api.post).not.toHaveBeenCalled();
 });
 it('validates email, prevents duplicate sends, announces success and restores focus', async () => {

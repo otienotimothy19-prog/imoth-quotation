@@ -52,7 +52,8 @@ def test_pdf_and_email_use_locked_insurer_and_total_without_client(monkeypatch):
     pdf = client.get(path+'/pdf?total_premium=1&insurer_name=Fake', headers=headers(offer))
     assert pdf.status_code == 200, pdf.text
     assert pdf.content.startswith(b'%PDF')
-    assert offer['offer_id'] in pdf.headers['content-disposition']
+    assert 'KAA123A' in pdf.headers['content-disposition']
+    assert offer['offer_id'] not in pdf.headers['content-disposition']
     assert seen[-1] == (offer['offer_id'], offer['insurer_name'], offer['total_premium'])
     smtp = Mock()
     monkeypatch.setattr(email_service, '_send_smtp', smtp)
@@ -121,6 +122,25 @@ def test_offered_quote_cannot_submit_customer_details():
     assert result.status_code == 400, result.text
     with SessionLocal() as db:
         assert db.get(QuoteSelection, uuid.UUID(offer['offer_id'])).status == QuoteSelectionStatus.OFFERED
+
+
+def test_plate_retrieval_is_normalized_and_does_not_grant_customer_access():
+    offer = compare()[0]
+    result = client.post('/api/quote-offers/retrieve', json={'registration_no': 'kaa-123a'})
+    assert result.status_code == 200, result.text
+    found = next(row for row in result.json()['offers'] if row['selection_id'] == offer['offer_id'])
+    auth = {'Authorization': f"Bearer {found['access_token']}"}
+    path = f"/api/quote-offers/{offer['offer_id']}"
+    detail = client.get(path, headers=auth)
+    assert detail.status_code == 200
+    from app.core.security import decode_quote_access_token
+    assert decode_quote_access_token(detail.json()['access_token']).startswith('offer:')
+    assert client.get(path+'/pdf', headers=auth).status_code == 200
+    assert client.post(path+'/select', headers=auth).json()['status'] == 'SELECTED_PENDING_DETAILS'
+    assert client.post(path+'/select', headers=auth).status_code == 409
+    remaining = client.post('/api/quote-offers/retrieve', json={'registration_no': 'KAA 123A'}).json()['offers']
+    assert offer['offer_id'] not in [row['selection_id'] for row in remaining]
+    assert client.post('/api/quote-offers/retrieve', json={'registration_no': '../'}).status_code == 422
 
 
 def test_concurrent_email_submission_and_safe_failure(monkeypatch):

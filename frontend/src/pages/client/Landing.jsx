@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import HowItWorks from "../../components/HowItWorks";
 import TrustStrip from "../../components/TrustStrip";
+import { api, errorMessage, quoteMoney } from '../../api/client';
 
 function CheckIcon() {
   return (
@@ -40,6 +41,8 @@ export default function Landing() {
   const location = useLocation();
   const [lookupId, setLookupId] = useState("");
   const [lookupError, setLookupError] = useState("");
+  const [retrieving, setRetrieving] = useState(false);
+  const [offers, setOffers] = useState([]);
 
   useEffect(() => {
     if (location.hash === "#retrieve") {
@@ -47,15 +50,21 @@ export default function Landing() {
     }
   }, [location.hash]);
 
-  function handleLookup() {
+  async function handleLookup() {
     const trimmed = lookupId.trim();
     if (!trimmed) {
-      setLookupError("Please enter your quotation reference to continue.");
+      setLookupError("Please enter your vehicle number plate to continue.");
       return;
     }
     setLookupError("");
-    const idMatch = trimmed.match(/[0-9a-fA-F-]{20,}/);
-    navigate(`/quote/${idMatch ? idMatch[0] : trimmed}`);
+    if (retrieving) return;
+    setRetrieving(true); setOffers([]);
+    try {
+      const { data } = await api.post('/api/quote-offers/retrieve', { registration_no: trimmed });
+      setOffers(data.offers);
+      if (!data.offers.length) setLookupError('No valid unaccepted quotations found for this number plate. Start a new comparison, or use your secure link to continue an acceptance already started.');
+    } catch (err) { setLookupError(errorMessage(err, 'Could not retrieve quotations. Please try again.')); }
+    finally { setRetrieving(false); }
   }
 
   return (
@@ -125,27 +134,32 @@ export default function Landing() {
       <section className="retrieve-section" id="retrieve">
         <div className="card retrieve-card">
           <h2>Continue an Existing Quote</h2>
-          <p>Enter your quotation reference to reopen your saved quotation.</p>
+          <p>Enter your vehicle number plate to find your unaccepted quotations.</p>
           <div className="retrieve-form">
             <div className="retrieve-input-wrap">
               <SearchIcon />
               <input
                 type="text"
-                placeholder="Quotation reference"
+                placeholder="e.g. KAA 123A"
                 value={lookupId}
                 onChange={(e) => {
                   setLookupId(e.target.value);
                   if (lookupError) setLookupError("");
                 }}
                 onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-                aria-label="Quotation reference"
+                aria-label="Vehicle number plate"
               />
             </div>
-            <button className="btn btn-primary" onClick={handleLookup}>
-              Find My Quote
+            <button className="btn btn-primary" disabled={retrieving} onClick={handleLookup}>
+              {retrieving ? 'Finding quotations…' : 'Find My Quote'}
             </button>
           </div>
           {lookupError && <p className="error-text">{lookupError}</p>}
+          {offers.map(offer => <div className="card" key={offer.selection_id} style={{ marginTop: 12 }}>
+            <strong>{offer.insurer_name}</strong>
+            <p>{offer.vehicle_class_label} · {quoteMoney(offer.total_premium)}</p>
+            <button className="btn btn-secondary" onClick={() => navigate(`/quote/offer/${offer.selection_id}#token=${encodeURIComponent(offer.access_token)}`)}>View Quotation</button>
+          </div>)}
         </div>
       </section>
 
