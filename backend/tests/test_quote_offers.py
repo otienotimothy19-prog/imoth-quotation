@@ -23,13 +23,33 @@ def reset_limits():
     limiter._storage.reset()
 
 
-def compare():
+def compare(options=None):
     result = client.post('/api/quotes/compare', json={
         'category': 'private', 'sum_insured': 1500000,
+        'options': options or {},
         'vehicle': {'registration_no': 'KAA 123A', 'year_of_manufacture': datetime.now().year-4,
                     'make': '<b>Toyota & Sons</b>', 'model': 'Test <model>'}})
     assert result.status_code == 200, result.text
     return result.json()['options']
+
+
+def test_checked_extensions_are_itemized_and_preserved_in_pdf_snapshot():
+    offers = compare({'ep': True, 'pvt': True})
+    charged = set()
+    for offer in offers:
+        lines = offer['premium_lines']
+        assert sum(line['amount'] for line in lines) == pytest.approx(offer['subtotal'], abs=.01)
+        assert offer['subtotal'] + offer['levies'] + offer['stamp_duty'] == pytest.approx(offer['total_premium'], abs=.02)
+        with SessionLocal() as db:
+            stored = db.get(QuoteSelection, uuid.UUID(offer['offer_id']))
+            assert stored.options['ep'] is True and stored.options['pvt'] is True
+            assert stored.items == lines
+        for key, label in [('pvt', 'PVT'), ('ep', 'Excess Protector')]:
+            if any(label in line['label'] for line in lines[1:]):
+                charged.add(key)
+            else:
+                assert any(note.startswith(label + ':') for note in offer['extension_notes'])
+    assert charged == {'pvt', 'ep'}
 
 
 def headers(offer, **extra):

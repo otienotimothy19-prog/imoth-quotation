@@ -123,8 +123,18 @@ def list_eligible_options(
             institutional_vehicle_type=institutional_vehicle_type, passenger_category=passenger_category,
         )
         result = compute_premium(class_dict, sum_insured, engine_opts, levy_rate, stamp_duty)
+        extension_notes = []
+        band = result.band_used or {}
+        for key, label in (("pvt", "PVT"), ("ep", "Excess Protector")):
+            if engine_opts.get(key):
+                if not band or band.get(f"{key}_not_offered"):
+                    extension_notes.append(f"{label}: not available for this insurer / vehicle class or age.")
+                elif band.get(f"{key}_included"):
+                    extension_notes.append(f"{label}: included in the basic premium; no extra charge.")
         results.append(
             {
+                "premium_lines": result.as_dict()["lines"],
+                "extension_notes": extension_notes,
                 "insurer_id": mc.insurer.id,
                 "insurer_code": mc.insurer.code,
                 "insurer_name": mc.insurer.name,

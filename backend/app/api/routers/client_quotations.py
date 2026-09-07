@@ -120,6 +120,7 @@ def compare_insurers(request: Request, payload: CompareRequest, db: Session = De
             offer_id=selection.id,
             offer_token=create_quote_access_token(str(selection.id), get_setting(db, "quote_selection.validity_minutes", 60)),
             offer_expires_at=selection.expires_at,
+            premium_lines=selection.items,
             **{field: float(getattr(selection, field)) for field in
                ("basic_premium", "subtotal", "levies", "stamp_duty", "total_premium")},
         )
