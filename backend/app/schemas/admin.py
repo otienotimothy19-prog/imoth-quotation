@@ -306,6 +306,7 @@ class VoidRiskNoteRequest(BaseModel):
 # None means unbounded on that side.
 _NUMERIC_SETTING_RANGES: dict[str, tuple[float | None, float | None]] = {
     "quotation.validity_days": (1, 365),
+    "quote_selection.validity_minutes": (5, 24 * 60),
     "levy.rate": (0, 1),
     "levy.stamp_duty": (0, None),
     "documents.max_file_size_mb": (0.1, 100),

@@ -4,6 +4,33 @@ const baseURL = import.meta.env.VITE_API_BASE_URL || "";
 
 export const api = axios.create({ baseURL, timeout: 30000 });
 
+// The anonymous "Compare Quotes -> Accept This Quote" flow's short-lived
+// access token: proves possession of a specific QuoteSelection (pre-"About
+// You") or Quotation (post-"About You"), never anything about who the
+// customer is. Only PATCH .../customer and POST .../complete-acceptance
+// require it -- every other client-facing endpoint (compare, select,
+// document upload, the read-only GET/pdf/accept/reject used by the
+// pre-existing flow) stays exactly as unauthenticated as it is today.
+const QUOTE_FLOW_KEY = "imoth_quote_flow";
+const QUOTE_AUTH_URL_RE = /\/api\/quotes\/selections\/[^/]+\/customer$|\/api\/quotes\/[^/]+\/complete-acceptance$/;
+
+export function loadQuoteFlow() {
+  try {
+    const raw = localStorage.getItem(QUOTE_FLOW_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveQuoteFlow(flow) {
+  localStorage.setItem(QUOTE_FLOW_KEY, JSON.stringify(flow));
+}
+
+export function clearQuoteFlow() {
+  localStorage.removeItem(QUOTE_FLOW_KEY);
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("imoth_admin_token");
   const needsAuth =
@@ -14,6 +41,14 @@ api.interceptors.request.use((config) => {
   if (needsAuth) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  if (config.url && QUOTE_AUTH_URL_RE.test(config.url)) {
+    const flow = loadQuoteFlow();
+    if (flow?.token) {
+      config.headers.Authorization = `Bearer ${flow.token}`;
+    }
+  }
+
   return config;
 });
 

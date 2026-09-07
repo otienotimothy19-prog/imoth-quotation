@@ -24,6 +24,16 @@ from app.services.client_document_service import DOCUMENT_LABELS
 router = APIRouter(prefix="/api/admin/quotations", tags=["admin-quotations"])
 
 
+def _mask_sensitive(value: str | None) -> str | None:
+    """Reveals only the last 4 characters of an ID/passport or KRA PIN --
+    the admin interface must never display these values in full."""
+    if not value:
+        return value
+    if len(value) <= 4:
+        return "*" * len(value)
+    return f"{'*' * (len(value) - 4)}{value[-4:]}"
+
+
 def _summary(q: Quotation) -> dict:
     return {
         "id": str(q.id),
@@ -120,7 +130,8 @@ def get_quotation_detail(quotation_id: uuid.UUID, db: Session = Depends(get_db),
             "full_name": quotation.client.full_name,
             "phone": quotation.client.phone,
             "email": quotation.client.email,
-            "id_or_passport": quotation.client.id_or_passport,
+            "id_or_passport": _mask_sensitive(quotation.client.id_or_passport),
+            "kra_pin": _mask_sensitive(quotation.client.kra_pin),
         },
         "vehicle": {
             "registration_no": quotation.vehicle.registration_no,

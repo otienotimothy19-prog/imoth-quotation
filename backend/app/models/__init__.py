@@ -11,6 +11,7 @@ from app.models.enums import (
     ActorType,
     DocumentType,
     EmailStatus,
+    QuoteSelectionStatus,
     QuotationSource,
     QuotationStatus,
     RiskNoteStatus,
@@ -18,6 +19,7 @@ from app.models.enums import (
 )
 from app.models.insurer_rate import Insurer, MotorClass, RateBand, RateVersion
 from app.models.quotation import Quotation, QuotationItem, QuotationSnapshot
+from app.models.quote_selection import QuoteSelection
 from app.models.risk_note import RiskNote, RiskNoteStatusHistory
 from app.models.user import User
 
@@ -37,6 +39,7 @@ __all__ = [
     "ActorType",
     "DocumentType",
     "EmailStatus",
+    "QuoteSelectionStatus",
     "QuotationSource",
     "QuotationStatus",
     "RiskNoteStatus",
@@ -48,6 +51,7 @@ __all__ = [
     "Quotation",
     "QuotationItem",
     "QuotationSnapshot",
+    "QuoteSelection",
     "RiskNote",
     "RiskNoteStatusHistory",
     "User",

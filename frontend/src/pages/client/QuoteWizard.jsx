@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, errorMessage, money } from "../../api/client";
+import { api, errorMessage, money, saveQuoteFlow } from "../../api/client";
 import QuoteShell from "../../components/wizard/QuoteShell";
 
 const CATEGORIES = [
@@ -63,18 +63,10 @@ const PASSENGER_CATEGORIES = [
   { value: "GENERAL_INSTITUTIONAL", label: "General (Other Institutional Passengers)" },
 ];
 
-const emptyClient = { full_name: "", id_or_passport: "", phone: "", email: "" };
 const emptyVehicle = { registration_no: "", make: "", model: "", year_of_manufacture: "" };
 
 const MIN_MANUFACTURE_YEAR = 1960;
 const CURRENT_YEAR = new Date().getFullYear();
-
-// Light-touch Kenyan phone check -- accepts 07xx/01xx local format or +254/254
-// prefixed, without being so strict it rejects a legitimately entered number.
-function isValidKenyanPhone(value) {
-  const digits = value.replace(/[\s-]/g, "");
-  return /^(?:\+?254|0)[17]\d{8}$/.test(digits);
-}
 
 // Calendar-year age: current year minus year of manufacture. This is a
 // calendar-year difference, not an exact month/day age -- and it's for
@@ -88,8 +80,7 @@ function calculateVehicleAge(yearOfManufacture) {
 
 export default function QuoteWizard() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(0); // 0 = Your Details, 1 = Choose Cover
-  const [client, setClient] = useState(emptyClient);
+  const [step, setStep] = useState(0); // 0 = Vehicle & Cover, 1 = Compare Quotes
   const [vehicle, setVehicle] = useState(emptyVehicle);
   const [fieldErrors, setFieldErrors] = useState({});
   const [coverType, setCoverType] = useState("comprehensive");
@@ -125,19 +116,8 @@ export default function QuoteWizard() {
 
   const calculatedAge = calculateVehicleAge(vehicle.year_of_manufacture);
 
-  function validateDetails() {
+  function validateVehicle() {
     const errs = {};
-    if (!client.full_name.trim() || client.full_name.trim().length < 2) {
-      errs.full_name = "Please enter your full name.";
-    }
-    if (!client.phone.trim()) {
-      errs.phone = "Please enter your phone number.";
-    } else if (!isValidKenyanPhone(client.phone)) {
-      errs.phone = "Enter a valid Kenyan number, e.g. 07XX XXX XXX.";
-    }
-    if (client.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(client.email.trim())) {
-      errs.email = "Enter a valid email address.";
-    }
     if (!vehicle.registration_no.trim()) {
       errs.registration_no = "Please enter the vehicle registration number.";
     }
@@ -181,14 +161,6 @@ export default function QuoteWizard() {
     return "";
   }
 
-  function cleanClient() {
-    return {
-      full_name: client.full_name.trim(),
-      id_or_passport: client.id_or_passport.trim() || null,
-      phone: client.phone.trim(),
-      email: client.email.trim() || null,
-    };
-  }
   function cleanVehicle() {
     return {
       registration_no: vehicle.registration_no.trim(),
@@ -214,7 +186,7 @@ export default function QuoteWizard() {
     if (coverType === "comprehensive" && isInstitutional && numPassengers) {
       return { pll_seats: Number(numPassengers) };
     }
-    if (coverType === "comprehensive" && category === "commercial" && !isInstitutional && commercialUse !== "commercial_tuktuk" && tonnage) {
+    if (coverType === "comprehensive" && category === "commercial" && !isInstitutional && tonnage) {
       return { tonnage: Number(tonnage) };
     }
     return {};
@@ -239,7 +211,6 @@ export default function QuoteWizard() {
     setLoading(true);
     try {
       const res = await api.post("/api/quotes/compare", {
-        client: cleanClient(),
         vehicle: cleanVehicle(),
         category: effectiveCategory,
         sum_insured: si,
@@ -268,86 +239,38 @@ export default function QuoteWizard() {
     }
     setSelecting(opt.motor_class_id);
     const si = coverType === "third_party_only" ? 0 : Number(sumInsured);
-    const generateOptions = { ...cleanOptions() };
-    if (tonnageOverride) generateOptions.tonnage = Number(tonnageOverride);
+    const selectOptions = { ...cleanOptions() };
+    if (tonnageOverride) selectOptions.tonnage = Number(tonnageOverride);
+    const effectiveCategory = coverType === "third_party_only" ? "tpo" : category;
     try {
-      const res = await api.post("/api/quotes/generate", {
-        client: cleanClient(),
+      const res = await api.post("/api/quotes/select", {
         vehicle: cleanVehicle(),
+        category: effectiveCategory,
         insurer_id: opt.insurer_id,
         motor_class_id: opt.motor_class_id,
         sum_insured: si,
-        options: generateOptions,
-        amount_paid: 0,
+        options: selectOptions,
         ...institutionalFields(),
       });
-      navigate(`/quote/${res.data.id}`);
+      const { access_token, ...selectionSummary } = res.data;
+      saveQuoteFlow({
+        selectionId: res.data.selection_id,
+        quotationId: null,
+        token: access_token,
+        selectionSummary,
+      });
+      navigate(`/quote/select/${res.data.selection_id}`);
     } catch (err) {
-      setError(errorMessage(err, "Could not generate this quotation."));
+      setError(errorMessage(err, "Could not select this quotation."));
       setSelecting(null);
     }
   }
 
   if (step === 0) {
     return (
-      <QuoteShell currentIndex={0} heading="Tell Us About Yourself and Your Vehicle" subtitle="Enter the details needed to calculate and securely save your quotation.">
+      <QuoteShell currentIndex={0} heading="Tell Us About Your Vehicle" subtitle="Enter your vehicle and cover details to compare eligible insurers.">
         <div className="wizard-form">
           {error && <div className="alert alert-error">{error}</div>}
-
-          <section className="wizard-section">
-            <h2 className="wizard-section-title">About You</h2>
-
-            <div className="field-group">
-              <label className="first">Full Name</label>
-              <input
-                type="text"
-                value={client.full_name}
-                onChange={(e) => setClient({ ...client, full_name: e.target.value })}
-                placeholder="e.g. John Mwangi"
-                aria-invalid={!!fieldErrors.full_name}
-              />
-              {fieldErrors.full_name && <div className="error-text">{fieldErrors.full_name}</div>}
-            </div>
-
-            <div className="row2">
-              <div className="field-group">
-                <div className="field-label-row">
-                  <label>ID / Passport Number</label>
-                  <span className="optional-badge">Optional</span>
-                </div>
-                <input
-                  type="text"
-                  value={client.id_or_passport}
-                  onChange={(e) => setClient({ ...client, id_or_passport: e.target.value })}
-                />
-              </div>
-              <div className="field-group">
-                <label>Phone Number</label>
-                <input
-                  type="tel"
-                  value={client.phone}
-                  onChange={(e) => setClient({ ...client, phone: e.target.value })}
-                  placeholder="07XX XXX XXX"
-                  aria-invalid={!!fieldErrors.phone}
-                />
-                {fieldErrors.phone && <div className="error-text">{fieldErrors.phone}</div>}
-              </div>
-            </div>
-
-            <div className="field-group">
-              <div className="field-label-row">
-                <label>Email Address</label>
-                <span className="optional-badge">Optional</span>
-              </div>
-              <input
-                type="email"
-                value={client.email}
-                onChange={(e) => setClient({ ...client, email: e.target.value })}
-              />
-              <div className="hint">We can use this to send your quotation documents.</div>
-              {fieldErrors.email && <div className="error-text">{fieldErrors.email}</div>}
-            </div>
-          </section>
 
           <section className="wizard-section">
             <h2 className="wizard-section-title">Your Vehicle</h2>
@@ -393,6 +316,7 @@ export default function QuoteWizard() {
                     // already run against the previous age, and any stale
                     // error message for a value that's since been edited.
                     setOptions([]);
+                    setIneligibleOptions([]);
                     setFieldErrors((prev) => ({ ...prev, year_of_manufacture: undefined }));
                   }}
                   placeholder={`e.g. ${CURRENT_YEAR - 5}`}
@@ -413,21 +337,220 @@ export default function QuoteWizard() {
             </div>
           </section>
 
+          <section className="wizard-section">
+            <h2 className="wizard-section-title">Cover Details</h2>
+
+            <div className="field-group">
+              <label className="first">Cover Type</label>
+              <div className="option-card-grid">
+                <button
+                  type="button"
+                  className={`option-card ${coverType === "comprehensive" ? "option-card-selected" : ""}`}
+                  onClick={() => {
+                    setCoverType("comprehensive");
+                    setOptions([]);
+                    setIneligibleOptions([]);
+                  }}
+                  aria-pressed={coverType === "comprehensive"}
+                >
+                  <div className="option-card-title">Comprehensive</div>
+                  <div className="option-card-desc">Covers your own vehicle plus third-party liability.</div>
+                </button>
+                <button
+                  type="button"
+                  className={`option-card ${coverType === "third_party_only" ? "option-card-selected" : ""}`}
+                  onClick={() => {
+                    setCoverType("third_party_only");
+                    setOptions([]);
+                    setIneligibleOptions([]);
+                  }}
+                  aria-pressed={coverType === "third_party_only"}
+                >
+                  <div className="option-card-title">Third Party Only</div>
+                  <div className="option-card-desc">Covers legal liability for injury or damage to others.</div>
+                </button>
+              </div>
+            </div>
+
+            {coverType === "comprehensive" && (
+              <div className="row2">
+                <div className="field-group">
+                  <label htmlFor="wizard-category-select">Vehicle Class</label>
+                  <select id="wizard-category-select" value={category} onChange={(e) => handleCategoryChange(e.target.value)}>
+                    {CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field-group">
+                  <label>Sum Insured (KES)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={sumInsured}
+                    onChange={(e) => {
+                      setSumInsured(e.target.value);
+                      setOptions([]);
+                      setIneligibleOptions([]);
+                    }}
+                    placeholder="e.g. 1500000"
+                  />
+                  <div className="hint">Your vehicle's current market value.</div>
+                </div>
+              </div>
+            )}
+
+            {coverType === "comprehensive" && category === "psv" && (
+              <div className="field-group">
+                <label htmlFor="wizard-passengers-input">Number of Passengers</label>
+                <input
+                  id="wizard-passengers-input"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={numPassengers}
+                  onChange={(e) => setNumPassengers(e.target.value)}
+                  placeholder="e.g. 14"
+                />
+                <div className="hint">Passenger Legal Liability is charged per passenger (Kshs 500/passenger where applicable) and is added to the premium.</div>
+              </div>
+            )}
+
+            {coverType === "comprehensive" && category === "commercial" && (
+              <div className="field-group">
+                <label className="first">What is this commercial vehicle used for?</label>
+                <div className="option-card-grid">
+                  {COMMERCIAL_USES.map((u) => (
+                    <button
+                      key={u.value}
+                      type="button"
+                      className={`option-card ${commercialUse === u.value ? "option-card-selected" : ""}`}
+                      onClick={() => {
+                        setCommercialUse(u.value);
+                        setInstitutionType("");
+                        setInstitutionalVehicleType("");
+                        setPassengerCategory("");
+                        setNumPassengers("");
+                        setTonnage("");
+                        setOptions([]);
+                        setIneligibleOptions([]);
+                      }}
+                      aria-pressed={commercialUse === u.value}
+                    >
+                      <div className="option-card-title">{u.label}</div>
+                      <div className="option-card-desc">{u.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {coverType === "comprehensive" && isInstitutional && (
+              <>
+                <div className="row2">
+                  <div className="field-group">
+                    <label htmlFor="wizard-institution-type-select">Institution Type</label>
+                    <select
+                      id="wizard-institution-type-select"
+                      value={institutionType}
+                      onChange={(e) => setInstitutionType(e.target.value)}
+                    >
+                      <option value="">Select...</option>
+                      {INSTITUTION_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field-group">
+                    <label htmlFor="wizard-institutional-vehicle-type-select">Vehicle Type</label>
+                    <select
+                      id="wizard-institutional-vehicle-type-select"
+                      value={institutionalVehicleType}
+                      onChange={(e) => setInstitutionalVehicleType(e.target.value)}
+                    >
+                      <option value="">Select...</option>
+                      {INSTITUTIONAL_VEHICLE_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="row2">
+                  <div className="field-group">
+                    <label htmlFor="wizard-passenger-category-select">Passenger Category</label>
+                    <select
+                      id="wizard-passenger-category-select"
+                      value={passengerCategory}
+                      onChange={(e) => setPassengerCategory(e.target.value)}
+                    >
+                      <option value="">Select...</option>
+                      {PASSENGER_CATEGORIES.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field-group">
+                    <label htmlFor="wizard-institutional-seats-input">Passenger Seats (excluding the driver)</label>
+                    <input
+                      id="wizard-institutional-seats-input"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={numPassengers}
+                      onChange={(e) => setNumPassengers(e.target.value)}
+                      placeholder="e.g. 32"
+                    />
+                    <div className="hint">Passenger Legal Liability is calculated from this insurer's rate for the selected passenger category.</div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {coverType === "comprehensive" && category === "commercial" && commercialUse && !isInstitutional && (
+              <div className="field-group">
+                <div className="field-label-row">
+                  <label htmlFor="wizard-tonnage-input">Vehicle Tonnage</label>
+                  <span className="optional-badge">Optional</span>
+                </div>
+                <input
+                  id="wizard-tonnage-input"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={tonnage}
+                  onChange={(e) => setTonnage(e.target.value)}
+                  placeholder="e.g. 5"
+                />
+                <div className="hint">Some insurers price goods-carrying vehicles (including Tuk Tuks) by carrying capacity as well as Sum Insured. Leave blank if unsure.</div>
+              </div>
+            )}
+          </section>
+
           <div className="quote-footer-nav quote-footer-nav-end">
             <button
               className="btn btn-primary"
-              onClick={() => {
-                const errs = validateDetails();
-                setFieldErrors(errs);
-                if (Object.keys(errs).length > 0) {
+              disabled={loading}
+              onClick={async () => {
+                const vehicleErrs = validateVehicle();
+                setFieldErrors(vehicleErrs);
+                if (Object.keys(vehicleErrs).length > 0) {
                   setError("Please fix the highlighted fields to continue.");
+                  return;
+                }
+                const coverErr = validateCover();
+                if (coverErr) {
+                  setError(coverErr);
                   return;
                 }
                 setError("");
                 setStep(1);
+                await goToCompare();
               }}
             >
-              Save &amp; Continue →
+              {loading ? <span className="spinner" /> : "Compare Quotes →"}
             </button>
           </div>
         </div>
@@ -435,214 +558,24 @@ export default function QuoteWizard() {
     );
   }
 
-  // step === 1: Choose Cover
+  // step === 1: Compare Quotes
   return (
     <QuoteShell
       currentIndex={1}
-      heading="Choose Your Cover"
-      subtitle="Select your cover type, tell us a bit more, and compare eligible insurers instantly."
+      heading="Compare Quotes"
+      subtitle="Review eligible insurers for your vehicle and accept the quote that suits you."
       onNavigate={(i) => i === 0 && setStep(0)}
     >
       <div className="wizard-form">
         {error && <div className="alert alert-error">{error}</div>}
 
-        <div className="field-group">
-          <label className="first">Cover Type</label>
-          <div className="option-card-grid">
-            <button
-              type="button"
-              className={`option-card ${coverType === "comprehensive" ? "option-card-selected" : ""}`}
-              onClick={() => setCoverType("comprehensive")}
-              aria-pressed={coverType === "comprehensive"}
-            >
-              <div className="option-card-title">Comprehensive</div>
-              <div className="option-card-desc">Covers your own vehicle plus third-party liability.</div>
-            </button>
-            <button
-              type="button"
-              className={`option-card ${coverType === "third_party_only" ? "option-card-selected" : ""}`}
-              onClick={() => setCoverType("third_party_only")}
-              aria-pressed={coverType === "third_party_only"}
-            >
-              <div className="option-card-title">Third Party Only</div>
-              <div className="option-card-desc">Covers legal liability for injury or damage to others.</div>
-            </button>
-          </div>
-        </div>
+        {loading && <div className="card">Comparing insurers…</div>}
 
-        {coverType === "comprehensive" && (
-          <div className="row2">
-            <div className="field-group">
-              <label htmlFor="wizard-category-select">Vehicle Class</label>
-              <select id="wizard-category-select" value={category} onChange={(e) => handleCategoryChange(e.target.value)}>
-                {CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field-group">
-              <label>Sum Insured (KES)</label>
-              <input
-                type="number"
-                min="0"
-                step="1000"
-                value={sumInsured}
-                onChange={(e) => setSumInsured(e.target.value)}
-                placeholder="e.g. 1500000"
-              />
-              <div className="hint">Your vehicle's current market value.</div>
-            </div>
-          </div>
-        )}
-
-        {coverType === "comprehensive" && category === "psv" && (
-          <div className="field-group">
-            <label htmlFor="wizard-passengers-input">Number of Passengers</label>
-            <input
-              id="wizard-passengers-input"
-              type="number"
-              min="1"
-              step="1"
-              value={numPassengers}
-              onChange={(e) => setNumPassengers(e.target.value)}
-              placeholder="e.g. 14"
-            />
-            <div className="hint">Passenger Legal Liability is charged per passenger (Kshs 500/passenger where applicable) and is added to the premium.</div>
-          </div>
-        )}
-
-        {coverType === "comprehensive" && category === "commercial" && (
-          <div className="field-group">
-            <label className="first">What is this commercial vehicle used for?</label>
-            <div className="option-card-grid">
-              {COMMERCIAL_USES.map((u) => (
-                <button
-                  key={u.value}
-                  type="button"
-                  className={`option-card ${commercialUse === u.value ? "option-card-selected" : ""}`}
-                  onClick={() => {
-                    setCommercialUse(u.value);
-                    setInstitutionType("");
-                    setInstitutionalVehicleType("");
-                    setPassengerCategory("");
-                    setNumPassengers("");
-                    setTonnage("");
-                  }}
-                  aria-pressed={commercialUse === u.value}
-                >
-                  <div className="option-card-title">{u.label}</div>
-                  <div className="option-card-desc">{u.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {coverType === "comprehensive" && isInstitutional && (
-          <>
-            <div className="row2">
-              <div className="field-group">
-                <label htmlFor="wizard-institution-type-select">Institution Type</label>
-                <select
-                  id="wizard-institution-type-select"
-                  value={institutionType}
-                  onChange={(e) => setInstitutionType(e.target.value)}
-                >
-                  <option value="">Select...</option>
-                  {INSTITUTION_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field-group">
-                <label htmlFor="wizard-institutional-vehicle-type-select">Vehicle Type</label>
-                <select
-                  id="wizard-institutional-vehicle-type-select"
-                  value={institutionalVehicleType}
-                  onChange={(e) => setInstitutionalVehicleType(e.target.value)}
-                >
-                  <option value="">Select...</option>
-                  {INSTITUTIONAL_VEHICLE_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="row2">
-              <div className="field-group">
-                <label htmlFor="wizard-passenger-category-select">Passenger Category</label>
-                <select
-                  id="wizard-passenger-category-select"
-                  value={passengerCategory}
-                  onChange={(e) => setPassengerCategory(e.target.value)}
-                >
-                  <option value="">Select...</option>
-                  {PASSENGER_CATEGORIES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field-group">
-                <label htmlFor="wizard-institutional-seats-input">Passenger Seats (excluding the driver)</label>
-                <input
-                  id="wizard-institutional-seats-input"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={numPassengers}
-                  onChange={(e) => setNumPassengers(e.target.value)}
-                  placeholder="e.g. 32"
-                />
-                <div className="hint">Passenger Legal Liability is calculated from this insurer's rate for the selected passenger category.</div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {coverType === "comprehensive" && category === "commercial" && commercialUse && !isInstitutional && commercialUse !== "commercial_tuktuk" && (
-          <div className="field-group">
-            <div className="field-label-row">
-              <label htmlFor="wizard-tonnage-input">Vehicle Tonnage</label>
-              <span className="optional-badge">Optional</span>
-            </div>
-            <input
-              id="wizard-tonnage-input"
-              type="number"
-              min="0"
-              step="any"
-              value={tonnage}
-              onChange={(e) => setTonnage(e.target.value)}
-              placeholder="e.g. 5"
-            />
-            <div className="hint">Some insurers price goods-carrying vehicles by carrying capacity as well as Sum Insured. Leave blank if unsure.</div>
-          </div>
-        )}
-
-        <div className="quote-footer-nav">
-          <button className="btn btn-secondary" onClick={() => setStep(0)}>
-            ← Back
-          </button>
-          <button
-            className="btn btn-primary"
-            disabled={loading}
-            onClick={() => {
-              const err = validateCover();
-              if (err) return setError(err);
-              setError("");
-              goToCompare();
-            }}
-          >
-            {loading ? <span className="spinner" /> : "Get Quotes →"}
-          </button>
-        </div>
-
-        {options.length > 0 && (
-          <div style={{ marginTop: 28 }}>
+        {!loading && options.length > 0 && (
+          <div>
             <h2 className="wizard-section-title">Eligible Insurers</h2>
             <p className="hint" style={{ marginBottom: 14 }}>
-              Premiums shown include levies and stamp duty. Select an option to generate your quotation.
+              Premiums shown include levies and stamp duty. Accept an option to continue.
             </p>
             {options.map((opt, i) => (
               <div key={opt.motor_class_id} className={`insurer-card ${i === 0 ? "insurer-card-selected" : ""}`}>
@@ -658,6 +591,7 @@ export default function QuoteWizard() {
                     </div>
                     <div className="insurer-card-meta">
                       {opt.motor_class_label} · {opt.cover_type === "comprehensive" ? "Comprehensive" : "Third Party Only"}
+                      {opt.max_age != null && ` · Max vehicle age ${opt.max_age} years`}
                     </div>
                   </div>
                   <div className="insurer-card-premium">
@@ -689,7 +623,7 @@ export default function QuoteWizard() {
                         disabled={selecting !== null}
                         onClick={() => selectOption(opt, Number(tonnagePromptValue))}
                       >
-                        {selecting === opt.motor_class_id ? <span className="spinner" /> : "Confirm & Generate"}
+                        {selecting === opt.motor_class_id ? <span className="spinner" /> : "Accept This Quote"}
                       </button>
                       <button
                         className="btn btn-secondary btn-sm"
@@ -717,7 +651,7 @@ export default function QuoteWizard() {
                         selectOption(opt);
                       }}
                     >
-                      {selecting === opt.motor_class_id ? <span className="spinner" /> : "Select this quote"}
+                      {selecting === opt.motor_class_id ? <span className="spinner" /> : "Accept This Quote"}
                     </button>
                   </div>
                 )}
@@ -726,7 +660,7 @@ export default function QuoteWizard() {
           </div>
         )}
 
-        {ineligibleOptions.length > 0 && (
+        {!loading && ineligibleOptions.length > 0 && (
           <div style={{ marginTop: 24 }}>
             <h2 className="wizard-section-title">Not Eligible for This Vehicle</h2>
             <p className="hint" style={{ marginBottom: 14 }}>
@@ -747,6 +681,12 @@ export default function QuoteWizard() {
             ))}
           </div>
         )}
+
+        <div className="quote-footer-nav">
+          <button className="btn btn-secondary" onClick={() => setStep(0)}>
+            ← Back
+          </button>
+        </div>
       </div>
     </QuoteShell>
   );

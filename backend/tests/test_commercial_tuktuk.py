@@ -6,9 +6,11 @@ Covers: the migration's exact code mapping, category-level isolation
 between the two (no label matching, no cross-contamination either way),
 the newly-enforced allow-list on `commercial_use` (previously defined but
 never actually rejected an unsupported value), Commercial Tuk Tuk's
-minimal intake (no tonnage, no passenger fields), and that the reused
-`commercial_use`/tonnage-band/eligibility machinery keeps working
-unchanged for Own Goods, General Cartage and Commercial Institutional.
+minimal intake (tonnage optional -- insurers rate it by carrying capacity
+too, same as Own Goods/General Cartage -- no passenger fields), and that
+the reused `commercial_use`/tonnage-band/eligibility machinery keeps
+working unchanged for Own Goods, General Cartage and Commercial
+Institutional.
 """
 import uuid
 from datetime import datetime, timezone
@@ -190,8 +192,10 @@ def test_psv_tuktuk_compare_never_returns_a_commercial_tuktuk_class(admin_header
 
 
 # ---------------------------------------------------------------------
-# Commercial Tuk Tuk intake: only sum_insured + year_of_manufacture. No
-# tonnage, no passenger/institutional fields required or accepted.
+# Commercial Tuk Tuk intake: sum_insured + year_of_manufacture are the
+# only required fields; tonnage is optional (insurers rate a Tuk Tuk by
+# carrying capacity too, same as Own Goods/General Cartage) and no
+# passenger/institutional fields are required or accepted.
 # ---------------------------------------------------------------------
 def test_generate_commercial_tuktuk_quotation_minimal_fields(admin_headers):
     _, cls = _get_class(admin_headers, "monarch", "tuktuk_commercial")
@@ -217,6 +221,30 @@ def test_generate_commercial_tuktuk_quotation_minimal_fields(admin_headers):
     assert body["institution_type"] is None
     assert body["passenger_seats"] is None
     assert body["calculated_age_years"] == 3
+
+
+def test_generate_commercial_tuktuk_quotation_with_tonnage(admin_headers):
+    _, cls = _get_class(admin_headers, "monarch", "tuktuk_commercial")
+    insurers = client.get("/api/admin/insurers", headers=admin_headers).json()
+    monarch = next(i for i in insurers if i["code"] == "monarch")
+
+    resp = client.post(
+        "/api/quotes/generate",
+        json={
+            "client": {"full_name": "Commercial Tuktuk Tonnage Client", "phone": _unique_phone()},
+            "vehicle": {"registration_no": _unique_reg(), "year_of_manufacture": CURRENT_YEAR - 3},
+            "insurer_id": monarch["id"],
+            "motor_class_id": cls["id"],
+            "commercial_use": "commercial_tuktuk",
+            "sum_insured": 300000,
+            "options": {"tonnage": 0.5},
+            "amount_paid": 0,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["commercial_use"] == "commercial_tuktuk"
+    assert body["tonnage"] == 0.5
 
 
 def test_commercial_tuktuk_max_age_enforced(admin_headers):

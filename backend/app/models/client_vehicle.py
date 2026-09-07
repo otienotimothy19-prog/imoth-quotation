@@ -15,6 +15,7 @@ class Client(UUIDPKMixin, TimestampMixin, Base):
     id_or_passport: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     phone: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    kra_pin: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     vehicles: Mapped[list["Vehicle"]] = relationship(back_populates="client")
 

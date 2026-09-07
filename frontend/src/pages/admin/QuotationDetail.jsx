@@ -156,7 +156,13 @@ export default function QuotationDetail() {
         <div className="row2">
           <div className="card">
             <h3 style={{ fontSize: 13 }}>Client</h3>
-            <p>{q.client.full_name}<br />{q.client.phone}<br />{q.client.email || "—"}<br />{q.client.id_or_passport || "—"}</p>
+            <p>
+              {q.client.full_name}<br />
+              {q.client.phone}<br />
+              {q.client.email || "—"}<br />
+              ID/Passport: {q.client.id_or_passport || "—"}<br />
+              KRA PIN: {q.client.kra_pin || "—"}
+            </p>
             <h3 style={{ fontSize: 13 }}>Vehicle</h3>
             <p>
               {q.vehicle.registration_no}<br />

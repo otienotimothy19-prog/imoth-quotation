@@ -21,6 +21,9 @@ DEFAULT_SETTINGS: dict = {
     "company.paybill": "4108121",
     "company.logo_document_id": None,
     "quotation.validity_days": env_settings.QUOTATION_VALIDITY_DAYS,
+    # How long an anonymous QuoteSelection (a locked-in comparison result,
+    # before "About You" is submitted) stays valid for.
+    "quote_selection.validity_minutes": 60,
     "levy.rate": env_settings.LEVY_RATE,
     "levy.stamp_duty": env_settings.STAMP_DUTY,
     "pdf.footer_text": (

@@ -64,7 +64,7 @@ def upload_client_document(
     file: UploadFile,
     actor_label: str,
 ) -> ClientDocumentUpload:
-    if quotation.locked or quotation.status.value not in ("GENERATED", "SENT"):
+    if quotation.locked or quotation.status.value not in ("GENERATED", "SENT", "DOCUMENTS_PENDING"):
         raise ClientDocumentError(
             "Documents can only be uploaded before this quotation is accepted."
         )

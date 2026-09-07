@@ -37,3 +37,23 @@ def decode_access_token(token: str) -> dict | None:
         return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError:
         return None
+
+
+# Short-lived, anonymous tokens proving possession of a specific
+# QuoteSelection (pre-personal-info) or Quotation (post-personal-info) from
+# the client quotation flow. Reuses the exact same JWT machinery/secret as
+# the admin access token above, distinguished only by `role` -- never
+# equal to a real UserRole value, so it can never satisfy require_admin/
+# require_roles(...) checks.
+QUOTE_ACCESS_ROLE = "quote_access"
+
+
+def create_quote_access_token(subject: str, expires_minutes: int) -> str:
+    return create_access_token(subject=subject, role=QUOTE_ACCESS_ROLE, expires_minutes=expires_minutes)
+
+
+def decode_quote_access_token(token: str) -> str | None:
+    payload = decode_access_token(token)
+    if not payload or payload.get("role") != QUOTE_ACCESS_ROLE:
+        return None
+    return payload.get("sub")
