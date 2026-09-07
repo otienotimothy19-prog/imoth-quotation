@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     # Rate limiting
     RATE_LIMIT_DEFAULT: str = "100/minute"
     RATE_LIMIT_LOGIN: str = "10/minute"
+    # Anonymous, pre-personal-info endpoints (compare / select) -- tighter
+    # than the general default since these can be hit with no identity at
+    # all behind them.
+    RATE_LIMIT_ANON: str = "30/minute"
 
     # Initial super admin bootstrap (only used by seed script)
     BOOTSTRAP_ADMIN_EMAIL: str = "admin@imoth.co.ke"

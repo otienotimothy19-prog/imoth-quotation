@@ -5,6 +5,7 @@ import AdminLayout from "./layouts/AdminLayout";
 import Landing from "./pages/client/Landing";
 import QuoteWizard from "./pages/client/QuoteWizard";
 import QuoteDetail from "./pages/client/QuoteDetail";
+import CompleteAcceptance from "./pages/client/CompleteAcceptance";
 import QuoteAccept from "./pages/client/QuoteAccept";
 import Documents from "./pages/client/Documents";
 
@@ -26,6 +27,7 @@ export default function App() {
       <Route element={<ClientLayout />}>
         <Route path="/" element={<Landing />} />
         <Route path="/quote" element={<QuoteWizard />} />
+        <Route path="/quote/select/:selectionId" element={<CompleteAcceptance />} />
         <Route path="/quote/:id" element={<QuoteDetail />} />
         <Route path="/quote/:id/accept" element={<QuoteAccept />} />
         <Route path="/documents/:id" element={<Documents />} />

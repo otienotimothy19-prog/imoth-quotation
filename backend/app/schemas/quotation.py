@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime
 
@@ -5,6 +6,22 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 
 from app.models.enums import InstitutionalVehicleType, InstitutionType, PassengerCategory, QuotationStatus, RiskNoteStatus
 from app.services.vehicle_age import MIN_MANUFACTURE_YEAR, current_year
+
+_KENYAN_PHONE_RE = re.compile(r"^(?:\+?254|0)([17]\d{8})$")
+_KRA_PIN_RE = re.compile(r"^[A-Za-z]\d{9}[A-Za-z]$")
+
+
+def normalize_kenyan_phone(value: str) -> str:
+    """Accepts 07xx/01xx local format or +254/254-prefixed, and always
+    returns the same canonical 2547xxxxxxxx/2541xxxxxxxx form -- so two
+    customers who typed the same number differently (e.g. "0712 345 678"
+    vs "+254712345678") are recognised as the same phone number wherever
+    it's compared (get_or_create_client's lookup key)."""
+    digits = re.sub(r"[\s-]", "", value or "")
+    match = _KENYAN_PHONE_RE.match(digits)
+    if not match:
+        raise ValueError("Enter a valid Kenyan phone number, e.g. 07XX XXX XXX.")
+    return f"254{match.group(1)}"
 
 # Sub-uses of category="commercial" a customer may actually select. Hybrid /
 # private_hire / online_hailed / tanker classes still exist and are
@@ -71,7 +88,9 @@ class QuoteOptionsIn(BaseModel):
 
 
 class CompareRequest(BaseModel):
-    client: ClientIn
+    # No client details here on purpose -- comparing quotes is anonymous;
+    # list_eligible_options never reads personal information, only vehicle
+    # and cover details.
     vehicle: VehicleIn
     category: str
     # Only meaningful when category == "commercial" -- selects which
@@ -154,9 +173,96 @@ class GenerateQuotationRequest(BaseModel):
         return self
 
 
+class SelectQuoteRequest(BaseModel):
+    """Body of POST /api/quotes/select -- everything GenerateQuotationRequest
+    has except `client`: locking in a comparison result is still anonymous."""
+
+    vehicle: VehicleIn
+    category: str
+    commercial_use: str | None = None
+    institution_type: InstitutionType | None = None
+    institutional_vehicle_type: InstitutionalVehicleType | None = None
+    passenger_category: PassengerCategory | None = None
+    insurer_id: uuid.UUID
+    motor_class_id: uuid.UUID
+    sum_insured: float = Field(ge=0)
+    options: QuoteOptionsIn = QuoteOptionsIn()
+
+    @model_validator(mode="after")
+    def _validate_commercial_use_intake(self):
+        _validate_commercial_use_intake(
+            self.commercial_use, self.institution_type, self.institutional_vehicle_type,
+            self.passenger_category, self.options.pll_seats,
+        )
+        return self
+
+
 class QuotationLineOut(BaseModel):
     label: str
     amount: float
+
+
+class QuoteSelectionOut(BaseModel):
+    selection_id: uuid.UUID
+    access_token: str
+    expires_at: datetime
+    insurer_name: str
+    vehicle_class_label: str
+    cover_type: str
+    sum_insured: float
+    basic_premium: float
+    subtotal: float
+    levies: float
+    stamp_duty: float
+    total_premium: float
+    items: list[QuotationLineOut]
+
+
+class CustomerIn(BaseModel):
+    """"About You" -- collected only after a quote has been selected. ID/
+    passport and KRA PIN are required at this stage (unlike the legacy
+    ClientIn used by the still-supported /generate path), matching "ID or
+    passport number is required at acceptance" / "KRA PIN is required"."""
+
+    full_name: str = Field(min_length=2, max_length=255)
+    phone: str = Field(min_length=7, max_length=30)
+    email: EmailStr | None = None
+    id_or_passport: str = Field(min_length=1, max_length=50)
+    kra_pin: str = Field(min_length=1, max_length=20)
+
+    @field_validator("full_name")
+    @classmethod
+    def _full_name_not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError("Please enter your full name.")
+        return v
+
+    @field_validator("phone")
+    @classmethod
+    def _validate_phone(cls, v: str) -> str:
+        return normalize_kenyan_phone(v)
+
+    @field_validator("id_or_passport")
+    @classmethod
+    def _id_not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("ID or passport number is required.")
+        return v
+
+    @field_validator("kra_pin")
+    @classmethod
+    def _validate_kra_pin(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not _KRA_PIN_RE.match(v):
+            raise ValueError("Enter a valid KRA PIN, e.g. A123456789B.")
+        return v
+
+
+class CustomerAttachOut(BaseModel):
+    quotation_id: uuid.UUID
+    access_token: str
 
 
 class QuotationOut(BaseModel):

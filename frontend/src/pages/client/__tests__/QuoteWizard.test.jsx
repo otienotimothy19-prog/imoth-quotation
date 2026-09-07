@@ -12,12 +12,12 @@ vi.mock("../../../api/client", async () => {
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-async function fillDetailsAndContinue(user) {
-  await user.type(screen.getByPlaceholderText("e.g. John Mwangi"), "Jane Doe");
-  await user.type(screen.getByPlaceholderText("07XX XXX XXX"), "0712345678");
+// Registration + year of manufacture are the only fields required before a
+// cover-branch selection can be made -- personal details are never asked
+// for on this (or any) step before a quote is selected.
+async function fillVehicleBasics(user) {
   await user.type(screen.getByPlaceholderText("e.g. KCZ 538G"), "KAA 1A");
   await user.type(screen.getByPlaceholderText(`e.g. ${CURRENT_YEAR - 5}`), String(CURRENT_YEAR - 5));
-  await user.click(screen.getByRole("button", { name: /save & continue/i }));
 }
 
 describe("QuoteWizard cover step", () => {
@@ -33,7 +33,7 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     expect(screen.queryByLabelText("Vehicle Tonnage")).not.toBeInTheDocument();
 
@@ -51,7 +51,7 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
     await user.click(screen.getByRole("button", { name: /commercial institutional/i }));
@@ -70,7 +70,7 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "psv");
     expect(screen.getByLabelText("Number of Passengers")).toBeInTheDocument();
@@ -85,13 +85,13 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
     await user.click(screen.getByRole("button", { name: /own goods/i }));
     await user.type(screen.getByPlaceholderText("e.g. 1500000"), "1500000");
     await user.type(screen.getByLabelText("Vehicle Tonnage"), "5");
-    await user.click(screen.getByRole("button", { name: /get quotes/i }));
+    await user.click(screen.getByRole("button", { name: /compare quotes/i }));
 
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(
@@ -109,12 +109,12 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
     await user.click(screen.getByRole("button", { name: /own goods/i }));
     await user.type(screen.getByPlaceholderText("e.g. 1500000"), "1500000");
-    await user.click(screen.getByRole("button", { name: /get quotes/i }));
+    await user.click(screen.getByRole("button", { name: /compare quotes/i }));
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith("/api/quotes/compare", expect.objectContaining({ options: {} })));
   });
@@ -126,7 +126,7 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     const option = screen.getByRole("option", { name: "Commercial" });
     expect(option).toBeInTheDocument();
@@ -140,7 +140,7 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
 
@@ -157,7 +157,7 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
     await user.click(screen.getByRole("button", { name: /^Commercial Tuk Tuk/ }));
@@ -176,12 +176,12 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
     await user.click(screen.getByRole("button", { name: /^Commercial Tuk Tuk/ }));
     await user.type(screen.getByPlaceholderText("e.g. 1500000"), "300000");
-    await user.click(screen.getByRole("button", { name: /get quotes/i }));
+    await user.click(screen.getByRole("button", { name: /compare quotes/i }));
 
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(
@@ -199,13 +199,13 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
     await user.click(screen.getByRole("button", { name: /^Commercial Tuk Tuk/ }));
     await user.type(screen.getByPlaceholderText("e.g. 1500000"), "300000");
     await user.type(screen.getByLabelText("Vehicle Tonnage"), "0.5");
-    await user.click(screen.getByRole("button", { name: /get quotes/i }));
+    await user.click(screen.getByRole("button", { name: /compare quotes/i }));
 
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(
@@ -222,13 +222,27 @@ describe("QuoteWizard cover step", () => {
         <QuoteWizard />
       </MemoryRouter>
     );
-    await fillDetailsAndContinue(user);
+    await fillVehicleBasics(user);
 
     await user.selectOptions(screen.getByLabelText("Vehicle Class"), "commercial");
     await user.type(screen.getByPlaceholderText("e.g. 1500000"), "1500000");
-    await user.click(screen.getByRole("button", { name: /get quotes/i }));
+    await user.click(screen.getByRole("button", { name: /compare quotes/i }));
 
     expect(screen.getByText(/select what this commercial vehicle is used for/i)).toBeInTheDocument();
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("never shows a personal-details field on the Vehicle & Cover step", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <QuoteWizard />
+      </MemoryRouter>
+    );
+    await fillVehicleBasics(user);
+
+    expect(screen.queryByPlaceholderText("e.g. John Mwangi")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("07XX XXX XXX")).not.toBeInTheDocument();
+    expect(screen.queryByText(/kra pin/i)).not.toBeInTheDocument();
   });
 });

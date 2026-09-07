@@ -11,6 +11,13 @@ class QuotationStatus(str, enum.Enum):
     DRAFT = "DRAFT"
     GENERATED = "GENERATED"
     SENT = "SENT"
+    # A real Quotation row created once "About You" is submitted for a
+    # quote selected through the anonymous-comparison flow, but before the
+    # customer has uploaded all required documents and confirmed
+    # acceptance. Behaves exactly like GENERATED for every existing
+    # purpose (PDF already rendered, visible to admin) except that
+    # accept_quotation() also accepts a transition to ACCEPTED from here.
+    DOCUMENTS_PENDING = "DOCUMENTS_PENDING"
     ACCEPTED = "ACCEPTED"
     REJECTED = "REJECTED"
     EXPIRED = "EXPIRED"
@@ -69,3 +76,16 @@ class PassengerCategory(str, enum.Enum):
     STAFF = "STAFF"
     CHURCH_MEMBERS = "CHURCH_MEMBERS"
     GENERAL_INSTITUTIONAL = "GENERAL_INSTITUTIONAL"
+
+
+class QuoteSelectionStatus(str, enum.Enum):
+    """Lifecycle of an anonymous QuoteSelection -- the locked-in choice of
+    insurer/class/premium a customer makes on the Compare Quotes step,
+    before any personal information exists. Never reachable once
+    CONVERTED; a fresh Quotation row (see QuotationStatus) takes over from
+    there."""
+
+    SELECTED_PENDING_DETAILS = "SELECTED_PENDING_DETAILS"
+    CONVERTED = "CONVERTED"
+    EXPIRED = "EXPIRED"
+    ABANDONED = "ABANDONED"

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import VerticalStepper from "./VerticalStepper";
 import { QUOTE_STEPS } from "./steps";
 
-const WHATSAPP_URL = "https://wa.me/254759642797";
+export const WHATSAPP_URL = "https://wa.me/254759642797";
 
 /**
  * Shared two-column layout for the four-step quotation journey. Desktop

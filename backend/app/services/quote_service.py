@@ -403,10 +403,10 @@ def accept_quotation(
         # Idempotent: accept has already run for this quotation.
         return existing_rn
 
-    if quotation.status not in (QuotationStatus.GENERATED, QuotationStatus.SENT):
+    if quotation.status not in (QuotationStatus.GENERATED, QuotationStatus.SENT, QuotationStatus.DOCUMENTS_PENDING):
         raise QuoteServiceError(
             f"Quotation cannot be accepted from status {quotation.status.value}. "
-            "Only a GENERATED or SENT quotation may be accepted."
+            "Only a GENERATED, SENT or DOCUMENTS_PENDING quotation may be accepted."
         )
 
     if not acceptance_confirmed:
