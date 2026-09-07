@@ -113,6 +113,8 @@ class CompareRequest(BaseModel):
 
 
 class CompareOption(BaseModel):
+    premium_lines: list[dict] = Field(default_factory=list)
+    extension_notes: list[str] = Field(default_factory=list)
     offer_id: uuid.UUID | None = None
     offer_token: str | None = None
     offer_expires_at: datetime | None = None

@@ -637,6 +637,17 @@ export default function QuoteWizard() {
                   <div><dt>Levies</dt><dd>{money(opt.levies)}</dd></div>
                   <div><dt>Stamp duty</dt><dd>{money(opt.stamp_duty)}</dd></div>
                 </dl>
+                {(opt.premium_lines?.length > 1 || opt.extension_notes?.length > 0) && (
+                  <div className="insurer-extension-details">
+                    {opt.premium_lines?.slice(1).map((line, index) => (
+                      <div className="insurer-extension-line" key={index}>
+                        <span>{line.label}</span><strong>{money(line.amount)}</strong>
+                      </div>
+                    ))}
+                    {opt.extension_notes?.map(note => <p className="hint" key={note}>{note}</p>)}
+                    <div className="insurer-extension-line"><span>Subtotal before levies &amp; stamp duty</span><strong>{money(opt.subtotal)}</strong></div>
+                  </div>
+                )}
                 {opt.tonnage_required && tonnagePromptId === opt.motor_class_id ? (
                   <div className="insurer-card-actions" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
                     <div className="field-group" style={{ margin: 0 }}>
