@@ -51,8 +51,12 @@ export default function QuotationDetail() {
     setPdfBusy(true);
     try {
       const res = await api.get(`/api/admin/quotations/${id}/pdf`, { responseType: "blob" });
-      downloadBlob(res.data, `${q.quotation_number}.pdf`);
+      const filename = res.headers?.['content-disposition']?.match(/filename="([^"]+)"/)?.[1];
+      downloadBlob(res.data, filename || `${q.quotation_number}.pdf`);
     } catch (err) {
+      if (err.response?.data instanceof Blob) {
+        try { err.response.data = JSON.parse(await err.response.data.text()); } catch { /* use fallback */ }
+      }
       setError(errorMessage(err, "Could not download the PDF."));
     } finally {
       setPdfBusy(false);

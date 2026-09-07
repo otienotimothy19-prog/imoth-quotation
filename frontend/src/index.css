@@ -1548,6 +1548,13 @@ table tr:nth-child(even) td {
 }
 
 /* ---- Insurer comparison cards (Choose Cover step) ---- */
+.optional-cover-section { margin-top: 24px; }
+.optional-cover-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.optional-cover-choice { display: flex; align-items: flex-start; gap: 12px; border: 1px solid #dce4ee; border-radius: 12px; padding: 16px; cursor: pointer; }
+.optional-cover-choice:has(input:checked) { background: #f1f5fa; border-color: #183d79; }
+.optional-cover-choice input { width: 18px; height: 18px; flex-shrink: 0; margin-top: 3px; accent-color: #183d79; }
+.optional-cover-choice small { display: block; color: var(--muted); line-height: 1.5; margin-top: 5px; }
+@media (max-width: 600px) { .optional-cover-grid { grid-template-columns: 1fr; } }
 .insurer-card {
   border: 1px solid #dce4ee;
   border-radius: 16px;

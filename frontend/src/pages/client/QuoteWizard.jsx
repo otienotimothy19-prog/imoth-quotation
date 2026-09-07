@@ -89,6 +89,8 @@ export default function QuoteWizard() {
   const [sumInsured, setSumInsured] = useState("");
   const [numPassengers, setNumPassengers] = useState("");
   const [tonnage, setTonnage] = useState("");
+  const [pvt, setPvt] = useState(false);
+  const [excessProtector, setExcessProtector] = useState(false);
   const [commercialUse, setCommercialUse] = useState("");
   const [institutionType, setInstitutionType] = useState("");
   const [institutionalVehicleType, setInstitutionalVehicleType] = useState("");
@@ -181,16 +183,19 @@ export default function QuoteWizard() {
   // 3.01-8T) -- optional, since not every insurer's commercial product
   // uses this. Left blank, pricing falls back to the Sum-Insured-only band.
   function cleanOptions() {
+    const extensions = coverType === "comprehensive"
+      ? { ...(pvt ? { pvt: true } : {}), ...(excessProtector ? { ep: true } : {}) }
+      : {};
     if (coverType === "comprehensive" && category === "psv" && numPassengers) {
-      return { pll_seats: Number(numPassengers) };
+      return { ...extensions, pll_seats: Number(numPassengers) };
     }
     if (coverType === "comprehensive" && isInstitutional && numPassengers) {
-      return { pll_seats: Number(numPassengers) };
+      return { ...extensions, pll_seats: Number(numPassengers) };
     }
     if (coverType === "comprehensive" && category === "commercial" && !isInstitutional && tonnage) {
-      return { tonnage: Number(tonnage) };
+      return { ...extensions, tonnage: Number(tonnage) };
     }
-    return {};
+    return extensions;
   }
 
   function institutionalFields() {
@@ -536,6 +541,21 @@ export default function QuoteWizard() {
               </div>
             )}
           </section>
+
+          {coverType === "comprehensive" && <section className="optional-cover-section">
+            <h2 className="wizard-section-title">Optional cover</h2>
+            <p className="hint">Choose additional protection to include in your quotation. Prices follow each insurer’s rates. Cover already included is not charged twice; mandatory insurer cover still applies.</p>
+            <div className="optional-cover-grid">
+              <label className="optional-cover-choice">
+                <input type="checkbox" checked={pvt} onChange={e => setPvt(e.target.checked)} />
+                <span><strong>PVT</strong><small>Political Violence &amp; Terrorism cover, where offered.</small></span>
+              </label>
+              <label className="optional-cover-choice">
+                <input type="checkbox" checked={excessProtector} onChange={e => setExcessProtector(e.target.checked)} />
+                <span><strong>Excess Protector</strong><small>Own-damage excess protection, where offered.</small></span>
+              </label>
+            </div>
+          </section>}
 
           <div className="quote-footer-nav quote-footer-nav-end">
             <button
