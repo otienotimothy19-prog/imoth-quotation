@@ -85,6 +85,7 @@ class QuoteSelectionStatus(str, enum.Enum):
     CONVERTED; a fresh Quotation row (see QuotationStatus) takes over from
     there."""
 
+    OFFERED = "OFFERED"
     SELECTED_PENDING_DETAILS = "SELECTED_PENDING_DETAILS"
     CONVERTED = "CONVERTED"
     EXPIRED = "EXPIRED"

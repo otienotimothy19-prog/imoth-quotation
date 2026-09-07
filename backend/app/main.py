@@ -22,6 +22,7 @@ from app.api.routers import (
     client_documents,
     client_quotations,
     client_uploads,
+    quote_offers,
 )
 
 logging.basicConfig(level=logging.INFO if not settings.DEBUG else logging.DEBUG)
@@ -86,6 +87,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth.router)
 app.include_router(client_quotations.router)
+app.include_router(quote_offers.router)
 app.include_router(client_documents.router)
 app.include_router(client_uploads.router)
 app.include_router(admin_dashboard.router)

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, errorMessage, money, saveQuoteFlow } from "../../api/client";
+import { api, errorMessage, quoteMoney as money, saveQuoteFlow } from "../../api/client";
+import QuoteOfferActions from "../../components/QuoteOfferActions";
 import QuoteShell from "../../components/wizard/QuoteShell";
 
 const CATEGORIES = [
@@ -233,7 +234,7 @@ export default function QuoteWizard() {
   // to price this vehicle, prompted for inline on the result card.
   async function selectOption(opt, tonnageOverride) {
     setError("");
-    if (opt.tonnage_required && !(Number(tonnageOverride) > 0)) {
+    if (!opt.offer_id && opt.tonnage_required && !(Number(tonnageOverride) > 0)) {
       setError("Please enter the vehicle tonnage required by this insurer.");
       return;
     }
@@ -243,14 +244,21 @@ export default function QuoteWizard() {
     if (tonnageOverride) selectOptions.tonnage = Number(tonnageOverride);
     const effectiveCategory = coverType === "third_party_only" ? "tpo" : category;
     try {
-      const res = await api.post("/api/quotes/select", {
-        vehicle: cleanVehicle(),
-        category: effectiveCategory,
-        insurer_id: opt.insurer_id,
-        motor_class_id: opt.motor_class_id,
-        sum_insured: si,
-        options: selectOptions,
-        ...institutionalFields(),
+      let secured = opt;
+      if (!secured.offer_id) {
+        const compared = await api.post("/api/quotes/compare", {
+          vehicle: cleanVehicle(), category: effectiveCategory, sum_insured: si,
+          options: selectOptions, ...institutionalFields(),
+        });
+        secured = compared.data.options.find(item => item.motor_class_id === opt.motor_class_id);
+        if (!secured?.offer_id) throw new Error("This quotation could not be prepared.");
+        setOptions(current => current.map(item => item.motor_class_id === secured.motor_class_id ? secured : item));
+        setTonnagePromptId(null);
+        setSelecting(null);
+        return; // Show the final tonnage-priced total before any acceptance.
+      }
+      const res = await api.post(`/api/quote-offers/${secured.offer_id}/select`, {}, {
+        headers: { Authorization: `Bearer ${secured.offer_token}` },
       });
       const { access_token, ...selectionSummary } = res.data;
       saveQuoteFlow({
@@ -575,12 +583,17 @@ export default function QuoteWizard() {
           <div>
             <h2 className="wizard-section-title">Eligible Insurers</h2>
             <p className="hint" style={{ marginBottom: 14 }}>
-              Premiums shown include levies and stamp duty. Accept an option to continue.
+              Compare premiums, download a PDF or email a quotation to review later. Accept when you are ready.
             </p>
+            <div className="indicative-quote-notice">
+              <strong>Indicative Motor Insurance Quotation</strong>
+              <p>This quotation has not yet been accepted and does not constitute an active insurance policy.</p>
+            </div>
             {options.map((opt, i) => (
-              <div key={opt.motor_class_id} className={`insurer-card ${i === 0 ? "insurer-card-selected" : ""}`}>
+              <div key={opt.motor_class_id} className="insurer-card">
                 <div className="insurer-card-head">
                   <div>
+                    <div className="insurer-card-eyebrow">Insurer quotation</div>
                     <div className="insurer-card-name">
                       {opt.insurer_name}
                       {i === 0 && (
@@ -596,12 +609,14 @@ export default function QuoteWizard() {
                   </div>
                   <div className="insurer-card-premium">
                     <div className="insurer-card-premium-amount">{money(opt.total_premium)}</div>
-                    <div className="insurer-card-premium-label">Total premium</div>
+                    <div className="insurer-card-premium-label">Total premium · Includes levies &amp; stamp duty</div>
                   </div>
                 </div>
-                <div className="insurer-card-details">
-                  Basic premium {money(opt.basic_premium)} · Levies {money(opt.levies)} · Stamp duty {money(opt.stamp_duty)}
-                </div>
+                <dl className="insurer-card-details">
+                  <div><dt>Basic premium</dt><dd>{money(opt.basic_premium)}</dd></div>
+                  <div><dt>Levies</dt><dd>{money(opt.levies)}</dd></div>
+                  <div><dt>Stamp duty</dt><dd>{money(opt.stamp_duty)}</dd></div>
+                </dl>
                 {opt.tonnage_required && tonnagePromptId === opt.motor_class_id ? (
                   <div className="insurer-card-actions" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
                     <div className="field-group" style={{ margin: 0 }}>
@@ -623,7 +638,7 @@ export default function QuoteWizard() {
                         disabled={selecting !== null}
                         onClick={() => selectOption(opt, Number(tonnagePromptValue))}
                       >
-                        {selecting === opt.motor_class_id ? <span className="spinner" /> : "Accept This Quote"}
+                        {selecting === opt.motor_class_id ? <span className="spinner" /> : "Prepare Quotation"}
                       </button>
                       <button
                         className="btn btn-secondary btn-sm"
@@ -638,12 +653,12 @@ export default function QuoteWizard() {
                     </div>
                   </div>
                 ) : (
-                  <div className="insurer-card-actions">
+                  <QuoteOfferActions offer={opt}>
                     <button
                       className="btn btn-primary btn-sm"
                       disabled={selecting !== null}
                       onClick={() => {
-                        if (opt.tonnage_required) {
+                        if (opt.tonnage_required && !opt.offer_id) {
                           setTonnagePromptId(opt.motor_class_id);
                           setTonnagePromptValue("");
                           return;
@@ -653,7 +668,7 @@ export default function QuoteWizard() {
                     >
                       {selecting === opt.motor_class_id ? <span className="spinner" /> : "Accept This Quote"}
                     </button>
-                  </div>
+                  </QuoteOfferActions>
                 )}
               </div>
             ))}

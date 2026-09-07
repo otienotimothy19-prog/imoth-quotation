@@ -105,6 +105,24 @@ def compare_insurers(request: Request, payload: CompareRequest, db: Session = De
         if ineligible:
             detail += " " + " | ".join(i["reason"].replace("\n", " ") for i in ineligible)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+    for option in options:
+        if option["tonnage_required"] and not payload.options.tonnage:
+            continue  # Not yet a priceable offer; retain the existing tonnage prompt.
+        selection = select_quote(
+            db, category=payload.category, vehicle_in=payload.vehicle,
+            insurer_id=option["insurer_id"], motor_class_id=option["motor_class_id"],
+            sum_insured=payload.sum_insured, options=payload.options,
+            commercial_use=payload.commercial_use, institution_type=payload.institution_type,
+            institutional_vehicle_type=payload.institutional_vehicle_type,
+            passenger_category=payload.passenger_category, as_offer=True,
+        )
+        option.update(
+            offer_id=selection.id,
+            offer_token=create_quote_access_token(str(selection.id), get_setting(db, "quote_selection.validity_minutes", 60)),
+            offer_expires_at=selection.expires_at,
+            **{field: float(getattr(selection, field)) for field in
+               ("basic_premium", "subtotal", "levies", "stamp_duty", "total_premium")},
+        )
     return CompareResponse(
         category=payload.category,
         sum_insured=payload.sum_insured,
