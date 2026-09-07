@@ -1549,10 +1549,12 @@ table tr:nth-child(even) td {
 
 /* ---- Insurer comparison cards (Choose Cover step) ---- */
 .insurer-card {
-  border: 1.5px solid var(--line);
-  border-radius: 14px;
-  padding: 16px;
-  margin-bottom: 12px;
+  border: 1px solid #dce4ee;
+  border-radius: 16px;
+  padding: 0 20px 16px;
+  margin-bottom: 22px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgb(24 61 121 / 6%);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1566,20 +1568,32 @@ table tr:nth-child(even) td {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 10px;
+  gap: 20px;
   flex-wrap: wrap;
+  background: #183d79;
+  border-top: 3px solid #e2231a;
+  border-radius: 15px 15px 0 0;
+  padding: 22px 20px;
+  margin: 0 -20px;
 }
 
+.insurer-card-eyebrow { color: #dce8fa; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+.indicative-quote-notice { background: #f1f5fa; border-left: 3px solid #e2231a; padding: 14px 18px; margin-bottom: 22px; border-radius: 0 8px 8px 0; color: #183d79; }
+.indicative-quote-notice strong { font-size: 14px; }
+.indicative-quote-notice p { font-size: 12px; line-height: 1.6; margin: 5px 0 0; color: #44546c; }
+
 .insurer-card-name {
-  font-size: 14.5px;
+  font-size: 17px;
   font-weight: 800;
-  color: var(--imoth-navy);
+  color: #fff;
 }
 
 .insurer-card-meta {
   font-size: 11.5px;
-  color: var(--muted);
-  margin-top: 2px;
+  color: #dce8fa;
+  margin-top: 8px;
+  max-width: 400px;
+  line-height: 1.6;
 }
 
 .insurer-card-premium {
@@ -1587,22 +1601,37 @@ table tr:nth-child(even) td {
 }
 
 .insurer-card-premium-amount {
-  font-size: 17px;
+  font-size: 28px;
   font-weight: 800;
-  color: var(--ink);
+  color: #fff;
+  letter-spacing: -0.7px;
+  font-variant-numeric: tabular-nums;
 }
 
 .insurer-card-premium-label {
   font-size: 10.5px;
-  color: var(--muted);
+  color: #dce8fa;
 }
 
 .insurer-card-details {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--panel);
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid #dce4ee;
   font-size: 11.5px;
   color: var(--muted);
+}
+.insurer-card-details dt { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
+.insurer-card-details dd { margin: 0; color: #243248; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .insurer-card { padding: 0 12px 12px; }
+  .insurer-card-head { margin: 0 -12px; padding: 18px 14px; }
+  .insurer-card-premium { text-align: left; }
+  .insurer-card-premium-amount { font-size: 26px; }
+  .insurer-card-details { gap: 8px; }
+  .insurer-card-details dd { font-size: 11px; }
 }
 
 .insurer-card-actions {
@@ -1837,4 +1866,20 @@ table tr:nth-child(even) td {
   position: absolute;
   top: 10px;
   right: 10px;
+}
+
+/* Quote actions retain the card layout and fit narrow mobile viewports. */
+.quote-offer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%; }
+.quote-offer-actions .offer-accept { margin-left: auto; }
+.quote-offer-actions .btn { white-space: normal; }
+.offer-share { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.quote-share-dialog { border: 0; border-radius: 12px; padding: 24px; width: min(440px, calc(100vw - 32px)); max-height: 90vh; box-sizing: border-box; }
+.quote-share-dialog::backdrop { background: rgb(0 0 0 / 45%); }
+.quote-share-dialog input { box-sizing: border-box; width: 100%; margin-top: 8px; }
+.quote-share-controls { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+@media (max-width: 600px) {
+  .quote-offer-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .quote-offer-actions .offer-accept { margin-left: 0; }
+  .quote-offer-actions .offer-accept .btn { width: 100%; }
+  .quote-offer-actions .btn { width: 100%; min-width: 0; padding-left: 8px; padding-right: 8px; font-size: 12px; }
 }

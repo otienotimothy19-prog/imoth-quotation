@@ -114,3 +114,20 @@ production use).
 - A dedicated password-reset/change-password flow for admin users beyond
   the existing `PATCH /api/admin/users/:id` (super-admin can reset any
   user's password there).
+
+## Anonymous quotation downloads and email sharing
+
+Comparison responses now include `offer_id`, `offer_token`, and `offer_expires_at` for each fully priced option. Offers reuse the existing `quote_selections` table and server pricing engine without creating a Client record. Apply migration `9b7c2e4a6d10` with `alembic upgrade head` before deploying: it adds `OFFERED` and corrects existing unselected offers. Download and email preserve `OFFERED`; only the secured select action changes it to `SELECTED_PENDING_DETAILS`. About You creates a `DOCUMENTS_PENDING` quotation, and all three documents plus explicit confirmation are required for `ACCEPTED`. Products missing mandatory tonnage must be prepared before their final price can be accepted.
+
+Every priced insurer card orders its actions Download Quote, Share by Email, Accept This Quote, including on mobile. The pre-acceptance PDF and email state “Indicative Motor Insurance Quotation” and “This quotation has not yet been accepted and does not constitute an active insurance policy.” Sharing requires only a recipient email address and does not open About You or record an acceptance intention.
+
+The new `/api/quote-offers/{offer_id}` endpoints require `Authorization: Bearer <offer_token>`:
+
+- `GET /pdf` returns an attachment using the locked offer snapshot.
+- `POST /email` accepts only `{ "email": "name@example.com" }` and requires a UUID `Idempotency-Key` header. Keep the key on network retries; use a new key only for an intentional new delivery attempt.
+- `GET /api/quote-offers/{offer_id}` returns the quotation summary for the email return page.
+- `POST /select` selects the existing snapshot and returns the existing Complete Acceptance response shape.
+
+Set `PUBLIC_APP_URL` to the public frontend origin and configure the existing `SMTP_*` settings. The DigitalOcean app spec sets the production frontend URL. Email links keep their short-lived token in the URL fragment, which the return page removes after reading it. Every endpoint also checks the stored expiry and rejects access with another offer's token. Sharing is limited to five requests per IP per minute and five delivery reservations per offer, with database-serialized duplicate protection across workers. Attempts are recorded in `audit_logs` under `entity_type=quote_offer`, including recipient, status and request IP; raw SMTP exception text and access tokens are not logged. A worker interruption after reserving a send leaves it pending to prevent an unsafe automatic duplicate.
+
+Validation (7 September 2026): 6,631 backend tests and 48 frontend tests passed; the changed frontend tests were rerun after cents formatting (18 passed), and offer API tests after PDF date/layout fixes (6 passed). Production build passes; lint has only the five pre-existing warnings in admin/auth components. Manual browser checks covered 1280px desktop, 375px and 320px mobile, download, email, focus restoration and Complete Acceptance. A local SMTP capture verified subject, recipient, insurer, exact total, PDF attachment and secure return access. PDF pages were rendered and visually reviewed. Production SMTP delivery was not exercised.

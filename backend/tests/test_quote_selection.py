@@ -98,7 +98,7 @@ def test_select_creates_selection_not_quotation():
     assert selection["total_premium"] == pytest.approx(cheapest["total_premium"], abs=0.01)
 
     db = SessionLocal()
-    assert db.query(QuoteSelection).count() == selections_before + 1
+    assert db.query(QuoteSelection).count() > selections_before + 1  # compare now persists anonymous offers
     assert db.query(Quotation).count() == quotations_before
     db.close()
 

@@ -48,6 +48,7 @@ def select_quote(
     institution_type=None,
     institutional_vehicle_type=None,
     passenger_category=None,
+    as_offer: bool = False,
 ) -> QuoteSelection:
     """Re-validates eligibility and recomputes the premium server-side --
     never trusts a premium/eligibility result the browser might send back
@@ -112,6 +113,8 @@ def select_quote(
             "stamp_duty": stamp_duty,
             "year_of_manufacture": vehicle_in.year_of_manufacture,
             "calculated_age_years": age,
+            "offer_selected": not as_offer,
+            "eligibility": True,
         }
     )
 
@@ -140,7 +143,7 @@ def select_quote(
         total_premium=result.total,
         items=[{"label": line.label, "amount": line.amount} for line in result.lines],
         snapshot_data=snapshot_data,
-        status=QuoteSelectionStatus.SELECTED_PENDING_DETAILS,
+        status=QuoteSelectionStatus.OFFERED if as_offer else QuoteSelectionStatus.SELECTED_PENDING_DETAILS,
         expires_at=now + timedelta(minutes=validity_minutes),
     )
     db.add(selection)
@@ -153,7 +156,7 @@ def select_quote(
         db,
         actor_type=ActorType.CLIENT,
         actor_label=selection.registration_no,
-        action="quote_selected",
+        action="quote_offer_created" if as_offer else "quote_selected",
         entity_type="quote_selection",
         entity_id=str(selection.id),
         new_value={
@@ -173,7 +176,7 @@ def get_selection(db: Session, selection_id: uuid.UUID) -> QuoteSelection | None
 
 def _expire_if_stale(selection: QuoteSelection) -> None:
     if (
-        selection.status == QuoteSelectionStatus.SELECTED_PENDING_DETAILS
+        selection.status in (QuoteSelectionStatus.OFFERED, QuoteSelectionStatus.SELECTED_PENDING_DETAILS)
         and datetime.now(timezone.utc) > selection.expires_at
     ):
         selection.status = QuoteSelectionStatus.EXPIRED
@@ -190,6 +193,8 @@ def attach_customer(
     this flow -- reuses quote_service's own get_or_create_client/
     get_or_create_vehicle so both paths produce identically-shaped rows."""
     _expire_if_stale(selection)
+    if selection.snapshot_data.get("offer_selected") is False:
+        raise QuoteSelectionError("Please select this quotation before completing About You.")
     if selection.status == QuoteSelectionStatus.EXPIRED:
         db.commit()
         raise QuoteSelectionError("This quotation selection has expired. Please compare quotes again.")

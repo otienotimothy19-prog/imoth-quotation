@@ -145,3 +145,6 @@ export function commercialUseLabel(value) {
   if (!value) return "";
   return COMMERCIAL_USE_LABELS[value] || value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+// Preserve cents so comparison cards agree exactly with server-generated PDFs.
+export const quoteMoney = (n) => "Kshs " + Number(n || 0).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

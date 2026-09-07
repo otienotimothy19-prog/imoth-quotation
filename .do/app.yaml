@@ -99,6 +99,9 @@ services:
   - key: DEBUG
     scope: RUN_AND_BUILD_TIME
     value: "false"
+  - key: PUBLIC_APP_URL
+    scope: RUN_TIME
+    value: https://quotes.imoth.co.ke
   - key: CORS_ORIGINS
     scope: RUN_TIME
     value: https://quotes.imoth.co.ke

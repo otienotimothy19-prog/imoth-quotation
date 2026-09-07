@@ -54,6 +54,7 @@ describe("QuoteWizard (Vehicle & Cover -> Compare Quotes)", () => {
       data: {
         options: [
           {
+            offer_id: "offer-1", offer_token: "offer-token",
             insurer_id: "insurer-1",
             insurer_name: "Test Insurer",
             motor_class_id: "class-1",
@@ -92,6 +93,7 @@ describe("QuoteWizard (Vehicle & Cover -> Compare Quotes)", () => {
       data: {
         options: [
           {
+            offer_id: "offer-1", offer_token: "offer-token",
             insurer_id: "insurer-1",
             insurer_name: "Test Insurer",
             motor_class_id: "class-1",
@@ -137,6 +139,7 @@ describe("QuoteWizard (Vehicle & Cover -> Compare Quotes)", () => {
 
     await waitFor(() => expect(saveQuoteFlow).toHaveBeenCalled());
 
+    expect(api.post.mock.calls[1][0]).toBe("/api/quote-offers/offer-1/select");
     const [, selectBody] = api.post.mock.calls[1];
     expect(selectBody).not.toHaveProperty("client");
 

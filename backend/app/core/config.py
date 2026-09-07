@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     SMTP_FROM_EMAIL: str = "noreply@imoth.co.ke"
     SMTP_FROM_NAME: str = "Imoth Insurance Brokers"
+    PUBLIC_APP_URL: str = "http://localhost:5173"
 
     # Business defaults (overridable via system_settings table)
     QUOTATION_VALIDITY_DAYS: int = 30

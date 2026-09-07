@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, clearQuoteFlow, dateTimeFmt, errorMessage, fieldErrors, loadQuoteFlow, money, saveQuoteFlow } from "../../api/client";
+import { api, clearQuoteFlow, dateTimeFmt, errorMessage, fieldErrors, loadQuoteFlow, quoteMoney as money, saveQuoteFlow } from "../../api/client";
 import DocumentUploadSection from "../../components/DocumentUploadSection";
 import QuoteShell from "../../components/wizard/QuoteShell";
 

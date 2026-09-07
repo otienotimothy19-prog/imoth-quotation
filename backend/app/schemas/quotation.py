@@ -113,6 +113,9 @@ class CompareRequest(BaseModel):
 
 
 class CompareOption(BaseModel):
+    offer_id: uuid.UUID | None = None
+    offer_token: str | None = None
+    offer_expires_at: datetime | None = None
     insurer_id: uuid.UUID
     insurer_code: str
     insurer_name: str
