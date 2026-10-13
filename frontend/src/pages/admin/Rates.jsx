@@ -928,12 +928,20 @@ export default function Rates() {
             <label className="first" htmlFor="rates-class-select">Motor Class</label>
             <select id="rates-class-select" value={classId} onChange={(e) => setClassId(e.target.value)} disabled={!insurerId}>
               <option value="">Select class…</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                  {c.active === false ? " (Inactive — not offered to clients)" : ""}
-                </option>
-              ))}
+              {classes
+                // Inactive classes are hidden from this picker so an admin
+                // can't select a deactivated duplicate going forward -- but
+                // if one is already selected (e.g. via the ?motor_class_id=
+                // deep link from the Motor Classes page), keep it in the
+                // list so the <select> doesn't silently show a blank value
+                // while loadRates()/the warning banner below still work.
+                .filter((c) => c.active !== false || c.id === classId)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                    {c.active === false ? " (Inactive — not offered to clients)" : ""}
+                  </option>
+                ))}
             </select>
             {selectedClass?.active === false && (
               <div className="alert alert-error" style={{ marginTop: 10 }}>

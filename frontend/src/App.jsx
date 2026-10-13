@@ -1,6 +1,6 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import ClientLayout from "./layouts/ClientLayout";
-import AdminLayout from "./layouts/AdminLayout";
+import AdminLayout, { AdminIndexRedirect } from "./layouts/AdminLayout";
 
 import Landing from "./pages/client/Landing";
 import QuoteWizard from "./pages/client/QuoteWizard";
@@ -13,6 +13,7 @@ import Documents from "./pages/client/Documents";
 import AdminLogin from "./pages/admin/Login";
 import Dashboard from "./pages/admin/Dashboard";
 import Quotations from "./pages/admin/Quotations";
+import NewQuotation from "./pages/admin/NewQuotation";
 import QuotationDetail from "./pages/admin/QuotationDetail";
 import RiskNotes from "./pages/admin/RiskNotes";
 import RiskNoteDetail from "./pages/admin/RiskNoteDetail";
@@ -37,9 +38,10 @@ export default function App() {
 
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminLayout />}>
-        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route index element={<AdminIndexRedirect />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="quotations" element={<Quotations />} />
+        <Route path="quotations/new" element={<NewQuotation />} />
         <Route path="quotations/:id" element={<QuotationDetail />} />
         <Route path="risk-notes" element={<RiskNotes />} />
         <Route path="risk-notes/:id" element={<RiskNoteDetail />} />
