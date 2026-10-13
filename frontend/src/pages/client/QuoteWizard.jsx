@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { api, errorMessage, quoteMoney as money, saveQuoteFlow } from "../../api/client";
+import { api, errorMessage, quoteMoney as money } from "../../api/client";
 import QuoteOfferActions from "../../components/QuoteOfferActions";
 import QuoteShell from "../../components/wizard/QuoteShell";
 
@@ -80,14 +79,12 @@ function calculateVehicleAge(yearOfManufacture) {
 }
 
 export default function QuoteWizard() {
-  const navigate = useNavigate();
   const [step, setStep] = useState(0); // 0 = Vehicle & Cover, 1 = Compare Quotes
   const [vehicle, setVehicle] = useState(emptyVehicle);
   const [fieldErrors, setFieldErrors] = useState({});
   const [coverType, setCoverType] = useState("comprehensive");
   const [category, setCategory] = useState("private");
   const [sumInsured, setSumInsured] = useState("");
-  const [amountPaid, setAmountPaid] = useState("");
   const [numPassengers, setNumPassengers] = useState("");
   const [tonnage, setTonnage] = useState("");
   const [pvt, setPvt] = useState(false);
@@ -235,48 +232,31 @@ export default function QuoteWizard() {
     }
   }
 
-  // `tonnageOverride` is supplied when the selected option flagged
-  // `tonnage_required` -- the insurer's own class needs a tonnage figure
-  // to price this vehicle, prompted for inline on the result card.
-  async function selectOption(opt, tonnageOverride) {
+  // This insurer's class needs a tonnage (carrying capacity) figure before
+  // it can be priced -- re-runs the comparison with it included so the
+  // card gets a priced offer_id and its Download/Share actions light up.
+  async function prepareWithTonnage(opt, tonnageOverride) {
     setError("");
-    if (!opt.offer_id && opt.tonnage_required && !(Number(tonnageOverride) > 0)) {
+    if (!(Number(tonnageOverride) > 0)) {
       setError("Please enter the vehicle tonnage required by this insurer.");
       return;
     }
     setSelecting(opt.motor_class_id);
     const si = coverType === "third_party_only" ? 0 : Number(sumInsured);
-    const selectOptions = { ...cleanOptions() };
-    if (tonnageOverride) selectOptions.tonnage = Number(tonnageOverride);
+    const selectOptions = { ...cleanOptions(), tonnage: Number(tonnageOverride) };
     const effectiveCategory = coverType === "third_party_only" ? "tpo" : category;
     try {
-      let secured = opt;
-      if (!secured.offer_id) {
-        const compared = await api.post("/api/quotes/compare", {
-          vehicle: cleanVehicle(), category: effectiveCategory, sum_insured: si,
-          options: selectOptions, ...institutionalFields(),
-        });
-        secured = compared.data.options.find(item => item.motor_class_id === opt.motor_class_id);
-        if (!secured?.offer_id) throw new Error("This quotation could not be prepared.");
-        setOptions(current => current.map(item => item.motor_class_id === secured.motor_class_id ? secured : item));
-        setTonnagePromptId(null);
-        setSelecting(null);
-        return; // Show the final tonnage-priced total before any acceptance.
-      }
-      const res = await api.post(`/api/quote-offers/${secured.offer_id}/select`, {}, {
-        headers: { Authorization: `Bearer ${secured.offer_token}` },
+      const compared = await api.post("/api/quotes/compare", {
+        vehicle: cleanVehicle(), category: effectiveCategory, sum_insured: si,
+        options: selectOptions, ...institutionalFields(),
       });
-      const { access_token, ...selectionSummary } = res.data;
-      saveQuoteFlow({
-        selectionId: res.data.selection_id,
-        quotationId: null,
-        token: access_token,
-        selectionSummary,
-        amountPaid: Number(amountPaid) || 0,
-      });
-      navigate(`/quote/select/${res.data.selection_id}`);
+      const secured = compared.data.options.find(item => item.motor_class_id === opt.motor_class_id);
+      if (!secured?.offer_id) throw new Error("This quotation could not be prepared.");
+      setOptions(current => current.map(item => item.motor_class_id === secured.motor_class_id ? secured : item));
+      setTonnagePromptId(null);
     } catch (err) {
-      setError(errorMessage(err, "Could not select this quotation."));
+      setError(errorMessage(err, "Could not prepare this quotation."));
+    } finally {
       setSelecting(null);
     }
   }
@@ -559,21 +539,6 @@ export default function QuoteWizard() {
             </div>
           </section>}
 
-          <div className="field-group">
-            <label>
-              Amount Already Paid (KES) <span style={{ fontWeight: 400, color: "var(--muted)" }}>— optional</span>
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="100"
-              value={amountPaid}
-              onChange={(e) => setAmountPaid(e.target.value)}
-              placeholder="e.g. 20000"
-            />
-            <div className="hint">If you've already made a part-payment, enter it here and your quotation will show the outstanding balance.</div>
-          </div>
-
           <div className="quote-footer-nav quote-footer-nav-end">
             <button
               className="btn btn-primary"
@@ -684,7 +649,7 @@ export default function QuoteWizard() {
                       <button
                         className="btn btn-primary btn-sm"
                         disabled={selecting !== null}
-                        onClick={() => selectOption(opt, Number(tonnagePromptValue))}
+                        onClick={() => prepareWithTonnage(opt, Number(tonnagePromptValue))}
                       >
                         {selecting === opt.motor_class_id ? <span className="spinner" /> : "Prepare Quotation"}
                       </button>
@@ -702,20 +667,17 @@ export default function QuoteWizard() {
                   </div>
                 ) : (
                   <QuoteOfferActions offer={opt}>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      disabled={selecting !== null}
-                      onClick={() => {
-                        if (opt.tonnage_required && !opt.offer_id) {
+                    {opt.tonnage_required && !opt.offer_id && (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
                           setTonnagePromptId(opt.motor_class_id);
                           setTonnagePromptValue("");
-                          return;
-                        }
-                        selectOption(opt);
-                      }}
-                    >
-                      {selecting === opt.motor_class_id ? <span className="spinner" /> : "Accept This Quote"}
-                    </button>
+                        }}
+                      >
+                        Enter Tonnage to Prepare Quote
+                      </button>
+                    )}
                   </QuoteOfferActions>
                 )}
               </div>
