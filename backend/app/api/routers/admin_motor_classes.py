@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_client_ip, require_admin
+from app.api.deps import get_client_ip, require_admin, require_any_staff
 from app.database import get_db
 from app.models.enums import ActorType
 from app.models.insurer_rate import Insurer, MotorClass, RateVersion
@@ -31,7 +31,7 @@ def list_motor_classes(
     insurer_id: uuid.UUID | None = Query(default=None),
     category: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_any_staff),
 ):
     q = db.query(MotorClass).options(joinedload(MotorClass.insurer), joinedload(MotorClass.rate_bands))
     if insurer_id:

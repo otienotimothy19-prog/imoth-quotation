@@ -2,16 +2,26 @@ import { useState } from "react";
 import { NavLink, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+// Items with `roles` are only shown to those roles -- STAFF ("agent") users
+// get just quote generation for now, not rate/insurer/user management.
 const NAV_ITEMS = [
-  { to: "/admin/dashboard", label: "Dashboard" },
-  { to: "/admin/quotations", label: "Quotations" },
-  { to: "/admin/risk-notes", label: "Risk Notes" },
-  { to: "/admin/insurers", label: "Insurers" },
-  { to: "/admin/motor-classes", label: "Motor Classes" },
-  { to: "/admin/rates", label: "Rates" },
-  { to: "/admin/settings", label: "Settings" },
-  { to: "/admin/users", label: "Users" },
+  { to: "/admin/dashboard", label: "Dashboard", roles: ["SUPER_ADMIN", "ADMIN"] },
+  { to: "/admin/quotations/new", label: "New Quotation" },
+  { to: "/admin/quotations", label: "Quotations", roles: ["SUPER_ADMIN", "ADMIN"] },
+  { to: "/admin/risk-notes", label: "Risk Notes", roles: ["SUPER_ADMIN", "ADMIN"] },
+  { to: "/admin/insurers", label: "Insurers", roles: ["SUPER_ADMIN", "ADMIN"] },
+  { to: "/admin/motor-classes", label: "Motor Classes", roles: ["SUPER_ADMIN", "ADMIN"] },
+  { to: "/admin/rates", label: "Rates", roles: ["SUPER_ADMIN", "ADMIN"] },
+  { to: "/admin/settings", label: "Settings", roles: ["SUPER_ADMIN", "ADMIN"] },
+  { to: "/admin/users", label: "Users", roles: ["SUPER_ADMIN", "ADMIN"] },
 ];
+
+// Where "/admin" (no sub-path) should land: STAFF only has New Quotation,
+// so send them straight there instead of the admin-only Dashboard.
+export function AdminIndexRedirect() {
+  const { user } = useAuth();
+  return <Navigate to={user?.role === "STAFF" ? "quotations/new" : "dashboard"} replace />;
+}
 
 function LogoutButton({ style }) {
   const { logout, loggingOut } = useAuth();
@@ -34,6 +44,8 @@ export default function AdminLayout() {
 
   if (!ready) return null;
   if (!user) return <Navigate to="/admin/login" replace />;
+
+  const navItems = NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(user.role));
 
   return (
     <div className="admin-shell">
@@ -75,7 +87,7 @@ export default function AdminLayout() {
           id="admin-nav"
           className={`admin-sidebar-nav ${navOpen ? "open" : ""}`}
         >
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

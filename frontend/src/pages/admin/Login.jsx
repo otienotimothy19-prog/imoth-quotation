@@ -12,15 +12,15 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (ready && user) return <Navigate to="/admin/dashboard" replace />;
+  if (ready && user) return <Navigate to={user.role === "STAFF" ? "/admin/quotations/new" : "/admin/dashboard"} replace />;
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setBusy(true);
     try {
-      await login(email, password);
-      navigate("/admin/dashboard");
+      const loggedInUser = await login(email, password);
+      navigate(loggedInUser.role === "STAFF" ? "/admin/quotations/new" : "/admin/dashboard");
     } catch (err) {
       setError(errorMessage(err, "Invalid email or password."));
     } finally {

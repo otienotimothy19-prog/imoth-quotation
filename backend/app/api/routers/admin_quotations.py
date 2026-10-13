@@ -8,18 +8,18 @@ from sqlalchemy.orm import Session, joinedload
 
 from pydantic import BaseModel
 
-from app.api.deps import get_client_ip, require_admin
+from app.api.deps import get_client_ip, require_admin, require_any_staff
 from app.database import get_db
 from app.models.client_document import ClientDocumentUpload, ClientUploadStatus, VerificationStatus
 from app.models.client_vehicle import Client, Vehicle
 from app.models.documents_email_audit import AuditLog, Document, EmailLog
-from app.models.enums import ActorType, QuotationStatus
+from app.models.enums import ActorType, QuotationSource, QuotationStatus
 from app.models.insurer_rate import Insurer, RateVersion
 from app.models.quotation import Quotation
 from app.models.user import User
-from app.schemas.quotation import EmailSendRequest
+from app.schemas.quotation import EmailSendRequest, GenerateQuotationRequest
 from app.services import audit_service, client_document_service, email_service, storage_service, pdf_service
-from app.services.quote_service import _company_settings
+from app.services.quote_service import QuoteServiceError, _company_settings, generate_quotation
 from app.services.settings_service import get_setting
 from app.services.client_document_service import DOCUMENT_LABELS
 
@@ -52,6 +52,39 @@ def _summary(q: Quotation) -> dict:
         "created_at": q.created_at,
         "generated_at": q.generated_at,
     }
+
+
+@router.post("")
+def create_quotation(
+    payload: GenerateQuotationRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_any_staff),
+):
+    """Lets a staff member (agent) generate a quotation directly -- picking
+    the insurer/class themselves for a client on the phone or in person --
+    instead of only ever viewing quotations that came through the anonymous
+    client self-service journey."""
+    try:
+        quotation = generate_quotation(
+            db,
+            client_in=payload.client,
+            vehicle_in=payload.vehicle,
+            insurer_id=payload.insurer_id,
+            motor_class_id=payload.motor_class_id,
+            sum_insured=payload.sum_insured,
+            options=payload.options,
+            amount_paid=payload.amount_paid,
+            source=QuotationSource.ADMIN_PANEL,
+            created_by=user.id,
+            actor_label=user.email,
+            commercial_use=payload.commercial_use,
+            institution_type=payload.institution_type,
+            institutional_vehicle_type=payload.institutional_vehicle_type,
+            passenger_category=payload.passenger_category,
+        )
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return get_quotation_detail(quotation.id, db, user)
 
 
 @router.get("")
@@ -172,7 +205,7 @@ def get_quotation_detail(quotation_id: uuid.UUID, db: Session = Depends(get_db),
 
 
 @router.get("/{quotation_id}/pdf")
-def download_pdf(quotation_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+def download_pdf(quotation_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(require_any_staff)):
     quotation = _get_full(db, quotation_id)
     document = db.get(Document, quotation.pdf_document_id) if quotation.pdf_document_id else None
     content = None
