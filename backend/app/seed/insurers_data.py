@@ -175,19 +175,12 @@ INSURERS = {
                     band(2500001, None, 0.03, 20000, ep_included=False, ep_rate=0.0025, ep_min=3000, pvt_included=False, pvt_rate=0.0025, pvt_min=2500),
                 ],
             },
-            # Monarch's dedicated older-vehicle private-car product: max age 20
-            # (vs the standard 15-year product above), for vehicles valued at
-            # KSh 400,000 and above. Only one documented band is available
-            # (400,000-499,999) -- since no further-band figures above
-            # 499,999 were supplied, that band's rate/min-premium/EP/PVT
-            # terms are applied uniformly to the whole KSh 400,000-and-above
-            # range this product covers, rather than inventing additional
-            # bands. See the completion report for this documented gap.
-            "private_400_499": {
-                "label": "Private Car (Max Age 20yrs, SI 400,000 and above)", "category": "private", "max_age": 20, "min_si": 400000,
-                "excess": ["No Excess Protector available"], "benefits": [], "limits": [],
-                "bands": [band(400000, None, 0.06, 30000, ep_included=False, ep_not_offered=True, pvt_included=False, pvt_rate=0.0025, pvt_min=2500)],
-            },
+            # Monarch's older dedicated-20-year-max-age private-car product
+            # (code "private_400_499") was retired: it duplicated terms not
+            # found in the Monarch rate card and has been confirmed obsolete
+            # -- see 2019eca025ea, which also removes it from any already-
+            # seeded database. Not re-adding it here as well would let a
+            # fresh seed recreate the very product that migration deletes.
             "commercial_own_goods": {
                 "label": "Commercial Own Goods", "category": "commercial", "commercial_use": "own_goods", "max_age": 20, "min_si": 500000,
                 "excess": [], "benefits": [], "limits": [],

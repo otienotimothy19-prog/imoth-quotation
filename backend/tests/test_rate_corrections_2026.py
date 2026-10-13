@@ -67,31 +67,12 @@ def test_monarch_private_band_boundary_at_2_5m():
 
 
 # ---------------------------------------------------------------------
-# 2. Monarch's dedicated 20-year private-car product: preserved separately,
-#    and exempt from the blanket >15yr EP/PVT-stripping rule since its own
-#    bands already document EP/PVT for its whole eligible age range.
+# 2. Monarch's standard private-car product still strips EP/PVT over 15
+#    years old. (Monarch's older dedicated-20-year-max-age product, code
+#    "private_400_499", was retired as a confirmed-obsolete duplicate --
+#    see 2019eca025ea -- so there is no longer an age-exemption case to
+#    cover here.)
 # ---------------------------------------------------------------------
-def test_monarch_20yr_product_eligible_at_16_to_20_years():
-    mc = INSURERS["monarch"]["classes"]["private_400_499"]
-    assert mc["max_age"] == 20
-    for age in (16, 17, 20):
-        assert is_eligible(mc, 500000, age), f"age {age} should remain eligible for the 20-year product"
-    assert not is_eligible(mc, 500000, 21)
-
-
-def test_monarch_20yr_product_not_stripped_by_blanket_15yr_rule():
-    """Excess Protector is documented as genuinely unavailable on this
-    product (ep_not_offered) regardless of age; PVT (0.25% min 2,500) must
-    still be chargeable at age 17, not silently zeroed out by the generic
-    private->age>15 stripping rule that governs the standard 15-year
-    product."""
-    mc = INSURERS["monarch"]["classes"]["private_400_499"]
-    result = compute_premium(mc, 500000, {"age": 17, "pvt": True}, LEVY_RATE, STAMP_DUTY)
-    pvt_lines = [l for l in result.lines if "PVT" in l.label]
-    assert pvt_lines, "PVT must still be chargeable at age 17 on Monarch's dedicated 20-year product"
-    assert pvt_lines[0].amount == pytest.approx(max(500000 * 0.0025, 2500))
-
-
 def test_monarch_standard_15yr_product_still_strips_ep_pvt_over_15():
     """The blanket rule must still apply to Monarch's ordinary 15-year
     private car product (max_age 15) -- only products explicitly designed
@@ -295,9 +276,7 @@ def test_eligibility_reason_none_when_eligible():
 
 def test_compare_endpoint_surfaces_ineligible_reason_for_over_age_class():
     """A vehicle old enough to exceed Star Discover's private-car max_age
-    (15) but young enough to still qualify for Monarch's 20-year product
-    must show Star Discover as ineligible with a clear reason, while still
-    returning Monarch as an eligible option."""
+    (15) must show it as ineligible with a clear, specific reason."""
     resp = compare(CURRENT_YEAR - 17, sum_insured=1000000)
     assert resp.status_code == 200
     body = resp.json()
@@ -307,9 +286,6 @@ def test_compare_endpoint_surfaces_ineligible_reason_for_over_age_class():
     assert "Vehicle age: 17 years" in star_entry["reason"]
     assert "Maximum eligible age: 15 years" in star_entry["reason"]
     assert "Not eligible for this insurer's product" in star_entry["reason"]
-    # Monarch's 20-year product should still be offered as eligible.
-    eligible_codes = {(o["insurer_code"], o["motor_class_code"]) for o in body["options"]}
-    assert ("monarch", "private_400_499") in eligible_codes
 
 
 # ---------------------------------------------------------------------
