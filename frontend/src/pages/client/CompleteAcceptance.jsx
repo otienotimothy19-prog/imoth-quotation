@@ -82,6 +82,7 @@ export default function CompleteAcceptance() {
         email: customer.email.trim() || null,
         id_or_passport: customer.id_or_passport.trim(),
         kra_pin: customer.kra_pin.trim(),
+        amount_paid: flow.amountPaid || 0,
       });
       const nextFlow = { ...flow, quotationId: res.data.quotation_id, token: res.data.access_token };
       saveQuoteFlow(nextFlow);
@@ -133,6 +134,18 @@ export default function CompleteAcceptance() {
         <div className="hint">Total Premium</div>
         <div className="quote-summary-value">{money(summary.total_premium)}</div>
       </div>
+      {quotation && quotation.amount_paid > 0 && (
+        <>
+          <div className="quote-summary-item">
+            <div className="hint">Amount Already Paid</div>
+            <div className="quote-summary-value">{money(quotation.amount_paid)}</div>
+          </div>
+          <div className="quote-summary-item">
+            <div className="hint">Balance Due</div>
+            <div className="quote-summary-value">{money(quotation.balance)}</div>
+          </div>
+        </>
+      )}
       <div className="quote-summary-item">
         <div className="hint">Quotation Validity</div>
         <div className="quote-summary-value">{dateTimeFmt(quotation?.expires_at || summary.expires_at)}</div>

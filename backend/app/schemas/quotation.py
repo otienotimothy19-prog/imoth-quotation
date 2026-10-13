@@ -234,6 +234,11 @@ class CustomerIn(BaseModel):
     email: EmailStr | None = None
     id_or_passport: str = Field(min_length=1, max_length=50)
     kra_pin: str = Field(min_length=1, max_length=20)
+    # Optional: a part-payment the customer already made before finishing
+    # acceptance (e.g. over M-Pesa). Never more than the quoted total --
+    # validated against the selection's total_premium in attach_customer,
+    # since this schema alone doesn't know that figure.
+    amount_paid: float = Field(default=0, ge=0)
 
     @field_validator("full_name")
     @classmethod

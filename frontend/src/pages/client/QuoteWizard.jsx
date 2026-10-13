@@ -87,6 +87,7 @@ export default function QuoteWizard() {
   const [coverType, setCoverType] = useState("comprehensive");
   const [category, setCategory] = useState("private");
   const [sumInsured, setSumInsured] = useState("");
+  const [amountPaid, setAmountPaid] = useState("");
   const [numPassengers, setNumPassengers] = useState("");
   const [tonnage, setTonnage] = useState("");
   const [pvt, setPvt] = useState(false);
@@ -271,6 +272,7 @@ export default function QuoteWizard() {
         quotationId: null,
         token: access_token,
         selectionSummary,
+        amountPaid: Number(amountPaid) || 0,
       });
       navigate(`/quote/select/${res.data.selection_id}`);
     } catch (err) {
@@ -556,6 +558,21 @@ export default function QuoteWizard() {
               </label>
             </div>
           </section>}
+
+          <div className="field-group">
+            <label>
+              Amount Already Paid (KES) <span style={{ fontWeight: 400, color: "var(--muted)" }}>— optional</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="100"
+              value={amountPaid}
+              onChange={(e) => setAmountPaid(e.target.value)}
+              placeholder="e.g. 20000"
+            />
+            <div className="hint">If you've already made a part-payment, enter it here and your quotation will show the outstanding balance.</div>
+          </div>
 
           <div className="quote-footer-nav quote-footer-nav-end">
             <button
