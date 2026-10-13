@@ -1,10 +1,12 @@
 import { QUOTE_STEPS } from "./steps";
 
 /**
- * Renders the list of four steps (used by both the desktop sidebar and the
- * mobile drawer). `currentIndex` and `maxReachedIndex` are 0-based.
- * Completed steps (index < currentIndex) are clickable so the customer can
- * go back and edit; future incomplete steps are not clickable.
+ * Renders the tracked steps (used by both the desktop sidebar and the
+ * mobile drawer). `currentIndex` is 0-based and may run past the last
+ * step (acceptance/confirmation pages do this on purpose, marking every
+ * tracked step done with none shown as current). Completed steps
+ * (index < currentIndex) are clickable so the customer can go back and
+ * edit; future incomplete steps are not clickable.
  */
 export default function VerticalStepper({ currentIndex, errorIndex, onNavigate, canNavigateTo }) {
   return (

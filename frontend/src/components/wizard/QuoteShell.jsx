@@ -5,11 +5,13 @@ import { QUOTE_STEPS } from "./steps";
 export const WHATSAPP_URL = "https://wa.me/254759642797";
 
 /**
- * Shared two-column layout for the four-step quotation journey. Desktop
- * gets a sticky vertical sidebar; below 900px that collapses into a
- * compact progress header with an expandable "view all steps" drawer.
+ * Shared two-column layout for the quotation journey. Desktop gets a
+ * sticky vertical sidebar; below 900px that collapses into a compact
+ * progress header with an expandable "view all steps" drawer.
  *
- * `currentIndex`/`maxReachedIndex` are 0-based indexes into QUOTE_STEPS.
+ * `currentIndex` is a 0-based index; values at or past QUOTE_STEPS.length
+ * are valid (acceptance/confirmation pages use them) and render the
+ * tracked steps as fully complete rather than indexing past the array.
  * `onNavigate(index)` is called when the customer clicks a completed step
  * to go back and edit it; omit it to make steps non-clickable (e.g. once
  * the quotation has been accepted).
@@ -25,8 +27,12 @@ export default function QuoteShell({
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const headingRef = useRef(null);
-  const step = QUOTE_STEPS[currentIndex];
-  const stepNumber = currentIndex + 1;
+  // currentIndex can run past the tracked steps (acceptance/confirmation
+  // pages use indexes beyond QUOTE_STEPS.length on purpose, so the stepper
+  // shows them as fully complete) -- clamp so nothing indexes past the
+  // array or exceeds 100%.
+  const step = QUOTE_STEPS[Math.min(currentIndex, QUOTE_STEPS.length - 1)];
+  const stepNumber = Math.min(currentIndex + 1, QUOTE_STEPS.length);
   const percent = Math.round((stepNumber / QUOTE_STEPS.length) * 100);
 
   useEffect(() => {
