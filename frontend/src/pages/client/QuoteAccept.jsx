@@ -100,6 +100,18 @@ export default function QuoteAccept() {
             <div className="hint">Total Premium</div>
             <div className="quote-summary-value">{money(quote.total_premium)}</div>
           </div>
+          {quote.amount_paid > 0 && (
+            <>
+              <div className="quote-summary-item">
+                <div className="hint">Amount Already Paid</div>
+                <div className="quote-summary-value">{money(quote.amount_paid)}</div>
+              </div>
+              <div className="quote-summary-item">
+                <div className="hint">Balance Due</div>
+                <div className="quote-summary-value">{money(quote.balance)}</div>
+              </div>
+            </>
+          )}
           <div className="quote-summary-item">
             <div className="hint">Accepted On</div>
             <div className="quote-summary-value">{dateTimeFmt(quote.accepted_at)}</div>

@@ -205,6 +205,9 @@ def attach_customer(
     if insurer is None or not insurer.active:
         raise QuoteSelectionError("Selected insurer is no longer available")
 
+    if customer_in.amount_paid > float(selection.total_premium):
+        raise QuoteSelectionError("Amount already paid cannot be more than the total premium")
+
     client_in = ClientIn(
         full_name=customer_in.full_name,
         id_or_passport=customer_in.id_or_passport,
@@ -241,8 +244,8 @@ def attach_customer(
         levies=selection.levies,
         stamp_duty=selection.stamp_duty,
         total_premium=selection.total_premium,
-        amount_paid=0,
-        balance=selection.total_premium,
+        amount_paid=customer_in.amount_paid,
+        balance=float(selection.total_premium) - customer_in.amount_paid,
         status=QuotationStatus.DOCUMENTS_PENDING,
         source=QuotationSource.CLIENT_PORTAL,
         generated_at=now,
