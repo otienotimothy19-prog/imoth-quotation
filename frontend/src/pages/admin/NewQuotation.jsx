@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, downloadBlob, errorMessage, quoteMoney } from "../../api/client";
+import { api, downloadBlob, errorMessage, quoteMoney, serverFilename } from "../../api/client";
 import VehicleMakeSelect from "../../components/VehicleMakeSelect";
 
 const CATEGORY_LABELS = {
@@ -162,7 +162,7 @@ export default function NewQuotation() {
     setDownloading(true);
     try {
       const res = await api.get(`/api/admin/quotations/${result.id}/pdf`, { responseType: "blob" });
-      downloadBlob(res.data, `Imoth-Motor-Quote-${result.insurer_name}-${result.quotation_number}.pdf`);
+      downloadBlob(res.data, serverFilename(res, `Imoth_Quote_${result.quotation_number}.pdf`));
     } catch (err) {
       setError(errorMessage(err, "Could not download the PDF."));
     } finally {

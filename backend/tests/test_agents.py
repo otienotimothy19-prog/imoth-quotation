@@ -98,6 +98,8 @@ def test_staff_quotation_without_client_details(admin_headers):
 
     pdf = client.get(f"/api/admin/quotations/{first.json()['id']}/pdf", headers=admin_headers)
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+    disposition = pdf.headers["content-disposition"]
+    assert 'filename="Imoth_Quote_' in disposition and vehicle["registration_no"].replace(" ", "_") in disposition
 
     # The public client journey still requires client details.
     public = client.post("/api/quotes/generate", json=body)
