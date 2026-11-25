@@ -248,19 +248,6 @@ def _condition_lines(footer_text: str, conditions: list[str], validity_days: int
     return lines
 
 
-def _card_border(canvas, doc):
-    """The rounded card outline around the whole quote sheet."""
-    canvas.saveState()
-    canvas.setStrokeColor(colors.HexColor("#d9dde6"))
-    canvas.setLineWidth(0.8)
-    x = doc.leftMargin - 7 * mm
-    y = doc.bottomMargin - 7 * mm
-    w = doc.width + 14 * mm
-    h = doc.height + 14 * mm
-    canvas.roundRect(x, y, w, h, 4 * mm, stroke=1, fill=0)
-    canvas.restoreState()
-
-
 def render_quotation_pdf(*, quotation, company: dict, footer_text: str, conditions: list[str]) -> bytes:
     """The quote sheet, laid out like Imoth's standard quotation: header,
     vehicle/class/insurer block, cover basis and rates, premium table,
@@ -271,7 +258,7 @@ def render_quotation_pdf(*, quotation, company: dict, footer_text: str, conditio
     .vehicle, .insurer, .snapshot eager-loaded)."""
     buf = BytesIO()
     doc = SimpleDocTemplate(
-        buf, pagesize=A4, topMargin=18 * mm, bottomMargin=18 * mm, leftMargin=18 * mm, rightMargin=18 * mm,
+        buf, pagesize=A4, topMargin=8 * mm, bottomMargin=8 * mm, leftMargin=8 * mm, rightMargin=8 * mm,
         title=f"Imoth Quote {quotation.quotation_number}", author=company.get("name", "Imoth Insurance Brokers Limited"),
     )
     width = doc.width
@@ -438,7 +425,7 @@ def render_quotation_pdf(*, quotation, company: dict, footer_text: str, conditio
     payment.setStyle(TableStyle([("LEFTPADDING", (0, 0), (0, 0), 0), ("RIGHTPADDING", (-1, 0), (-1, 0), 0)]))
     story.append(payment)
 
-    doc.build(story, onFirstPage=_card_border, onLaterPages=_card_border)
+    doc.build(story)
     return buf.getvalue()
 
 
