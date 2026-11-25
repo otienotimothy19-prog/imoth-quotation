@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, commercialUseLabel, dateTimeFmt, downloadBlob, errorMessage, money } from "../../api/client";
+import { ArrowLeft, Car, Download, Mail, Printer, Receipt, ScrollText, Send, User } from "lucide-react";
+import { api, commercialUseLabel, dateFmt, dateTimeFmt, downloadBlob, errorMessage, openPdfInNewTab } from "../../api/client";
+import { Card, StatusBadge, kes } from "../../components/ui";
+
+const money = (n) => kes(n, { decimals: 2 });
 
 function titleCase(value) {
   if (!value) return "—";
@@ -125,58 +129,81 @@ export default function QuotationDetail() {
     }
   }
 
+  async function printPdf() {
+    setError("");
+    try {
+      await openPdfInNewTab(`/api/admin/quotations/${id}/pdf`);
+    } catch (err) {
+      setError(errorMessage(err, "Could not open the PDF."));
+    }
+  }
+
   if (loadError) return <div className="alert alert-error">{loadError}</div>;
-  if (!q) return <div className="card">Loading…</div>;
+  if (!q) return <div className="card"><span className="skeleton" style={{ width: "40%" }} /><span className="skeleton" style={{ width: "70%", marginTop: 12 }} /></div>;
 
   return (
     <div>
-      <Link to="/admin/quotations" className="hint">
-        ← Back to Quotations
+      <Link to="/admin/quotations" className="hint" style={{ display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
+        <ArrowLeft size={14} /> Back to Quotations
       </Link>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "10px 0 18px", flexWrap: "wrap", gap: 8 }}>
-        <h1 style={{ fontSize: 20, color: "var(--imoth-blue)" }}>{q.quotation_number}</h1>
-        <span className="badge badge-blue">{q.status}</span>
+      <div className="page-head" style={{ marginTop: 8 }}>
+        <div>
+          <h1 style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {q.quotation_number} <StatusBadge status={q.status} />
+          </h1>
+          <p>
+            {q.insurer_name} · {q.vehicle_class_label} · {q.registration_no}
+            {q.expires_at ? ` · Valid until ${dateFmt(q.expires_at)}` : ""}
+          </p>
+        </div>
+        <div className="page-actions">
+          {q.risk_note && (
+            <Link className="btn btn-secondary" to={`/admin/risk-notes/${q.risk_note.id}`}>
+              <ScrollText size={16} /> View risk note
+            </Link>
+          )}
+          <button type="button" className="btn btn-secondary" onClick={printPdf}>
+            <Printer size={16} /> Print
+          </button>
+          <button type="button" className="btn btn-primary" onClick={downloadPdf} disabled={pdfBusy} aria-busy={pdfBusy}>
+            {pdfBusy ? <span className="spinner" /> : <><Download size={16} /> Download PDF</>}
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <div className="segmented" role="tablist" aria-label="Quotation sections" style={{ marginBottom: 16 }}>
         {["details", "documents", "emails", "audit"].map((t) => (
-          <button key={t} type="button" className={tab === t ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"} onClick={() => setTab(t)}>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
             {t[0].toUpperCase() + t.slice(1)}
           </button>
         ))}
-        <button type="button" className="btn btn-secondary btn-sm" onClick={downloadPdf} disabled={pdfBusy} aria-busy={pdfBusy}>
-          {pdfBusy ? <span className="spinner spinner-dark" /> : "⬇ Download PDF"}
-        </button>
-        {q.risk_note && (
-          <Link className="btn btn-secondary btn-sm" to={`/admin/risk-notes/${q.risk_note.id}`}>
-            View Risk Note ({q.risk_note.risk_note_number})
-          </Link>
-        )}
       </div>
 
       {tab === "details" && (
-        <div className="row2">
-          <div className="card">
-            <h3 style={{ fontSize: 13 }}>Client</h3>
-            <p>
-              {q.client.full_name}<br />
-              {q.client.phone}<br />
-              {q.client.email || "—"}<br />
-              ID/Passport: {q.client.id_or_passport || "—"}<br />
-              KRA PIN: {q.client.kra_pin || "—"}
-            </p>
-            <h3 style={{ fontSize: 13 }}>Vehicle</h3>
-            <p>
-              {q.vehicle.registration_no}<br />
-              {q.vehicle.make} {q.vehicle.model}<br />
-              Year of Manufacture: {q.vehicle.year_of_manufacture ?? "—"}<br />
-              Vehicle Age at Quotation: {q.vehicle.age_years ?? "—"} years
-            </p>
+        <div className="grid-main-side">
+          <div className="stack">
+          <Card title="Client" icon={User}>
+            <dl className="kv">
+              <dt>Name</dt><dd>{q.client.full_name}</dd>
+              <dt>Phone</dt><dd>{q.client.phone || "—"}</dd>
+              <dt>Email</dt><dd>{q.client.email || "—"}</dd>
+              <dt>ID / Passport</dt><dd>{q.client.id_or_passport || "—"}</dd>
+              <dt>KRA PIN</dt><dd>{q.client.kra_pin || "—"}</dd>
+            </dl>
+          </Card>
+          <Card title="Vehicle" icon={Car}>
+            <dl className="kv">
+              <dt>Registration</dt><dd>{q.vehicle.registration_no}</dd>
+              <dt>Make / model</dt><dd>{[q.vehicle.make, q.vehicle.model].filter(Boolean).join(" ") || "—"}</dd>
+              <dt>Year of manufacture</dt><dd>{q.vehicle.year_of_manufacture ?? "—"}</dd>
+              <dt>Age at quotation</dt><dd>{q.vehicle.age_years ?? "—"} years</dd>
+              <dt>Sum insured</dt><dd>{money(q.sum_insured)}</dd>
+            </dl>
+          </Card>
             {q.snapshot?.options_used?.commercial_use && (
-              <>
-                <h3 style={{ fontSize: 13 }}>Commercial Details</h3>
+              <Card title="Commercial details">
                 <p>
                   Vehicle Class: Commercial<br />
                   Commercial Use: {commercialUseLabel(q.snapshot.options_used.commercial_use)}<br />
@@ -184,22 +211,21 @@ export default function QuotationDetail() {
                   {q.snapshot.options_used.tonnage != null ? <>Tonnage: {q.snapshot.options_used.tonnage} tons<br /></> : null}
                   {q.rate_version_no != null ? <>Applied Rate Version: v{q.rate_version_no}<br /></> : null}
                 </p>
-              </>
+              </Card>
             )}
             {q.snapshot?.options_used?.institution_type && (
-              <>
-                <h3 style={{ fontSize: 13 }}>Institutional Details</h3>
+              <Card title="Institutional details">
                 <p>
                   Institution Type: {titleCase(q.snapshot.options_used.institution_type)}<br />
                   Vehicle Type: {titleCase(q.snapshot.options_used.institutional_vehicle_type)}<br />
                   Passenger Category: {titleCase(q.snapshot.options_used.passenger_category)}<br />
                   {q.snapshot.options_used.pll_seats ? `Passenger Seats (excl. driver): ${q.snapshot.options_used.pll_seats}` : null}
                 </p>
-              </>
+              </Card>
             )}
           </div>
-          <div className="card">
-            <h3 style={{ fontSize: 13 }}>Premium Breakdown</h3>
+          <div className="stack">
+          <Card title="Premium breakdown" icon={Receipt}>
             <table>
               <tbody>
                 {q.items.map((it, i) => (
@@ -210,20 +236,25 @@ export default function QuotationDetail() {
                 ))}
                 <tr><td>Levies</td><td className="num">{money(q.levies)}</td></tr>
                 <tr><td>Stamp Duty</td><td className="num">{money(q.stamp_duty)}</td></tr>
-                <tr style={{ fontWeight: 800 }}><td>Total</td><td className="num">{money(q.total_premium)}</td></tr>
+                <tr style={{ fontWeight: 700 }}><td>Total premium</td><td className="num">{money(q.total_premium)}</td></tr>
+                <tr><td>Amount paid</td><td className="num">{money(q.amount_paid)}</td></tr>
+                <tr style={{ fontWeight: 700 }}>
+                  <td>Balance</td>
+                  <td className="num" style={{ color: q.balance > 0 ? "var(--c-red-hover)" : "var(--c-green)" }}>{money(q.balance)}</td>
+                </tr>
               </tbody>
             </table>
-
-            <div style={{ marginTop: 16 }}>
-              <label className="first">Email quotation to</label>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <input type="email" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
-                <button type="button" className="btn btn-primary" disabled={busy} aria-busy={busy} onClick={sendEmail}>
-                  {busy ? <span className="spinner" /> : "Send"}
-                </button>
-              </div>
-              {status && <div className="hint" style={{ marginTop: 6 }}>{status}</div>}
+          </Card>
+          <Card title="Email quotation" icon={Mail}>
+            <label className="first" htmlFor="qd-email">Send to</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input id="qd-email" type="email" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} style={{ flex: 1, minWidth: 180 }} placeholder="client@email.com" />
+              <button type="button" className="btn btn-primary" disabled={busy} aria-busy={busy} onClick={sendEmail}>
+                {busy ? <span className="spinner" /> : <><Send size={15} /> Send</>}
+              </button>
             </div>
+            {status && <div className="hint" style={{ marginTop: 6 }}>{status}</div>}
+          </Card>
           </div>
         </div>
       )}
@@ -234,7 +265,7 @@ export default function QuotationDetail() {
             {documents.uploaded_count} of {documents.required_count} required documents uploaded
             {documents.all_uploaded ? " — complete." : "."}
           </p>
-          <div style={{ overflowX: "auto" }}>
+          <div className="table-wrap">
           <table>
             <thead>
               <tr>
@@ -305,7 +336,7 @@ export default function QuotationDetail() {
 
       {tab === "emails" && (
         <div className="card">
-          <div style={{ overflowX: "auto" }}>
+          <div className="table-wrap">
           <table>
             <thead>
               <tr>
@@ -351,7 +382,7 @@ export default function QuotationDetail() {
 
       {tab === "audit" && (
         <div className="card">
-          <div style={{ overflowX: "auto" }}>
+          <div className="table-wrap">
           <table>
             <thead>
               <tr>

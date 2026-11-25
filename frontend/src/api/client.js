@@ -177,3 +177,20 @@ export function commercialUseLabel(value) {
 
 // Preserve cents so comparison cards agree exactly with server-generated PDFs.
 export const quoteMoney = (n) => "Kshs " + Number(n || 0).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Opens an authenticated PDF in a new tab (for viewing or printing). The
+// tab is opened straight away so pop-up blockers allow it, then pointed at
+// the downloaded file.
+export async function openPdfInNewTab(path) {
+  const win = window.open("", "_blank");
+  try {
+    const res = await api.get(path, { responseType: "blob" });
+    const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+    if (win) win.location.href = url;
+    else window.location.href = url;
+    setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    if (win) win.close();
+    throw err;
+  }
+}

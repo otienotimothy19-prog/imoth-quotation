@@ -173,6 +173,10 @@ def list_eligible_options(
                 "total_premium": result.total,
                 "tonnage_required": bool(class_dict.get("tonnage_required")),
                 "extras": _extras_for(class_dict, result.band_used, sum_insured),
+                # Cover wording, so staff can compare benefits as well as price.
+                "benefits": class_dict.get("benefits") or [],
+                "excess": class_dict.get("excess") or [],
+                "limits": class_dict.get("limits") or [],
             }
         )
 

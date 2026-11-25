@@ -31,6 +31,8 @@ const INSTITUTIONAL_CLASS = {
 function mockBaseCalls() {
   api.get.mockImplementation((url, config) => {
     if (url === "/api/admin/insurers") return Promise.resolve({ data: [INSURER] });
+    // The overview table at the top loads every class (no insurer filter).
+    if (url === "/api/admin/motor-classes" && !config?.params?.insurer_id) return Promise.resolve({ data: [] });
     if (url === "/api/admin/motor-classes" && config?.params?.insurer_id === "ins1") {
       return Promise.resolve({ data: [BANDED_CLASS, FLAT_CLASS, PSV_CLASS, COMMERCIAL_CLASS, INSTITUTIONAL_CLASS] });
     }
@@ -117,7 +119,7 @@ function mockBaseCalls() {
 }
 
 async function selectInsurerAndClass(user, className) {
-  await screen.findByRole("option", { name: "Test Insurer" });
+  await screen.findAllByRole("option", { name: "Test Insurer" });
   await user.selectOptions(screen.getByLabelText("Insurer"), "ins1");
   await waitFor(() => expect(screen.getByLabelText("Motor Class")).not.toBeDisabled());
   await user.selectOptions(screen.getByLabelText("Motor Class"), screen.getByRole("option", { name: new RegExp(className) }));
@@ -283,7 +285,7 @@ describe("Rates admin page", () => {
         <Rates />
       </MemoryRouter>
     );
-    await screen.findByRole("option", { name: "Test Insurer" });
+    await screen.findAllByRole("option", { name: "Test Insurer" });
     await user.selectOptions(screen.getByLabelText("Insurer"), "ins1");
     await user.click(screen.getByRole("button", { name: "+ Add New Rate" }));
 
@@ -316,7 +318,7 @@ describe("Rates admin page", () => {
         <Rates />
       </MemoryRouter>
     );
-    await screen.findByRole("option", { name: "Test Insurer" });
+    await screen.findAllByRole("option", { name: "Test Insurer" });
     await user.selectOptions(screen.getByLabelText("Insurer"), "ins1");
     await user.click(screen.getByRole("button", { name: "+ Add New Rate" }));
     await user.click(screen.getByRole("button", { name: /third party \(flat rate\)/i }));
@@ -361,7 +363,7 @@ describe("Rates admin page", () => {
         <Rates />
       </MemoryRouter>
     );
-    await screen.findByRole("option", { name: "Test Insurer" });
+    await screen.findAllByRole("option", { name: "Test Insurer" });
     await user.selectOptions(screen.getByLabelText("Insurer"), "ins1");
     await user.click(screen.getByRole("button", { name: "+ Add New Rate" }));
     await user.click(screen.getByRole("button", { name: /comprehensive \(sum-insured bands\)/i }));

@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { Pencil, Percent, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { api, dateTimeFmt, errorMessage } from "../../api/client";
+import { Card, DataTable, EmptyState, IconInput, PageHeader, Pagination, StatusBadge, kes } from "../../components/ui";
+import { useToast } from "../../components/ui/toast";
 
 const CATEGORIES = ["private", "commercial", "psv", "tuktuk", "motorcycle", "asset", "special", "tpo"];
 
@@ -625,6 +628,161 @@ function validateBands(bands, label) {
   return "";
 }
 
+// Every class's pricing at a glance, across all insurers. "Edit rates"
+// opens that class in the editor below. Read-only: all changes still go
+// through the editor and its versioned save.
+function pct(r) {
+  return `${(Number(r) * 100).toFixed(2).replace(/\.00$/, "")}%`;
+}
+
+function coverLabel(band, key) {
+  if (!band) return null;
+  if (band[`${key}_not_offered`]) return "not offered";
+  if (band[`${key}_included`]) return "included";
+  if (band[`${key}_mandatory`]) return "mandatory";
+  return "optional";
+}
+
+function pricingSummary(c) {
+  if (c.flat_only) {
+    const f = c.flat_only;
+    return {
+      rate: f.rate_on_si != null ? pct(f.rate_on_si) : "Flat",
+      minPremium: f.premium != null ? f.premium : f.min_premium,
+      bands: 0,
+    };
+  }
+  const all = [...(c.bands || []), ...(c.bands_alt || [])];
+  if (!all.length) return { rate: "Not set", minPremium: null, bands: 0 };
+  const rates = all.map((b) => b.rate);
+  const lo = Math.min(...rates);
+  const hi = Math.max(...rates);
+  return { rate: lo === hi ? pct(lo) : `${pct(lo)} – ${pct(hi)}`, minPremium: Math.min(...all.map((b) => b.min_premium)), bands: all.length };
+}
+
+function RatesOverview({ insurers, onEdit }) {
+  const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+  const [insurerFilter, setInsurerFilter] = useState("");
+  const [coverFilter, setCoverFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("active");
+  const [page, setPage] = useState(1);
+  const PAGE = 10;
+
+  useEffect(() => {
+    api
+      .get("/api/admin/motor-classes")
+      .then((res) => setClasses(res.data))
+      .catch((err) => setError(errorMessage(err, "Could not load the rate overview.")))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const rows = classes.filter((c) => {
+    if (insurerFilter && c.insurer_id !== insurerFilter) return false;
+    if (coverFilter === "comprehensive" && c.flat_only) return false;
+    if (coverFilter === "tpo" && !c.flat_only) return false;
+    if (statusFilter === "active" && !c.active) return false;
+    if (statusFilter === "inactive" && c.active) return false;
+    const term = q.trim().toLowerCase();
+    return !term || c.label.toLowerCase().includes(term) || (c.insurer_name || "").toLowerCase().includes(term);
+  });
+  const lastPage = Math.max(1, Math.ceil(rows.length / PAGE));
+  const shownPage = Math.min(page, lastPage);
+  const pageRows = rows.slice((shownPage - 1) * PAGE, shownPage * PAGE);
+  const filterChange = (setter) => (e) => { setter(e.target.value); setPage(1); };
+
+  const columns = [
+    { key: "insurer_name", header: "Insurer", sortable: true, render: (c) => <div style={{ minWidth: 140 }}>{c.insurer_name}</div> },
+    {
+      key: "label", header: "Motor Class", sortable: true,
+      render: (c) => (
+        <div style={{ minWidth: 200 }}>
+          <div className="cell-main">{c.label}</div>
+          <div className="cell-sub">{c.category}{c.commercial_use ? ` · ${c.commercial_use.replace(/_/g, " ")}` : ""}</div>
+        </div>
+      ),
+    },
+    { key: "cover", header: "Cover Type", sortable: true, sortValue: (c) => (c.flat_only ? 1 : 0), render: (c) => (c.flat_only ? "Third party (flat)" : "Comprehensive") },
+    { key: "rate", header: "Premium Rate", align: "right", sortable: true, sortValue: (c) => pricingSummary(c).minPremium ?? 0, render: (c) => <span style={{ whiteSpace: "nowrap" }}>{pricingSummary(c).rate}</span> },
+    { key: "min_premium", header: "Min Premium", align: "right", sortable: true, sortValue: (c) => pricingSummary(c).minPremium ?? 0, render: (c) => { const m = pricingSummary(c).minPremium; return m != null ? kes(m) : "—"; } },
+    { key: "min_si", header: "Min SI", align: "right", sortable: true, render: (c) => (c.flat_only ? "—" : kes(c.min_si)) },
+    { key: "max_si", header: "Max SI", align: "right", sortable: true, sortValue: (c) => c.max_si ?? Infinity, render: (c) => (c.flat_only ? "—" : c.max_si ? kes(c.max_si) : "Open") },
+    { key: "max_age", header: "Max Age", align: "right", sortable: true, render: (c) => (c.max_age != null ? `${c.max_age} yrs` : "—") },
+    {
+      key: "extras", header: "Benefits & Charges",
+      render: (c) => {
+        const b = (c.bands || [])[0];
+        const bits = [];
+        if (b) {
+          bits.push(`EP ${coverLabel(b, "ep")}`);
+          bits.push(`PVT ${coverLabel(b, "pvt")}`);
+        }
+        if (c.pll_included) bits.push("PLL included");
+        else if (c.pll_per_seat || c.pll_options?.length) bits.push("PLL per seat");
+        if (c.courtesy_car_options?.length) bits.push("Courtesy car");
+        return <span className="cell-sub" style={{ whiteSpace: "nowrap" }}>{bits.join(" · ") || "—"}</span>;
+      },
+    },
+    { key: "active", header: "Status", sortable: true, sortValue: (c) => (c.active ? 0 : 1), render: (c) => <StatusBadge status={c.active ? "ACTIVE" : "DISABLED"} label={c.active ? "Active" : "Inactive"} /> },
+    {
+      key: "actions", header: "", width: 110,
+      render: (c) => (
+        <button type="button" className="btn btn-secondary btn-sm" style={{ whiteSpace: "nowrap" }} onClick={() => onEdit(c)}>
+          <Pencil size={14} /> Edit rates
+        </button>
+      ),
+    },
+  ];
+
+  return (
+    <Card title="Rate configurations" icon={Percent} sub={`${rows.length} of ${classes.length}`} style={{ marginBottom: 16 }}>
+      <div className="filter-bar" style={{ marginBottom: 14 }}>
+        <div className="grow">
+          <label htmlFor="ro-search">Search</label>
+          <IconInput icon={Search}>
+            <input id="ro-search" type="text" placeholder="Class or insurer" value={q} onChange={filterChange(setQ)} />
+          </IconInput>
+        </div>
+        <div>
+          <label htmlFor="ro-insurer">Filter by insurer</label>
+          <select id="ro-insurer" value={insurerFilter} onChange={filterChange(setInsurerFilter)}>
+            <option value="">All insurers</option>
+            {insurers.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="ro-cover">Cover type</label>
+          <select id="ro-cover" value={coverFilter} onChange={filterChange(setCoverFilter)}>
+            <option value="">All cover types</option>
+            <option value="comprehensive">Comprehensive</option>
+            <option value="tpo">Third party (flat)</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="ro-status">Rate status</label>
+          <select id="ro-status" value={statusFilter} onChange={filterChange(setStatusFilter)}>
+            <option value="">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+      {error && <div className="alert alert-error">{error}</div>}
+      <DataTable
+        columns={columns}
+        rows={pageRows}
+        loading={loading}
+        skeletonRows={4}
+        minWidth={1250}
+        empty={<EmptyState icon={Percent} title="No rate configurations match" />}
+      />
+      <Pagination page={shownPage} pageSize={PAGE} total={rows.length} onPage={setPage} />
+    </Card>
+  );
+}
+
 export default function Rates() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [insurers, setInsurers] = useState([]);
@@ -649,6 +807,28 @@ export default function Rates() {
   const [pllForm, setPllForm] = useState(null); // { mode: "none" | "flat" | "tiered", perSeat, options: [{key,label,rate}] }
   const [pllReason, setPllReason] = useState("");
   const [savingPll, setSavingPll] = useState(false);
+  const editorRef = useRef(null);
+  const toast = useToast();
+
+  function editFromOverview(cls) {
+    setAddMode(null);
+    setNewClassForm(null);
+    setInsurerId(cls.insurer_id);
+    setClassId(cls.id);
+    setSearchParams({ motor_class_id: cls.id });
+    setTimeout(() => editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+
+  function startAddRate() {
+    if (!insurerId) {
+      toast.error("Choose the insurer in the rate editor first, then add the new rate.");
+      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      editorRef.current?.querySelector("select")?.focus();
+      return;
+    }
+    setAddMode("choose");
+    setTimeout(() => editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
 
   useEffect(() => {
     api.get("/api/admin/insurers").then((res) => setInsurers(res.data));
@@ -899,8 +1079,16 @@ export default function Rates() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 20, color: "var(--imoth-blue)", marginBottom: 16 }}>Rate Management</h1>
+      <PageHeader
+        title="Rates"
+        description="Premium rates, sum-insured bands, extras and passenger liability for every motor class. Every saved change is versioned."
+        actions={<button type="button" className="btn btn-primary" onClick={startAddRate}><Plus size={16} /> Add Rate</button>}
+      />
 
+      <RatesOverview insurers={insurers} onEdit={editFromOverview} />
+
+      <div ref={editorRef} style={{ scrollMarginTop: 76 }} />
+      <h2 className="section-title" style={{ marginTop: 8 }}><SlidersHorizontal size={17} /> Rate editor</h2>
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="row2">
           <div>

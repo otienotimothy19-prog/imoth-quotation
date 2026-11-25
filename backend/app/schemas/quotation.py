@@ -142,6 +142,9 @@ class CompareOption(BaseModel):
     # quotation will charge them (amounts before levies/stamp duty). Status is
     # one of: optional | included | mandatory | not_offered.
     extras: dict | None = None
+    benefits: list[str] = Field(default_factory=list)
+    excess: list[str] = Field(default_factory=list)
+    limits: list[str] = Field(default_factory=list)
 
 
 class IneligibleOption(BaseModel):

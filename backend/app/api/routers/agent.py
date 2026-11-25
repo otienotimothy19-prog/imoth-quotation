@@ -34,6 +34,7 @@ def my_quotations(
             joinedload(Quotation.insurer),
             joinedload(Quotation.risk_note),
             joinedload(Quotation.created_by_user),
+            joinedload(Quotation.motor_class),
         )
         .filter(Quotation.created_by_id == user.id)
     )
