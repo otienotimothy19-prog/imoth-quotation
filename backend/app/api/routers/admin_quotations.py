@@ -17,7 +17,7 @@ from app.models.enums import ActorType, QuotationSource, QuotationStatus, UserRo
 from app.models.insurer_rate import Insurer, RateVersion
 from app.models.quotation import Quotation
 from app.models.user import User
-from app.schemas.quotation import EmailSendRequest, GenerateQuotationRequest
+from app.schemas.quotation import AdminGenerateQuotationRequest, EmailSendRequest
 from app.services import audit_service, client_document_service, email_service, storage_service, pdf_service
 from app.services.quote_service import QuoteServiceError, _company_settings, generate_quotation
 from app.services.settings_service import get_setting
@@ -58,7 +58,7 @@ def _summary(q: Quotation) -> dict:
 
 @router.post("")
 def create_quotation(
-    payload: GenerateQuotationRequest,
+    payload: AdminGenerateQuotationRequest,
     db: Session = Depends(get_db),
     user: User = Depends(require_quote_creator),
 ):

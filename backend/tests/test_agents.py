@@ -73,3 +73,32 @@ def test_agent_signup_approval_and_persistent_login(admin_headers):
 def test_approve_only_applies_to_agents(admin_headers):
     me = client.get("/api/auth/me", headers=admin_headers).json()
     assert client.post(f"/api/admin/users/{me['id']}/approve", headers=admin_headers).status_code == 404
+
+
+def test_staff_quotation_without_client_details(admin_headers):
+    """The New Quotation form no longer asks for client details: the quote
+    is issued to "To be confirmed", and each such quote gets its own
+    placeholder client rather than merging into one."""
+    year = datetime.now(timezone.utc).year
+    vehicle = {"registration_no": f"KNC {uuid.uuid4().hex[:3].upper()}A", "year_of_manufacture": year - 3}
+    option = client.post(
+        "/api/quotes/compare",
+        json={"client": {"full_name": "Compare Only", "phone": "0700000000"}, "vehicle": vehicle,
+              "category": "private", "sum_insured": 1000000},
+    ).json()["options"][0]
+    body = {"vehicle": vehicle, "insurer_id": option["insurer_id"], "motor_class_id": option["motor_class_id"],
+            "sum_insured": 1000000}
+
+    first = client.post("/api/admin/quotations", json=body, headers=admin_headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["client_name"] == "To be confirmed"
+    second = client.post("/api/admin/quotations", json=body, headers=admin_headers)
+    assert second.status_code == 200
+    assert first.json()["quotation_number"] != second.json()["quotation_number"]
+
+    pdf = client.get(f"/api/admin/quotations/{first.json()['id']}/pdf", headers=admin_headers)
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+
+    # The public client journey still requires client details.
+    public = client.post("/api/quotes/generate", json=body)
+    assert public.status_code == 422

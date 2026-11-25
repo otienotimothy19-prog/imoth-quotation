@@ -14,10 +14,6 @@ const CATEGORY_LABELS = {
 
 function emptyForm() {
   return {
-    clientName: "",
-    idOrPassport: "",
-    phone: "",
-    email: "",
     regNo: "",
     yom: "",
     make: "",
@@ -108,8 +104,6 @@ export default function NewQuotation() {
   async function submit(e) {
     e.preventDefault();
     setError("");
-    if (!form.clientName.trim()) return setError("Client / Insured name is required.");
-    if (form.phone.trim().length < 7) return setError("A valid phone number is required.");
     if (!form.regNo.trim()) return setError("Registration number is required.");
     if (!form.yom) return setError("Year of manufacture is required.");
     if (!insurerId) return setError("Select an insurance company.");
@@ -126,12 +120,6 @@ export default function NewQuotation() {
     }
 
     const payload = {
-      client: {
-        full_name: form.clientName.trim(),
-        id_or_passport: form.idOrPassport.trim() || null,
-        phone: form.phone.trim(),
-        email: form.email.trim() || null,
-      },
       vehicle: {
         registration_no: form.regNo.trim(),
         year_of_manufacture: Number(form.yom),
@@ -247,23 +235,7 @@ export default function NewQuotation() {
       {error && <div className="alert alert-error">{error}</div>}
 
       <form className="card" onSubmit={submit}>
-        <h2 style={{ fontSize: 15, marginBottom: 10 }}>Client</h2>
-        <label className="first">Client / Insured Name</label>
-        <input value={form.clientName} onChange={(e) => update({ clientName: e.target.value })} placeholder="e.g. John Mwangi" />
-        <div className="row2">
-          <div>
-            <label>Phone</label>
-            <input value={form.phone} onChange={(e) => update({ phone: e.target.value })} placeholder="e.g. 0712345678" />
-          </div>
-          <div>
-            <label>Email (optional)</label>
-            <input type="email" value={form.email} onChange={(e) => update({ email: e.target.value })} />
-          </div>
-        </div>
-        <label>ID / Passport No. (optional)</label>
-        <input value={form.idOrPassport} onChange={(e) => update({ idOrPassport: e.target.value })} />
-
-        <h2 style={{ fontSize: 15, margin: "20px 0 10px" }}>Vehicle</h2>
+        <h2 style={{ fontSize: 15, marginBottom: 10 }}>Vehicle</h2>
         <div className="row2">
           <div>
             <label className="first">Registration No.</label>
