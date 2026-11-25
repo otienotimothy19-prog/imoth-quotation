@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { CarFront, Pencil, Percent, Plus, Power, Search, Trash2 } from "lucide-react";
 import { api, errorMessage } from "../../api/client";
+import { ActionMenu, CATEGORY_LABELS, ConfirmDialog, DataTable, Drawer, EmptyState, Field, IconInput, PageHeader, StatusBadge, humanize, kes } from "../../components/ui";
+import { useToast } from "../../components/ui/toast";
 
 const CATEGORIES = ["private", "commercial", "psv", "tuktuk", "motorcycle", "asset", "special", "tpo"];
 
@@ -59,26 +62,36 @@ function emptyForm() {
     code: "", label: "", category: "private", max_age: "", min_si: 0, max_si: "",
     flatOnly: false, flatPremium: "", flatRateOnSi: "", flatMinPremium: "", flatNote: "",
     commercial_use: "",
+    cc10: "", cc20: "",
   };
 }
 
 export default function MotorClasses() {
+  const navigate = useNavigate();
+  const toast = useToast();
   const [insurers, setInsurers] = useState([]);
   const [insurerId, setInsurerId] = useState("");
   const [classes, setClasses] = useState([]);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [drawer, setDrawer] = useState(null); // "add" | { edit: cls }
   const [form, setForm] = useState(emptyForm());
-  const [creating, setCreating] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState(null);
+  const [formInsurerId, setFormInsurerId] = useState("");
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState(null); // { kind: "delete" | "disable", cls }
   const [busyId, setBusyId] = useState(null);
 
   async function loadInsurers() {
-    const res = await api.get("/api/admin/insurers");
-    setInsurers(res.data);
+    try {
+      const res = await api.get("/api/admin/insurers");
+      setInsurers(res.data);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   }
   async function loadClasses() {
     setError("");
@@ -102,111 +115,48 @@ export default function MotorClasses() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [insurerId]);
 
-  async function toggleActive(cls) {
-    if (cls.active && !window.confirm(`Disable "${cls.label}"? It will stop appearing for new quotations. Existing quotations are not affected.`)) {
-      return;
-    }
-    setError("");
-    setStatus("");
-    setBusyId(cls.id);
-    try {
-      await api.patch(`/api/admin/motor-classes/${cls.id}`, { active: !cls.active });
-      setStatus(`${cls.label} ${cls.active ? "disabled" : "activated"}.`);
-      await loadClasses();
-    } catch (err) {
-      setError(errorMessage(err, "Could not update this class."));
-    } finally {
-      setBusyId(null);
-    }
+  const rows = classes.filter((c) => {
+    if (categoryFilter && c.category !== categoryFilter) return false;
+    if (statusFilter === "active" && !c.active) return false;
+    if (statusFilter === "inactive" && c.active) return false;
+    const term = q.trim().toLowerCase();
+    return !term || c.label.toLowerCase().includes(term) || (c.code || "").toLowerCase().includes(term) || (c.insurer_name || "").toLowerCase().includes(term);
+  });
+
+  function openAdd() {
+    setForm(emptyForm());
+    setFormInsurerId(insurerId);
+    setFormError("");
+    setDrawer("add");
   }
 
-  async function deleteClass(cls) {
-    if (
-      !window.confirm(
-        `Permanently delete "${cls.label}"? This cannot be undone. If any quotations were generated against this class, they keep their own record, pricing and PDF -- they just won't show this class anymore, since it will no longer exist. Use Disable instead if you just want to hide it from new quotations while keeping it intact.`
-      )
-    ) {
-      return;
-    }
-    setError("");
-    setStatus("");
-    setBusyId(cls.id);
-    try {
-      const res = await api.delete(`/api/admin/motor-classes/${cls.id}`);
-      const detached = res.data?.quotations_detached || 0;
-      setStatus(`${cls.label} deleted.${detached ? ` ${detached} quotation(s) that referenced it kept their history.` : ""}`);
-      await loadClasses();
-    } catch (err) {
-      setError(errorMessage(err, "Could not delete this class."));
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  function startEdit(cls) {
-    setEditingId(cls.id);
-    setEditForm({
+  function openEdit(cls) {
+    setForm({
+      ...emptyForm(),
       code: cls.code,
       label: cls.label,
       category: cls.category,
       max_age: cls.max_age ?? "",
       min_si: cls.min_si ?? 0,
       max_si: cls.max_si ?? "",
+      flatOnly: !!cls.flat_only,
       cc10: courtesyPrice(cls, 10),
       cc20: courtesyPrice(cls, 20),
     });
-    setError("");
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setEditForm(null);
-  }
-
-  async function saveEdit(clsId) {
-    const validationError = validateClassForm(editForm);
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-    setError("");
-    setStatus("");
-    setBusyId(clsId);
-    try {
-      await api.patch(`/api/admin/motor-classes/${clsId}`, {
-        label: editForm.label,
-        category: editForm.category,
-        max_age: editForm.max_age === "" ? null : Number(editForm.max_age),
-        min_si: Number(editForm.min_si) || 0,
-        max_si: editForm.max_si === "" ? null : Number(editForm.max_si),
-        courtesy_car_options: [
-          ...(editForm.cc10 !== "" ? [{ days: 10, premium: Number(editForm.cc10) }] : []),
-          ...(editForm.cc20 !== "" ? [{ days: 20, premium: Number(editForm.cc20) }] : []),
-          // Keep any other periods set up for this class untouched.
-          ...((classes.find((x) => x.id === clsId)?.courtesy_car_options || []).filter((o) => o.days !== 10 && o.days !== 20)),
-        ],
-      });
-      cancelEdit();
-      setStatus("Class updated.");
-      await loadClasses();
-    } catch (err) {
-      setError(errorMessage(err, "Could not save changes."));
-    } finally {
-      setBusyId(null);
-    }
+    setFormError("");
+    setDrawer({ edit: cls });
   }
 
   async function createClass() {
-    setError("");
-    setStatus("");
-    if (!insurerId) return setError("Select an insurer first.");
+    setFormError("");
+    if (!formInsurerId) return setFormError("Select the insurer this class belongs to.");
     const validationError = validateClassForm(form);
-    if (validationError) return setError(validationError);
+    if (validationError) return setFormError(validationError);
 
-    setCreating(true);
+    setSaving(true);
     try {
       await api.post("/api/admin/motor-classes", {
-        insurer_id: insurerId,
+        insurer_id: formInsurerId,
         code: form.code,
         label: form.label,
         category: form.category,
@@ -223,344 +173,308 @@ export default function MotorClasses() {
             }
           : null,
       });
-      setShowAdd(false);
-      setForm(emptyForm());
-      setStatus("Motor class created.");
+      setDrawer(null);
+      toast.success("Motor class created. Configure its rates under Rates.");
       await loadClasses();
     } catch (err) {
-      setError(errorMessage(err, "Could not create this class."));
+      setFormError(errorMessage(err, "Could not create this class."));
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   }
 
+  async function saveEdit() {
+    const cls = drawer.edit;
+    const validationError = validateClassForm({ ...form, flatOnly: false, code: cls.code });
+    if (validationError) return setFormError(validationError);
+    setFormError("");
+    setSaving(true);
+    try {
+      await api.patch(`/api/admin/motor-classes/${cls.id}`, {
+        label: form.label,
+        category: form.category,
+        max_age: form.max_age === "" ? null : Number(form.max_age),
+        ...(cls.flat_only ? {} : { min_si: Number(form.min_si) || 0, max_si: form.max_si === "" ? null : Number(form.max_si) }),
+        courtesy_car_options: [
+          ...(form.cc10 !== "" ? [{ days: 10, premium: Number(form.cc10) }] : []),
+          ...(form.cc20 !== "" ? [{ days: 20, premium: Number(form.cc20) }] : []),
+          // Keep any other periods set up for this class untouched.
+          ...((cls.courtesy_car_options || []).filter((o) => o.days !== 10 && o.days !== 20)),
+        ],
+      });
+      setDrawer(null);
+      toast.success(`${form.label} updated.`);
+      await loadClasses();
+    } catch (err) {
+      setFormError(errorMessage(err, "Could not save changes."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleActive(cls) {
+    setBusyId(cls.id);
+    try {
+      await api.patch(`/api/admin/motor-classes/${cls.id}`, { active: !cls.active });
+      toast.success(`${cls.label} ${cls.active ? "disabled" : "activated"}.`);
+      await loadClasses();
+    } catch (err) {
+      toast.error(errorMessage(err, "Could not update this class."));
+    } finally {
+      setBusyId(null);
+      setConfirm(null);
+    }
+  }
+
+  async function deleteClass(cls) {
+    setBusyId(cls.id);
+    try {
+      const res = await api.delete(`/api/admin/motor-classes/${cls.id}`);
+      const detached = res.data?.quotations_detached || 0;
+      toast.success(`${cls.label} deleted.${detached ? ` ${detached} quotation(s) that referenced it kept their history.` : ""}`);
+      await loadClasses();
+    } catch (err) {
+      toast.error(errorMessage(err, "Could not delete this class."));
+    } finally {
+      setBusyId(null);
+      setConfirm(null);
+    }
+  }
+
+  const columns = [
+    {
+      key: "label", header: "Motor Class", sortable: true,
+      render: (c) => (
+        <div style={{ minWidth: 220 }}>
+          <div className="cell-main">{c.label}</div>
+          <div className="cell-sub">{c.code}</div>
+        </div>
+      ),
+    },
+    { key: "insurer_name", header: "Insurer", sortable: true, render: (c) => <div style={{ minWidth: 150 }}>{c.insurer_name}</div> },
+    {
+      key: "category", header: "Category", sortable: true,
+      render: (c) => (
+        <>
+          <span className="badge badge-navy no-dot">{CATEGORY_LABELS[c.category] || c.category}</span>
+          {c.commercial_use && <div className="cell-sub" style={{ marginTop: 3 }}>{humanize(c.commercial_use)}</div>}
+        </>
+      ),
+    },
+    {
+      key: "cover", header: "Cover / Pricing",
+      render: (c) => c.flat_only ? (
+        <><div>Third party (flat)</div><div className="cell-sub">{c.flat_only.premium != null ? kes(c.flat_only.premium) : `${(c.flat_only.rate_on_si * 100).toFixed(2)}% of SI`}</div></>
+      ) : (
+        <><div>Comprehensive</div><div className="cell-sub">SI {kes(c.min_si)}{c.max_si ? ` – ${kes(c.max_si)}` : "+"}</div></>
+      ),
+    },
+    { key: "max_age", header: "Max Age", align: "right", sortable: true, render: (c) => (c.max_age != null ? `${c.max_age} yrs` : "No limit") },
+    {
+      key: "courtesy", header: "Courtesy Car",
+      render: (c) => c.courtesy_car_options?.length
+        ? <span className="cell-sub" style={{ whiteSpace: "nowrap" }}>{c.courtesy_car_options.map((o) => `${o.days}d ${Number(o.premium).toLocaleString()}`).join(" · ")}</span>
+        : <span className="cell-sub">—</span>,
+    },
+    { key: "active", header: "Status", sortable: true, sortValue: (c) => (c.active ? 0 : 1), render: (c) => <StatusBadge status={c.active ? "ACTIVE" : "DISABLED"} label={c.active ? "Active" : "Disabled"} /> },
+    {
+      key: "actions", header: "", width: 48,
+      render: (c) => busyId === c.id ? <span className="spinner spinner-dark" /> : (
+        <ActionMenu
+          label={`Actions for ${c.label}`}
+          items={[
+            { label: "Edit", icon: Pencil, onClick: () => openEdit(c) },
+            { label: "Configure rates", icon: Percent, onClick: () => navigate("/admin/rates") },
+            c.active
+              ? { label: "Disable", icon: Power, onClick: () => setConfirm({ kind: "disable", cls: c }) }
+              : { label: "Activate", icon: Power, onClick: () => toggleActive(c) },
+            { label: "Delete", icon: Trash2, danger: true, onClick: () => setConfirm({ kind: "delete", cls: c }) },
+          ]}
+        />
+      ),
+    },
+  ];
+
+  const editing = drawer && drawer !== "add" ? drawer.edit : null;
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <h1 style={{ fontSize: 20, color: "var(--imoth-blue)" }}>Motor Classes</h1>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => {
-            setShowAdd((v) => !v);
-            setError("");
-          }}
-        >
-          + Add Class
-        </button>
-      </div>
+      <PageHeader
+        title="Motor Classes"
+        description="Each insurer's classes of business, the cover they give and who they're eligible for."
+        actions={<button type="button" className="btn btn-primary" onClick={openAdd}><Plus size={16} /> Add Motor Class</button>}
+      />
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <label className="first" htmlFor="motor-classes-insurer-filter">Filter by Insurer</label>
-        <select id="motor-classes-insurer-filter" value={insurerId} onChange={(e) => setInsurerId(e.target.value)}>
-          <option value="">All Insurers</option>
-          {insurers.map((i) => (
-            <option key={i.id} value={i.id}>
-              {i.name}
-            </option>
-          ))}
-        </select>
+      <div className="card" style={{ marginBottom: 16, padding: 14 }}>
+        <div className="filter-bar">
+          <div className="grow">
+            <label htmlFor="mc-search">Search</label>
+            <IconInput icon={Search}>
+              <input id="mc-search" type="text" placeholder="Class name, code or insurer" value={q} onChange={(e) => setQ(e.target.value)} />
+            </IconInput>
+          </div>
+          <div>
+            <label htmlFor="motor-classes-insurer-filter">Filter by Insurer</label>
+            <select id="motor-classes-insurer-filter" value={insurerId} onChange={(e) => setInsurerId(e.target.value)}>
+              <option value="">All Insurers</option>
+              {insurers.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="mc-category">Filter by Category</label>
+            <select id="mc-category" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+              <option value="">All categories</option>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="mc-status">Filter by Status</label>
+            <select id="mc-status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Disabled</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
-      {status && <div className="alert alert-success">{status}</div>}
 
-      {showAdd && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="hint" style={{ marginBottom: 10 }}>Adding a class for: {insurers.find((i) => i.id === insurerId)?.name || "(select insurer above)"}</div>
-          <div className="row2">
-            <div>
-              <label className="first" htmlFor="new-class-code">Code (unique per insurer)</label>
-              <input id="new-class-code" type="text" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-            </div>
-            <div>
-              <label className="first" htmlFor="new-class-label">Label</label>
-              <input id="new-class-label" type="text" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
-            </div>
-          </div>
-          <div className="row2">
-            <div>
-              <label htmlFor="new-class-category">Category</label>
-              <select id="new-class-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+      <DataTable
+        columns={columns}
+        rows={rows}
+        loading={loading && classes.length === 0}
+        minWidth={1100}
+        empty={<EmptyState icon={CarFront} title={classes.length ? "No classes match" : "No motor classes yet"}>{classes.length ? "Try a different filter." : "Add a class to start configuring rates."}</EmptyState>}
+      />
+      <div className="table-foot"><span>{rows.length} of {classes.length} classes</span></div>
+
+      <Drawer
+        open={!!drawer}
+        title={editing ? `Edit ${editing.label}` : "Add motor class"}
+        onClose={saving ? undefined : () => setDrawer(null)}
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => setDrawer(null)}>Cancel</button>
+            <button type="button" className="btn btn-primary" disabled={saving} aria-busy={saving} onClick={editing ? saveEdit : createClass}>
+              {saving ? <span className="spinner" /> : editing ? "Save changes" : "Save Class"}
+            </button>
+          </>
+        }
+      >
+        {formError && <div className="alert alert-error" role="alert">{formError}</div>}
+        <div className="stack" style={{ gap: 14 }}>
+          {editing ? (
+            <Field label="Insurer"><input type="text" value={editing.insurer_name || ""} disabled /></Field>
+          ) : (
+            <Field label="Insurer" required htmlFor="new-class-insurer">
+              <select id="new-class-insurer" value={formInsurerId} onChange={(e) => setFormInsurerId(e.target.value)}>
+                <option value="">Select insurer…</option>
+                {insurers.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
               </select>
-            </div>
-            <div>
-              <label>Max Age (blank = no limit)</label>
-              <input type="number" value={form.max_age} onChange={(e) => setForm({ ...form, max_age: e.target.value })} />
-            </div>
-          </div>
-          {form.category === "commercial" && (
-            <div className="row2">
-              <div>
-                <label htmlFor="new-class-commercial-use">Commercial Use</label>
-                <select
-                  id="new-class-commercial-use"
-                  value={form.commercial_use}
-                  onChange={(e) => setForm({ ...form, commercial_use: e.target.value })}
-                >
-                  <option value="">(not set)</option>
-                  {COMMERCIAL_USES.map((u) => (
-                    <option key={u} value={u}>{u.replace(/_/g, " ")}</option>
-                  ))}
-                </select>
-                <div className="hint">
-                  Only Own Goods, General Cartage and Commercial Institutional are offered to customers. Eligibility
-                  restrictions, tonnage requirements and Passenger Legal Liability rates are configured from Admin →
-                  Rates after creating this class.
-                </div>
-              </div>
-            </div>
+            </Field>
           )}
-          <div style={{ margin: "10px 0" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 400 }}>
-              <input
-                type="checkbox"
-                checked={form.flatOnly}
-                onChange={(e) => setForm({ ...form, flatOnly: e.target.checked })}
-              />
-              Flat-rate product (e.g. Third Party Only) — a fixed premium instead of Sum-Insured bands
-            </label>
+          <div className="form-grid">
+            <Field label="Code (unique per insurer)" required={!editing} htmlFor="new-class-code" hint={editing ? "The code can't be changed." : undefined}>
+              <input id="new-class-code" type="text" value={form.code} disabled={!!editing} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            </Field>
+            <Field label="Label" required htmlFor="new-class-label">
+              <input id="new-class-label" type="text" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+            </Field>
+            <Field label="Category" required htmlFor="new-class-category">
+              <select id="new-class-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
+              </select>
+            </Field>
+            <Field label="Max vehicle age" hint="Blank = no limit" htmlFor="new-class-max-age">
+              <input id="new-class-max-age" type="number" min="0" value={form.max_age} onChange={(e) => setForm({ ...form, max_age: e.target.value })} />
+            </Field>
           </div>
+
+          {!editing && form.category === "commercial" && (
+            <Field label="Commercial Use" htmlFor="new-class-commercial-use" hint="Only Own Goods, General Cartage, Commercial Institutional and Commercial Tuk Tuk are offered to customers. Eligibility, tonnage and passenger liability are configured under Rates.">
+              <select id="new-class-commercial-use" value={form.commercial_use} onChange={(e) => setForm({ ...form, commercial_use: e.target.value })}>
+                <option value="">(not set)</option>
+                {COMMERCIAL_USES.map((u) => <option key={u} value={u}>{humanize(u)}</option>)}
+              </select>
+            </Field>
+          )}
+
+          {!editing && (
+            <label className="switch" style={{ alignItems: "flex-start" }}>
+              <input type="checkbox" checked={form.flatOnly} onChange={(e) => setForm({ ...form, flatOnly: e.target.checked })} />
+              <span className="track" />
+              <span style={{ fontSize: 13 }}>Flat-rate product (e.g. Third Party Only) — a fixed premium instead of Sum-Insured bands</span>
+            </label>
+          )}
 
           {form.flatOnly ? (
-            <>
-              <div className="row2">
-                <div>
-                  <label htmlFor="new-class-flat-premium">Fixed Premium (leave blank to use a rate instead)</label>
-                  <input
-                    id="new-class-flat-premium"
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={form.flatPremium}
-                    onChange={(e) => setForm({ ...form, flatPremium: e.target.value })}
-                  />
+            editing ? (
+              <div className="alert alert-info">This is a flat-rate product. Change its premium under Rates.</div>
+            ) : (
+              <>
+                <div className="form-grid">
+                  <Field label="Fixed Premium (leave blank to use a rate instead)" htmlFor="new-class-flat-premium">
+                    <input id="new-class-flat-premium" type="number" step="any" min="0" value={form.flatPremium} onChange={(e) => setForm({ ...form, flatPremium: e.target.value })} />
+                  </Field>
+                  <Field label="Rate on Sum Insured (e.g. 0.04 = 4%)" htmlFor="new-class-flat-rate">
+                    <input id="new-class-flat-rate" type="number" step="any" min="0" value={form.flatRateOnSi} onChange={(e) => setForm({ ...form, flatRateOnSi: e.target.value })} />
+                  </Field>
+                  <Field label="Minimum Premium (required if using a rate)" htmlFor="new-class-flat-min">
+                    <input id="new-class-flat-min" type="number" step="any" min="0" value={form.flatMinPremium} onChange={(e) => setForm({ ...form, flatMinPremium: e.target.value })} />
+                  </Field>
+                  <Field label="Note" htmlFor="new-class-flat-note">
+                    <input id="new-class-flat-note" type="text" value={form.flatNote} onChange={(e) => setForm({ ...form, flatNote: e.target.value })} />
+                  </Field>
                 </div>
-                <div>
-                  <label>Rate on Sum Insured (e.g. 0.04 = 4%)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={form.flatRateOnSi}
-                    onChange={(e) => setForm({ ...form, flatRateOnSi: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="row2">
-                <div>
-                  <label>Minimum Premium (required if using a rate)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={form.flatMinPremium}
-                    onChange={(e) => setForm({ ...form, flatMinPremium: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label>Note</label>
-                  <input type="text" value={form.flatNote} onChange={(e) => setForm({ ...form, flatNote: e.target.value })} />
-                </div>
-              </div>
-              <div className="hint">
-                This creates the product ready to quote immediately -- no Sum-Insured bands to configure. You can
-                still adjust the premium later from Admin → Rates. This is independent of any Comprehensive class
-                for the same insurer; neither affects the other.
-              </div>
-            </>
+                <div className="hint">The product is ready to quote immediately. You can adjust the premium later under Rates.</div>
+              </>
+            )
           ) : (
             <>
-              <div className="row2">
-                <div>
-                  <label>Min Sum Insured</label>
-                  <input type="number" value={form.min_si} onChange={(e) => setForm({ ...form, min_si: e.target.value })} />
-                </div>
-                <div>
-                  <label>Max Sum Insured (blank = open)</label>
-                  <input type="number" value={form.max_si} onChange={(e) => setForm({ ...form, max_si: e.target.value })} />
-                </div>
+              <div className="form-grid">
+                <Field label="Min Sum Insured" htmlFor="new-class-min-si">
+                  <input id="new-class-min-si" type="number" min="0" value={form.min_si} onChange={(e) => setForm({ ...form, min_si: e.target.value })} />
+                </Field>
+                <Field label="Max Sum Insured" hint="Blank = open-ended" htmlFor="new-class-max-si">
+                  <input id="new-class-max-si" type="number" min="0" value={form.max_si} onChange={(e) => setForm({ ...form, max_si: e.target.value })} />
+                </Field>
               </div>
-              <div className="hint">After creating the class, configure its rate bands under Admin → Rates.</div>
+              {!editing && <div className="hint">After creating the class, configure its rate bands under Rates.</div>}
             </>
           )}
 
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button type="button" className="btn btn-primary" disabled={creating} aria-busy={creating} onClick={createClass}>
-              {creating ? <span className="spinner" /> : "Save Class"}
-            </button>
-            <button type="button" className="btn btn-ghost" disabled={creating} onClick={() => { setShowAdd(false); setForm(emptyForm()); }}>
-              Cancel
-            </button>
-          </div>
+          {editing && (
+            <>
+              <div className="divider" style={{ margin: "4px 0" }} />
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Courtesy car extension</div>
+              <div className="form-grid">
+                <Field label="10 days premium (KES)" hint="Blank = not offered" htmlFor="mc-cc10">
+                  <input id="mc-cc10" type="number" min="0" value={form.cc10} onChange={(e) => setForm({ ...form, cc10: e.target.value })} />
+                </Field>
+                <Field label="20 days premium (KES)" hint="Blank = not offered" htmlFor="mc-cc20">
+                  <input id="mc-cc20" type="number" min="0" value={form.cc20} onChange={(e) => setForm({ ...form, cc20: e.target.value })} />
+                </Field>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </Drawer>
 
-      <div className="card">
-        <div style={{ overflowX: "auto" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Insurer</th>
-                <th>Label</th>
-                <th>Category</th>
-                <th>Max Age</th>
-                <th>Min SI</th>
-                <th title="Courtesy car extension premium (KES)">Courtesy Car</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {classes.map((c) =>
-                editingId === c.id ? (
-                  <tr key={c.id}>
-                    <td>{c.insurer_name}</td>
-                    <td>
-                      <input type="text" value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} style={{ minWidth: 220 }} />
-                    </td>
-                    <td>
-                      <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}>
-                        {CATEGORIES.map((cat) => (
-                          <option key={cat} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        value={editForm.max_age}
-                        placeholder="no limit"
-                        onChange={(e) => setEditForm({ ...editForm, max_age: e.target.value })}
-                        style={{ width: 90 }}
-                      />
-                    </td>
-                    <td style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <input
-                        type="number"
-                        value={editForm.min_si}
-                        onChange={(e) => setEditForm({ ...editForm, min_si: e.target.value })}
-                        style={{ width: 100 }}
-                        title="Min Sum Insured"
-                      />
-                      <input
-                        type="number"
-                        value={editForm.max_si}
-                        placeholder="open"
-                        onChange={(e) => setEditForm({ ...editForm, max_si: e.target.value })}
-                        style={{ width: 100 }}
-                        title="Max Sum Insured (blank = open)"
-                      />
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <input
-                          type="number"
-                          min="0"
-                          value={editForm.cc10}
-                          placeholder="10 days"
-                          aria-label="Courtesy car premium, 10 days"
-                          title="Courtesy car premium for 10 days (blank = not offered)"
-                          onChange={(e) => setEditForm({ ...editForm, cc10: e.target.value })}
-                          style={{ width: 90 }}
-                        />
-                        <input
-                          type="number"
-                          min="0"
-                          value={editForm.cc20}
-                          placeholder="20 days"
-                          aria-label="Courtesy car premium, 20 days"
-                          title="Courtesy car premium for 20 days (blank = not offered)"
-                          onChange={(e) => setEditForm({ ...editForm, cc20: e.target.value })}
-                          style={{ width: 90 }}
-                        />
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${c.active ? "badge-green" : "badge-gray"}`}>{c.active ? "Active" : "Disabled"}</span>
-                    </td>
-                    <td style={{ display: "flex", gap: 6 }}>
-                      <button type="button" className="btn btn-primary btn-sm" disabled={busyId === c.id} aria-busy={busyId === c.id} onClick={() => saveEdit(c.id)}>
-                        {busyId === c.id ? <span className="spinner" /> : "Save"}
-                      </button>
-                      <button type="button" className="btn btn-ghost btn-sm" disabled={busyId === c.id} onClick={cancelEdit}>
-                        Cancel
-                      </button>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={c.id}>
-                    <td>{c.insurer_name}</td>
-                    <td>
-                      {c.label}
-                      {!c.active && <span className="hint" style={{ marginLeft: 6 }}>(inactive)</span>}
-                    </td>
-                    <td>
-                      {c.category}
-                      {c.commercial_use && <div className="hint">{c.commercial_use.replace(/_/g, " ")}</div>}
-                    </td>
-                    <td>{c.max_age ?? "—"}</td>
-                    <td>
-                      {c.flat_only
-                        ? "Flat rate"
-                        : `${Number(c.min_si).toLocaleString()}${c.max_si ? " – " + Number(c.max_si).toLocaleString() : "+"}`}
-                    </td>
-                    <td>
-                      {c.courtesy_car_options?.length
-                        ? c.courtesy_car_options.map((o) => `${o.days}d: ${Number(o.premium).toLocaleString()}`).join(" · ")
-                        : "—"}
-                    </td>
-                    <td>
-                      <span className={`badge ${c.active ? "badge-green" : "badge-gray"}`}>{c.active ? "Active" : "Disabled"}</span>
-                    </td>
-                    <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <button type="button" className="btn btn-secondary btn-sm" disabled={busyId === c.id} onClick={() => startEdit(c)}>
-                        Edit
-                      </button>
-                      <Link className="btn btn-secondary btn-sm" to={`/admin/rates?motor_class_id=${c.id}`}>
-                        {c.flat_only ? "Flat Rate" : "Rates"}
-                      </Link>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        disabled={busyId === c.id}
-                        aria-busy={busyId === c.id}
-                        onClick={() => toggleActive(c)}
-                      >
-                        {busyId === c.id ? <span className="spinner spinner-dark" /> : c.active ? "Disable" : "Activate"}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger btn-sm"
-                        disabled={busyId === c.id}
-                        aria-busy={busyId === c.id}
-                        onClick={() => deleteClass(c)}
-                        title="Permanently delete this class. Quotations that used it keep their own history but lose the class reference."
-                      >
-                        {busyId === c.id ? <span className="spinner" /> : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                )
-              )}
-              {!loading && classes.length === 0 && (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: "center", color: "var(--muted)" }}>
-                    No classes found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.kind === "delete" ? `Delete "${confirm?.cls.label}"?` : `Disable "${confirm?.cls.label}"?`}
+        message={
+          confirm?.kind === "delete"
+            ? "This permanently deletes the class and cannot be undone. Quotations already generated with it keep their own record, pricing and PDF. Use Disable instead if you only want to hide it from new quotations."
+            : "It will stop appearing for new quotations. Existing quotations are not affected."
+        }
+        confirmLabel={confirm?.kind === "delete" ? "Delete class" : "Disable"}
+        danger
+        busy={busyId === confirm?.cls.id}
+        onConfirm={() => (confirm.kind === "delete" ? deleteClass(confirm.cls) : toggleActive(confirm.cls))}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, commercialUseLabel, dateTimeFmt, downloadBlob, errorMessage, money } from "../../api/client";
+import { ArrowLeft, Ban, Download, FileText, History, Mail, Printer, ShieldCheck } from "lucide-react";
+import { api, commercialUseLabel, dateFmt, dateTimeFmt, downloadBlob, errorMessage, openPdfInNewTab } from "../../api/client";
+import { Card, EmptyState, Modal, StatusBadge, humanize, kes } from "../../components/ui";
+
+const money = (n) => kes(n, { decimals: 2 });
 import { useAuth } from "../../context/AuthContext";
 
 function titleCase(value) {
@@ -64,9 +68,6 @@ export default function RiskNoteDetail() {
       setError("A reason is required.");
       return;
     }
-    if (!window.confirm(`Mark ${rn.risk_note_number} as ${voidStatus}? This cannot be undone.`)) {
-      return;
-    }
     setError("");
     setBusy(true);
     try {
@@ -105,97 +106,106 @@ export default function RiskNoteDetail() {
 
   const canVoid = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
 
+  async function printPdf() {
+    setError("");
+    try {
+      await openPdfInNewTab(`/api/admin/risk-notes/${id}/pdf`);
+    } catch (err) {
+      setError(errorMessage(err, "Could not open the PDF."));
+    }
+  }
+
   return (
     <div>
-      <Link to="/admin/risk-notes" className="hint">
-        ← Back to Risk Notes
+      <Link to="/admin/risk-notes" className="hint" style={{ display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
+        <ArrowLeft size={14} /> Back to Risk Notes
       </Link>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "10px 0 18px", flexWrap: "wrap", gap: 8 }}>
-        <h1 style={{ fontSize: 20, color: "var(--imoth-blue)" }}>{rn.risk_note_number}</h1>
-        <span className={`badge ${rn.status === "ACTIVE" ? "badge-green" : "badge-gray"}`}>{rn.status}</span>
-      </div>
-
-      {error && <div className="alert alert-error">{error}</div>}
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={downloadPdf} disabled={pdfBusy} aria-busy={pdfBusy}>
-          {pdfBusy ? <span className="spinner spinner-dark" /> : "⬇ Download PDF"}
-        </button>
-        <Link className="btn btn-secondary btn-sm" to={`/admin/quotations/${rn.quotation_id}`}>
-          View Quotation ({rn.quotation_number})
-        </Link>
-        {canVoid && rn.status === "ACTIVE" && (
-          <button
-            type="button"
-            className="btn btn-danger btn-sm"
-            onClick={() => {
-              setVoidBox((v) => !v);
-              setError("");
-            }}
-          >
-            Void / Cancel
-          </button>
-        )}
-      </div>
-
-      {voidBox && (
-        <div className="card alert-info" style={{ marginBottom: 16 }}>
-          <label className="first">New Status</label>
-          <select value={voidStatus} onChange={(e) => setVoidStatus(e.target.value)}>
-            <option value="VOID">VOID</option>
-            <option value="CANCELLED">CANCELLED</option>
-          </select>
-          <label>Reason (required)</label>
-          <input type="text" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Explain why this risk note is being voided" />
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button type="button" className="btn btn-danger" disabled={busy || !voidReason.trim()} aria-busy={busy} onClick={handleVoid}>
-              {busy ? <span className="spinner" /> : "Confirm"}
-            </button>
-            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setVoidBox(false)}>
-              Cancel
-            </button>
-          </div>
+      <div className="page-head" style={{ marginTop: 8 }}>
+        <div>
+          <h1 style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {rn.risk_note_number} <StatusBadge status={rn.status} />
+          </h1>
+          <p>{rn.insurer_name} · {rn.registration_no} · Cover {dateFmt(rn.cover_start_date)} – {dateFmt(rn.cover_end_date)}</p>
         </div>
-      )}
+        <div className="page-actions">
+          <Link className="btn btn-secondary" to={`/admin/quotations/${rn.quotation_id}`}>
+            <FileText size={16} /> View quotation
+          </Link>
+          {canVoid && rn.status === "ACTIVE" && (
+            <button type="button" className="btn btn-danger" onClick={() => { setVoidBox(true); setError(""); }}>
+              <Ban size={16} /> Void / Cancel
+            </button>
+          )}
+          <button type="button" className="btn btn-secondary" onClick={printPdf}>
+            <Printer size={16} /> Print
+          </button>
+          <button type="button" className="btn btn-primary" onClick={downloadPdf} disabled={pdfBusy} aria-busy={pdfBusy}>
+            {pdfBusy ? <span className="spinner" /> : <><Download size={16} /> Download PDF</>}
+          </button>
+        </div>
+      </div>
 
-      <div className="row2">
-        <div className="card">
-          <h3 style={{ fontSize: 13 }}>Risk Note Details</h3>
-          <table>
-            <tbody>
-              <tr><td>Client</td><td>{rn.client_name}</td></tr>
-              <tr><td>Vehicle</td><td>{rn.registration_no}</td></tr>
-              <tr><td>Insurer</td><td>{rn.insurer_name}</td></tr>
-              <tr><td>Sum Insured</td><td className="num">{money(rn.sum_insured)}</td></tr>
-              <tr><td>Premium</td><td className="num">{money(rn.premium)}</td></tr>
-              <tr><td>Cover Start</td><td>{dateTimeFmt(rn.cover_start_date)}</td></tr>
-              <tr><td>Cover End</td><td>{dateTimeFmt(rn.cover_end_date)}</td></tr>
-              <tr><td>Accepted On</td><td>{dateTimeFmt(rn.quotation_accepted_at)}</td></tr>
+      {error && !voidBox && <div className="alert alert-error">{error}</div>}
+
+      <div className="grid-main-side">
+        <div className="stack">
+          <Card title="Cover summary" icon={ShieldCheck}>
+            <dl className="kv">
+              <dt>Insured</dt><dd>{rn.client_name}</dd>
+              <dt>Vehicle</dt><dd>{rn.registration_no}</dd>
+              <dt>Insurer</dt><dd>{rn.insurer_name}</dd>
+              <dt>Sum insured</dt><dd>{money(rn.sum_insured)}</dd>
+              <dt>Premium</dt><dd><strong>{money(rn.premium)}</strong></dd>
+              <dt>Cover start</dt><dd>{dateTimeFmt(rn.cover_start_date)}</dd>
+              <dt>Cover end</dt><dd>{dateTimeFmt(rn.cover_end_date)}</dd>
+              <dt>Accepted on</dt><dd>{dateTimeFmt(rn.quotation_accepted_at)}</dd>
               {rn.commercial_use && (
                 <>
-                  <tr><td>Commercial Use</td><td>{commercialUseLabel(rn.commercial_use)}</td></tr>
-                  {rn.tonnage != null && <tr><td>Tonnage</td><td>{rn.tonnage} tons</td></tr>}
+                  <dt>Commercial use</dt><dd>{commercialUseLabel(rn.commercial_use)}</dd>
+                  {rn.tonnage != null && <><dt>Tonnage</dt><dd>{rn.tonnage} tons</dd></>}
                 </>
               )}
               {rn.institution_type && (
                 <>
-                  <tr><td>Institution Type</td><td>{titleCase(rn.institution_type)}</td></tr>
-                  <tr><td>Vehicle Type</td><td>{titleCase(rn.institutional_vehicle_type)}</td></tr>
-                  <tr><td>Passenger Category</td><td>{titleCase(rn.passenger_category)}</td></tr>
-                  {rn.passenger_seats != null && (
-                    <tr><td>Passenger Seats (excl. driver)</td><td>{rn.passenger_seats}</td></tr>
-                  )}
+                  <dt>Institution type</dt><dd>{titleCase(rn.institution_type)}</dd>
+                  <dt>Vehicle type</dt><dd>{titleCase(rn.institutional_vehicle_type)}</dd>
+                  <dt>Passenger category</dt><dd>{titleCase(rn.passenger_category)}</dd>
+                  {rn.passenger_seats != null && <><dt>Passenger seats (excl. driver)</dt><dd>{rn.passenger_seats}</dd></>}
                 </>
               )}
-            </tbody>
-          </table>
+            </dl>
+          </Card>
 
-          <div style={{ marginTop: 16 }}>
-            <label className="first">Email to</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input type="email" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="client@email.com" />
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <Card title="Status history" icon={History}>
+            {rn.status_history.length === 0 ? (
+              <EmptyState title="No status changes" />
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>From</th><th>To</th><th>Reason</th><th>When</th></tr>
+                  </thead>
+                  <tbody>
+                    {rn.status_history.map((h, i) => (
+                      <tr key={i}>
+                        <td>{h.previous_status ? <StatusBadge status={h.previous_status} /> : "—"}</td>
+                        <td><StatusBadge status={h.new_status} /></td>
+                        <td>{h.reason}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>{dateTimeFmt(h.changed_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        <div className="stack">
+          <Card title="Email documents" icon={Mail}>
+            <label className="first" htmlFor="rn-email">Send to</label>
+            <input id="rn-email" type="email" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="client@email.com" />
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <button type="button" className="btn btn-secondary btn-sm" disabled={busy} aria-busy={busy} onClick={() => sendEmail(false)}>
                 Email Risk Note
               </button>
@@ -204,47 +214,48 @@ export default function RiskNoteDetail() {
               </button>
             </div>
             {emailStatus && <div className="hint" style={{ marginTop: 6 }}>{emailStatus}</div>}
-          </div>
-        </div>
+          </Card>
 
-        <div className="card">
-          <h3 style={{ fontSize: 13 }}>Status History</h3>
-          <table>
-            <thead>
-              <tr><th>From</th><th>To</th><th>Reason</th><th>When</th></tr>
-            </thead>
-            <tbody>
-              {rn.status_history.map((h, i) => (
-                <tr key={i}>
-                  <td>{h.previous_status}</td>
-                  <td>{h.new_status}</td>
-                  <td>{h.reason}</td>
-                  <td>{dateTimeFmt(h.changed_at)}</td>
-                </tr>
-              ))}
-              {rn.status_history.length === 0 && (
-                <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--muted)" }}>No status changes.</td></tr>
-              )}
-            </tbody>
-          </table>
-
-          <h3 style={{ fontSize: 13, marginTop: 18 }}>Audit Trail</h3>
-          <table>
-            <tbody>
-              {audit.map((a, i) => (
-                <tr key={i}>
-                  <td>{a.action}</td>
-                  <td>{a.actor_label}</td>
-                  <td>{dateTimeFmt(a.timestamp)}</td>
-                </tr>
-              ))}
-              {audit.length === 0 && (
-                <tr><td colSpan={3} style={{ textAlign: "center", color: "var(--muted)" }}>No audit entries.</td></tr>
-              )}
-            </tbody>
-          </table>
+          <Card title="Audit trail" icon={History}>
+            {audit.length === 0 ? (
+              <EmptyState title="No audit entries" />
+            ) : (
+              <div className="stack" style={{ gap: 10 }}>
+                {audit.map((a, i) => (
+                  <div key={i} style={{ borderLeft: "3px solid var(--c-border)", paddingLeft: 10 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{humanize(a.action)}</div>
+                    <div className="cell-sub">{[a.actor_label, dateTimeFmt(a.timestamp)].filter(Boolean).join(" · ")}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
         </div>
       </div>
+
+      <Modal
+        open={voidBox}
+        title={`Void or cancel ${rn.risk_note_number}`}
+        onClose={busy ? undefined : () => setVoidBox(false)}
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setVoidBox(false)}>Cancel</button>
+            <button type="button" className="btn btn-danger-solid" disabled={busy || !voidReason.trim()} aria-busy={busy} onClick={handleVoid}>
+              {busy ? <span className="spinner" /> : `Mark as ${voidStatus}`}
+            </button>
+          </>
+        }
+      >
+        <div className="alert alert-error" style={{ marginBottom: 14 }}>This cannot be undone. The risk note will no longer be active.</div>
+        {error && <div className="alert alert-error">{error}</div>}
+        <label className="first" htmlFor="rn-void-status">New status</label>
+        <select id="rn-void-status" value={voidStatus} onChange={(e) => setVoidStatus(e.target.value)}>
+          <option value="VOID">Void</option>
+          <option value="CANCELLED">Cancelled</option>
+        </select>
+        <label htmlFor="rn-void-reason">Reason <span className="req" style={{ color: "var(--c-red)" }}>*</span></label>
+        <textarea id="rn-void-reason" rows={3} value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Explain why this risk note is being voided" />
+      </Modal>
     </div>
   );
 }

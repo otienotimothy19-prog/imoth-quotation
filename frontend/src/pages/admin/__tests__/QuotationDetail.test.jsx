@@ -118,7 +118,7 @@ describe("QuotationDetail admin page", () => {
 
     renderDetail();
     await screen.findByText("IMQ-2026-001");
-    await user.click(screen.getByRole("button", { name: "Documents" }));
+    await user.click(screen.getByRole("tab", { name: "Documents" }));
     await user.click(await screen.findByRole("button", { name: /reject/i }));
 
     expect(confirmSpy).toHaveBeenCalled();

@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_client_ip, require_admin
@@ -32,6 +32,8 @@ def _summary(rn: RiskNote) -> dict:
         "client_name": rn.quotation.client.full_name,
         "registration_no": rn.quotation.vehicle.registration_no,
         "insurer_name": rn.quotation.insurer.name,
+        "cover_type": rn.quotation.cover_type,
+        "vehicle_class_label": rn.quotation.vehicle_class_label,
         "status": rn.status.value,
         "sum_insured": float(rn.sum_insured),
         "premium": float(rn.premium),
@@ -77,16 +79,24 @@ def list_risk_notes(
         )
     if insurer_id:
         query = query.filter(RiskNote.insurer_id == insurer_id)
-    if status_filter:
-        query = query.filter(RiskNote.status == status_filter)
     if date_from:
         query = query.filter(RiskNote.generated_at >= date_from)
     if date_to:
         query = query.filter(RiskNote.generated_at <= date_to)
+    # Counts per status for the summary cards (all other filters applied).
+    status_counts = {
+        s.value: n for s, n in query.with_entities(RiskNote.status, func.count(RiskNote.id)).group_by(RiskNote.status).all()
+    }
+    premium_total = float(query.with_entities(func.coalesce(func.sum(RiskNote.premium), 0)).scalar() or 0)
+    if status_filter:
+        query = query.filter(RiskNote.status == status_filter)
 
     total = query.count()
     rows = query.order_by(RiskNote.generated_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
-    return {"total": total, "page": page, "page_size": page_size, "items": [_summary(r) for r in rows]}
+    return {
+        "total": total, "page": page, "page_size": page_size, "items": [_summary(r) for r in rows],
+        "status_counts": status_counts, "premium_total": premium_total,
+    }
 
 
 def _get_full(db: Session, risk_note_id: uuid.UUID) -> RiskNote:

@@ -14,7 +14,7 @@ from app.models.client_document import ClientDocumentUpload, ClientUploadStatus,
 from app.models.client_vehicle import Client, Vehicle
 from app.models.documents_email_audit import AuditLog, Document, EmailLog
 from app.models.enums import ActorType, QuotationSource, QuotationStatus, UserRole
-from app.models.insurer_rate import Insurer, RateVersion
+from app.models.insurer_rate import Insurer, MotorClass, RateVersion
 from app.models.quotation import Quotation
 from app.models.user import User
 from app.schemas.quotation import AdminGenerateQuotationRequest, CompareRequest, CompareResponse, EmailSendRequest, IneligibleOption
@@ -49,6 +49,10 @@ def _summary(q: Quotation) -> dict:
         "cover_type": q.cover_type,
         "status": q.status.value,
         "total_premium": float(q.total_premium),
+        "sum_insured": float(q.sum_insured),
+        "amount_paid": float(q.amount_paid),
+        "balance": float(q.balance),
+        "vehicle_category": q.motor_class.category if q.motor_class else None,
         "has_risk_note": q.risk_note is not None,
         "created_by_name": q.created_by_user.full_name if q.created_by_user else None,
         "created_by_role": q.created_by_user.role.value if q.created_by_user else None,
@@ -125,6 +129,7 @@ def list_quotations(
     date_from: datetime | None = Query(default=None),
     date_to: datetime | None = Query(default=None),
     vehicle_class: str | None = Query(default=None),
+    vehicle_category: str | None = Query(default=None, description="Motor class category, e.g. private, commercial, psv"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -141,8 +146,11 @@ def list_quotations(
             joinedload(Quotation.insurer),
             joinedload(Quotation.risk_note),
             joinedload(Quotation.created_by_user),
+            joinedload(Quotation.motor_class),
         )
     )
+    if vehicle_category:
+        query = query.filter(Quotation.motor_class.has(MotorClass.category == vehicle_category))
     if q:
         like = f"%{q}%"
         query = query.filter(
