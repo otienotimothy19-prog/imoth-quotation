@@ -17,9 +17,10 @@ from app.models.enums import ActorType, QuotationSource, QuotationStatus, UserRo
 from app.models.insurer_rate import Insurer, RateVersion
 from app.models.quotation import Quotation
 from app.models.user import User
-from app.schemas.quotation import AdminGenerateQuotationRequest, EmailSendRequest
+from app.schemas.quotation import AdminGenerateQuotationRequest, CompareRequest, CompareResponse, EmailSendRequest, IneligibleOption
 from app.services import audit_service, client_document_service, email_service, storage_service, pdf_service
-from app.services.quote_service import QuoteServiceError, _company_settings, generate_quotation
+from app.services.quote_service import QuoteServiceError, _company_settings, generate_quotation, list_eligible_options
+from app.services.vehicle_age import calculate_vehicle_age
 from app.services.settings_service import get_setting
 from app.services.client_document_service import DOCUMENT_LABELS
 
@@ -54,6 +55,32 @@ def _summary(q: Quotation) -> dict:
         "created_at": q.created_at,
         "generated_at": q.generated_at,
     }
+
+
+@router.post("/compare", response_model=CompareResponse)
+def compare_rates(payload: CompareRequest, db: Session = Depends(get_db), user: User = Depends(require_quote_creator)):
+    """Prices every active insurer's matching class side by side for staff
+    and agents. Unlike the customer comparison it saves nothing (no
+    retrievable offers are created); the agent then generates the chosen
+    quotation through POST /api/admin/quotations."""
+    options, ineligible = list_eligible_options(
+        db,
+        category=payload.category,
+        sum_insured=payload.sum_insured,
+        options=payload.options,
+        year_of_manufacture=payload.vehicle.year_of_manufacture,
+        commercial_use=payload.commercial_use,
+        institution_type=payload.institution_type,
+        institutional_vehicle_type=payload.institutional_vehicle_type,
+        passenger_category=payload.passenger_category,
+    )
+    return CompareResponse(
+        category=payload.category,
+        sum_insured=payload.sum_insured,
+        calculated_age_years=calculate_vehicle_age(payload.vehicle.year_of_manufacture),
+        options=options,
+        ineligible_options=[IneligibleOption(**i) for i in ineligible],
+    )
 
 
 @router.post("")

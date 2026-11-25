@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, downloadBlob, errorMessage, quoteMoney, serverFilename } from "../../api/client";
 import VehicleMakeSelect from "../../components/VehicleMakeSelect";
 
@@ -12,6 +12,33 @@ const CATEGORY_LABELS = {
   special: "Special",
   tpo: "Third Party Only",
 };
+
+// What an agent can compare across insurers (the same choices a customer
+// gets, plus Third Party Only).
+const COMPARE_CATEGORIES = [
+  { value: "private", label: "Private Car" },
+  { value: "commercial", label: "Commercial" },
+  { value: "psv", label: "PSV / Chauffeur Driven" },
+  { value: "tuktuk", label: "PSV Tuk Tuk" },
+  { value: "motorcycle", label: "Motorcycle" },
+  { value: "asset", label: "Asset (New Units)" },
+  { value: "special", label: "Special Type (Farm / Construction)" },
+  { value: "tpo", label: "Third Party Only" },
+];
+const COMMERCIAL_USES = [
+  { value: "own_goods", label: "Own Goods" },
+  { value: "general_cartage", label: "General Cartage" },
+  { value: "commercial_institutional", label: "Commercial Institutional" },
+  { value: "commercial_tuktuk", label: "Commercial Tuk Tuk" },
+];
+const INSTITUTION_TYPES = ["SCHOOL", "CHURCH", "COMPANY", "NGO", "GOVERNMENT", "HOSPITAL", "OTHER"];
+const INSTITUTIONAL_VEHICLE_TYPES = ["VAN", "MINIBUS", "BUS", "OTHER"];
+const PASSENGER_CATEGORIES = ["STUDENTS", "STAFF", "CHURCH_MEMBERS", "GENERAL_INSTITUTIONAL"];
+const titleCase = (v) => v.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
+function emptyCompare() {
+  return { category: "private", commercialUse: "", institutionType: "", institutionalVehicleType: "", passengerCategory: "", seats: "" };
+}
 
 function emptyForm() {
   return {
@@ -44,6 +71,15 @@ export default function NewQuotation() {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const [mode, setMode] = useState("compare");
+  const [cmp, setCmp] = useState(emptyCompare());
+  const [comparing, setComparing] = useState(false);
+  const [comparison, setComparison] = useState(null);
+  // Set when the agent picks an insurer from the comparison: the class to
+  // select once that insurer's classes have loaded, and option values
+  // (institutional details) to keep when the class changes.
+  const pendingClassRef = useRef(null);
+  const carryRef = useRef(null);
 
   useEffect(() => {
     api.get("/api/admin/insurers")
@@ -59,7 +95,13 @@ export default function NewQuotation() {
     }
     setLoadingClasses(true);
     api.get("/api/admin/motor-classes", { params: { insurer_id: insurerId } })
-      .then((res) => setClasses(res.data.filter((c) => c.active)))
+      .then((res) => {
+        const active = res.data.filter((c) => c.active);
+        setClasses(active);
+        const pending = pendingClassRef.current;
+        pendingClassRef.current = null;
+        if (pending && active.some((c) => c.id === pending)) setClassId(pending);
+      })
       .catch((err) => setError(errorMessage(err)))
       .finally(() => setLoadingClasses(false));
   }, [insurerId]);
@@ -77,7 +119,9 @@ export default function NewQuotation() {
     update({
       ep: false, pvt: false, pllSeats: "", pllOptionKey: "", tonnage: "",
       lrBand: "good", institutionType: "", institutionalVehicleType: "", passengerCategory: "",
+      ...(carryRef.current || {}),
     });
+    carryRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
 
@@ -100,6 +144,59 @@ export default function NewQuotation() {
     setClassId("");
     setResult(null);
     setError("");
+    setMode("compare");
+    setCmp(emptyCompare());
+    setComparison(null);
+  }
+
+  const cmpInstitutional = cmp.category === "commercial" && cmp.commercialUse === "commercial_institutional";
+
+  async function compareRates() {
+    setError("");
+    setComparison(null);
+    if (!form.yom) return setError("Enter the year of manufacture to compare rates.");
+    if (cmp.category !== "tpo" && !(Number(form.sumInsured) > 0)) return setError("Enter the sum insured to compare rates.");
+    if (cmp.category === "commercial" && !cmp.commercialUse) return setError("Select the commercial use.");
+    if (cmpInstitutional && (!cmp.institutionType || !cmp.institutionalVehicleType || !cmp.passengerCategory || !(Number(cmp.seats) > 0))) {
+      return setError("Institution type, vehicle type, passenger category and number of seats are needed for Commercial Institutional.");
+    }
+    setComparing(true);
+    try {
+      const res = await api.post("/api/admin/quotations/compare", {
+        vehicle: { registration_no: form.regNo.trim() || "TBA", year_of_manufacture: Number(form.yom) },
+        category: cmp.category,
+        commercial_use: cmp.category === "commercial" ? cmp.commercialUse : null,
+        institution_type: cmpInstitutional ? cmp.institutionType : null,
+        institutional_vehicle_type: cmpInstitutional ? cmp.institutionalVehicleType : null,
+        passenger_category: cmpInstitutional ? cmp.passengerCategory : null,
+        sum_insured: Number(form.sumInsured || 0),
+        options: { pll_seats: cmpInstitutional ? Number(cmp.seats) : 0 },
+      });
+      setComparison(res.data);
+    } catch (err) {
+      setError(errorMessage(err, "Could not compare rates."));
+    } finally {
+      setComparing(false);
+    }
+  }
+
+  function chooseOption(option) {
+    setError("");
+    carryRef.current = cmpInstitutional
+      ? {
+          institutionType: cmp.institutionType,
+          institutionalVehicleType: cmp.institutionalVehicleType,
+          passengerCategory: cmp.passengerCategory,
+          pllSeats: cmp.seats,
+        }
+      : null;
+    if (option.insurer_id === insurerId) {
+      setClassId(option.motor_class_id);
+    } else {
+      pendingClassRef.current = option.motor_class_id;
+      setInsurerId(option.insurer_id);
+    }
+    setMode("pick");
   }
 
   async function submit(e) {
@@ -231,7 +328,7 @@ export default function NewQuotation() {
     <div>
       <h1 style={{ fontSize: 20, color: "var(--imoth-blue)" }}>New Quotation</h1>
       <p className="hint" style={{ marginBottom: 16 }}>
-        Generate a quotation directly for a client on the phone or in person — pick the insurer and class yourself and it's priced instantly.
+        Compare every insurer's rate for the vehicle, choose one, then generate the quotation.
       </p>
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -259,6 +356,138 @@ export default function NewQuotation() {
         </div>
 
         <h2 style={{ fontSize: 15, margin: "20px 0 10px" }}>Cover</h2>
+        <div role="tablist" aria-label="How to choose the insurer" style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          <button type="button" role="tab" aria-selected={mode === "compare"} className={`btn btn-sm ${mode === "compare" ? "btn-primary" : "btn-ghost"}`} onClick={() => setMode("compare")}>
+            Compare insurers
+          </button>
+          <button type="button" role="tab" aria-selected={mode === "pick"} className={`btn btn-sm ${mode === "pick" ? "btn-primary" : "btn-ghost"}`} onClick={() => setMode("pick")}>
+            Choose one insurer
+          </button>
+        </div>
+
+        {mode === "compare" && (
+          <div>
+            <div className="row2">
+              <div>
+                <label className="first" htmlFor="cmp-category">Vehicle Category</label>
+                <select id="cmp-category" value={cmp.category} onChange={(e) => { setCmp({ ...emptyCompare(), category: e.target.value }); setComparison(null); }}>
+                  {COMPARE_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="first" htmlFor="cmp-si">Sum Insured (KES){cmp.category === "tpo" && <span className="hint"> (not used for TPO)</span>}</label>
+                <input id="cmp-si" type="number" min="0" step="1000" value={form.sumInsured} onChange={(e) => update({ sumInsured: e.target.value })} placeholder="e.g. 1500000" />
+              </div>
+            </div>
+            {cmp.category === "commercial" && (
+              <>
+                <label htmlFor="cmp-use">Commercial Use</label>
+                <select id="cmp-use" value={cmp.commercialUse} onChange={(e) => { setCmp({ ...cmp, commercialUse: e.target.value }); setComparison(null); }}>
+                  <option value="">Select…</option>
+                  {COMMERCIAL_USES.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                </select>
+              </>
+            )}
+            {cmpInstitutional && (
+              <>
+                <div className="row2">
+                  <div>
+                    <label>Institution Type</label>
+                    <select value={cmp.institutionType} onChange={(e) => setCmp({ ...cmp, institutionType: e.target.value })}>
+                      <option value="">Select…</option>
+                      {INSTITUTION_TYPES.map((v) => <option key={v} value={v}>{titleCase(v)}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label>Vehicle Type</label>
+                    <select value={cmp.institutionalVehicleType} onChange={(e) => setCmp({ ...cmp, institutionalVehicleType: e.target.value })}>
+                      <option value="">Select…</option>
+                      {INSTITUTIONAL_VEHICLE_TYPES.map((v) => <option key={v} value={v}>{titleCase(v)}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="row2">
+                  <div>
+                    <label>Passenger Category</label>
+                    <select value={cmp.passengerCategory} onChange={(e) => setCmp({ ...cmp, passengerCategory: e.target.value })}>
+                      <option value="">Select…</option>
+                      {PASSENGER_CATEGORIES.map((v) => <option key={v} value={v}>{titleCase(v)}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label>Number of Seats/Passengers</label>
+                    <input type="number" min="1" value={cmp.seats} onChange={(e) => setCmp({ ...cmp, seats: e.target.value })} />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <button type="button" className="btn btn-secondary" style={{ marginTop: 14 }} disabled={comparing} aria-busy={comparing} onClick={compareRates}>
+              {comparing ? <span className="spinner spinner-dark" /> : "Compare rates"}
+            </button>
+
+            {comparison && (
+              <div style={{ marginTop: 16 }}>
+                {comparison.options.length === 0 ? (
+                  <div className="alert alert-info">No insurer offers this category at this sum insured and vehicle age.</div>
+                ) : (
+                  <>
+                    <div className="hint" style={{ marginBottom: 8 }}>
+                      {comparison.options.length} insurer{comparison.options.length === 1 ? "" : "s"} · vehicle age {comparison.calculated_age_years} yrs · prices exclude optional extras (Excess Protector, PVT), which you can add after choosing.
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Insurer &amp; Class</th>
+                            <th className="num">Total Premium</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {comparison.options.map((o, i) => (
+                            <tr key={`${o.insurer_id}-${o.motor_class_id}`}>
+                              <td>
+                                <strong>{o.insurer_name}</strong>
+                                {i === 0 && <span className="badge badge-green" style={{ marginLeft: 6 }}>Cheapest</span>}
+                                <div className="hint">
+                                  {o.motor_class_label}
+                                  {o.tonnage_required && " · needs tonnage"}
+                                </div>
+                              </td>
+                              <td className="num" style={{ whiteSpace: "nowrap" }}>
+                                <strong>{quoteMoney(o.total_premium)}</strong>
+                                <div className="hint">Basic {quoteMoney(o.basic_premium)}</div>
+                              </td>
+                              <td>
+                                <button type="button" className="btn btn-primary btn-sm" onClick={() => chooseOption(o)}>Choose</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+                {comparison.ineligible_options?.length > 0 && (
+                  <details style={{ marginTop: 10 }}>
+                    <summary className="hint" style={{ cursor: "pointer" }}>
+                      {comparison.ineligible_options.length} not available for this vehicle
+                    </summary>
+                    <ul className="hint" style={{ marginTop: 6 }}>
+                      {comparison.ineligible_options.map((x, i) => (
+                        <li key={i}><strong>{x.insurer_name}</strong> — {x.reason}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {mode === "pick" && (
+        <>
         <div className="row2">
           <div>
             <label className="first">Insurance Company</label>
@@ -388,6 +617,9 @@ export default function NewQuotation() {
               </div>
             )}
           </>
+        )}
+
+        </>
         )}
 
         <label style={{ marginTop: 16 }}>
