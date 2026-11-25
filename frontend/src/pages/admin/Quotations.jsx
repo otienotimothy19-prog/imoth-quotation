@@ -97,6 +97,7 @@ export default function Quotations() {
                 <th>Class</th>
                 <th>Status</th>
                 <th className="num">Premium</th>
+                <th>Created By</th>
                 <th>Risk Note</th>
                 <th></th>
               </tr>
@@ -113,6 +114,16 @@ export default function Quotations() {
                     <span className="badge badge-blue">{it.status}</span>
                   </td>
                   <td className="num">{money(it.total_premium)}</td>
+                  <td>
+                    {it.created_by_name ? (
+                      <>
+                        {it.created_by_name}
+                        {it.created_by_role === "AGENT" && <span className="badge badge-amber" style={{ marginLeft: 6 }}>Agent</span>}
+                      </>
+                    ) : (
+                      <span className="hint">Client portal</span>
+                    )}
+                  </td>
                   <td>{it.has_risk_note ? "Yes" : "—"}</td>
                   <td>
                     <Link className="btn btn-secondary btn-sm" to={`/admin/quotations/${it.id}`}>
@@ -123,7 +134,7 @@ export default function Quotations() {
               ))}
               {!loading && items.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", color: "var(--muted)" }}>
+                  <td colSpan={10} style={{ textAlign: "center", color: "var(--muted)" }}>
                     No quotations found.
                   </td>
                 </tr>

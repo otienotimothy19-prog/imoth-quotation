@@ -304,6 +304,7 @@ def generate_quotation(
         balance=result.total - amount_paid,
         status=QuotationStatus.GENERATED,
         source=source,
+        created_by_id=created_by,
         generated_at=now,
         expires_at=now + timedelta(days=validity_days),
         locked=False,

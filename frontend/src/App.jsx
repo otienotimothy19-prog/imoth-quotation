@@ -1,6 +1,7 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import ClientLayout from "./layouts/ClientLayout";
 import AdminLayout, { AdminIndexRedirect } from "./layouts/AdminLayout";
+import AgentLayout from "./layouts/AgentLayout";
 
 import Landing from "./pages/client/Landing";
 import QuoteWizard from "./pages/client/QuoteWizard";
@@ -22,6 +23,11 @@ import MotorClasses from "./pages/admin/MotorClasses";
 import Rates from "./pages/admin/Rates";
 import Settings from "./pages/admin/Settings";
 import Users from "./pages/admin/Users";
+
+import ChangePassword from "./pages/ChangePassword";
+import AgentLogin from "./pages/agent/AgentLogin";
+import AgentSignup from "./pages/agent/AgentSignup";
+import MyQuotations from "./pages/agent/MyQuotations";
 
 export default function App() {
   return (
@@ -50,6 +56,15 @@ export default function App() {
         <Route path="rates" element={<Rates />} />
         <Route path="settings" element={<Settings />} />
         <Route path="users" element={<Users />} />
+      </Route>
+
+      <Route path="/account/password" element={<ChangePassword />} />
+      <Route path="/agent/login" element={<AgentLogin />} />
+      <Route path="/agent/signup" element={<AgentSignup />} />
+      <Route path="/agent" element={<AgentLayout />}>
+        <Route index element={<Navigate to="new" replace />} />
+        <Route path="new" element={<NewQuotation />} />
+        <Route path="quotations" element={<MyQuotations />} />
       </Route>
 
       <Route path="*" element={<div style={{ padding: 40, textAlign: "center" }}>Page not found.</div>} />

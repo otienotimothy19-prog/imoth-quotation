@@ -35,6 +35,12 @@ class Quotation(UUIDPKMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("motor_classes.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    # The admin/staff/agent user who generated this quotation from the
+    # admin panel or agent app; NULL for client self-service quotations.
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     cover_type: Mapped[str] = mapped_column(String(50), nullable=False)  # comprehensive | tpo
     vehicle_class_label: Mapped[str] = mapped_column(String(255), nullable=False)
     sum_insured: Mapped[float] = mapped_column(Numeric(14, 2), default=0, nullable=False)
@@ -76,6 +82,7 @@ class Quotation(UUIDPKMixin, TimestampMixin, Base):
     vehicle: Mapped["Vehicle"] = relationship()  # noqa: F821
     insurer: Mapped["Insurer"] = relationship()  # noqa: F821
     motor_class: Mapped["MotorClass | None"] = relationship()  # noqa: F821
+    created_by_user: Mapped["User | None"] = relationship()  # noqa: F821
 
     items: Mapped[list["QuotationItem"]] = relationship(
         back_populates="quotation", cascade="all, delete-orphan", order_by="QuotationItem.sort_order"

@@ -24,7 +24,7 @@ export default function Documents() {
     try {
       const res = await api.get(`/api/documents/${id}`);
       setDocs(res.data);
-      setEmailTo(res.data.client_email || "");
+      setEmailTo("");
     } catch (err) {
       setError(errorMessage(err, "Could not load documents."));
     }
@@ -44,7 +44,7 @@ export default function Documents() {
         include_quotation: kind !== "risk_note",
         include_risk_note: kind !== "quotation",
       });
-      setStatus(res.data.status === "SENT" ? `${kind === "both" ? "Both documents" : "Document"} sent!` : `Failed: ${res.data.error}`);
+      setStatus(res.data.status === "SENT" ? `${kind === "both" ? "Both documents" : "Document"} sent to ${res.data.recipient}.` : `Failed: ${res.data.error}`);
     } catch (err) {
       setStatus(errorMessage(err));
     } finally {
@@ -100,10 +100,16 @@ export default function Documents() {
         </table>
 
         <div style={{ marginTop: 20 }}>
-          <label className="first">Email address</label>
-          <div style={{ display: "flex", gap: 8, maxWidth: 420 }}>
-            <input type="email" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="client@email.com" />
-          </div>
+          {docs.has_email_on_file ? (
+            <p className="hint">Documents will be sent to your email on file: <strong>{docs.client_email_masked}</strong></p>
+          ) : (
+            <>
+              <label className="first">Email address</label>
+              <div style={{ display: "flex", gap: 8, maxWidth: 420 }}>
+                <input type="email" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="client@email.com" />
+              </div>
+            </>
+          )}
 
           {docs.risk_note && (
             <div style={{ marginTop: 14 }}>

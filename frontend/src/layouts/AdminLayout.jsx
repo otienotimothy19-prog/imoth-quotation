@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, Navigate, Outlet } from "react-router-dom";
+import { Link, NavLink, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 // Items with `roles` are only shown to those roles -- STAFF ("agent") users
@@ -44,6 +44,8 @@ export default function AdminLayout() {
 
   if (!ready) return null;
   if (!user) return <Navigate to="/admin/login" replace />;
+  if (user.role === "AGENT") return <Navigate to="/agent" replace />;
+  if (user.must_change_password) return <Navigate to="/account/password" replace />;
 
   const navItems = NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(user.role));
 
@@ -108,6 +110,7 @@ export default function AdminLayout() {
           <div className="admin-sidebar-footer-mobile" style={{ fontSize: 12 }}>
             <div style={{ fontWeight: 700 }}>{user.full_name}</div>
             <div style={{ opacity: 0.75, marginBottom: 10 }}>{user.role.replace("_", " ")}</div>
+            <Link to="/account/password" style={{ color: "#fff", display: "block", marginBottom: 8, fontSize: 12 }}>Change password</Link>
             <LogoutButton />
           </div>
         </nav>
@@ -115,6 +118,7 @@ export default function AdminLayout() {
         <div className="admin-sidebar-footer" style={{ borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 12, marginTop: 20, fontSize: 12 }}>
           <div style={{ fontWeight: 700 }}>{user.full_name}</div>
           <div style={{ opacity: 0.75, marginBottom: 10 }}>{user.role.replace("_", " ")}</div>
+          <Link to="/account/password" style={{ color: "#fff", display: "block", marginBottom: 8, fontSize: 12 }}>Change password</Link>
           <LogoutButton />
         </div>
       </aside>

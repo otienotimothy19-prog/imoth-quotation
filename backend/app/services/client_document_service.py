@@ -41,6 +41,38 @@ class ClientDocumentError(Exception):
     transitions (e.g. uploading against a locked quotation)."""
 
 
+# First bytes ("magic numbers") of each accepted file type. The browser's
+# declared Content-Type is supplied by the uploader and can't be trusted on
+# its own, so the file's actual contents must match too.
+_SIGNATURES = {
+    "application/pdf": (b"%PDF-",),
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "image/webp": (b"RIFF",),
+    "image/heic": (b"",),
+}
+
+
+def _content_matches_type(content: bytes, mime_type: str | None) -> bool:
+    signatures = _SIGNATURES.get(mime_type or "")
+    if signatures is None:
+        return False
+    if mime_type == "image/webp":
+        return content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+    if mime_type == "image/heic":
+        return content[4:8] == b"ftyp"
+    return any(content.startswith(sig) for sig in signatures)
+
+
+def _read_limited(file: UploadFile, max_bytes: int) -> bytes:
+    """Reads at most max_bytes + 1 so an oversized upload is rejected
+    without loading the whole thing into memory."""
+    content = file.file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise ClientDocumentError(f"File is too large. Maximum allowed size is {max_bytes // (1024 * 1024)}MB.")
+    return content
+
+
 def _validate_file(db: Session, file: UploadFile, content: bytes) -> None:
     allowed_types = get_setting(db, "documents.allowed_mime_types")
     max_mb = get_setting(db, "documents.max_file_size_mb")
@@ -54,6 +86,8 @@ def _validate_file(db: Session, file: UploadFile, content: bytes) -> None:
         raise ClientDocumentError(f"File is too large. Maximum allowed size is {max_mb}MB.")
     if len(content) == 0:
         raise ClientDocumentError("The uploaded file appears to be empty.")
+    if not _content_matches_type(content, file.content_type):
+        raise ClientDocumentError("This file doesn't look like a valid PDF or image. Please upload the original document.")
 
 
 def upload_client_document(
@@ -69,7 +103,8 @@ def upload_client_document(
             "Documents can only be uploaded before this quotation is accepted."
         )
 
-    content = file.file.read()
+    max_bytes = int(get_setting(db, "documents.max_file_size_mb")) * 1024 * 1024
+    content = _read_limited(file, max_bytes)
     _validate_file(db, file, content)
 
     safe_filename = storage_service.sanitize_filename(file.filename, fallback=f"{document_type.value}.bin")

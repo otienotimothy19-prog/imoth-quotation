@@ -1,0 +1,17 @@
+{
+  "name": "Imoth Agent",
+  "short_name": "Imoth Agent",
+  "description": "Imoth Insurance Brokers motor quotation app for agents.",
+  "id": "/agent",
+  "start_url": "/agent",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#1b3f8b",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

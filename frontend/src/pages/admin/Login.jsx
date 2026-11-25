@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { errorMessage } from "../../api/client";
+import OtpStep from "../../components/OtpStep";
 
 export default function AdminLogin() {
   const { user, ready, login } = useAuth();
@@ -11,21 +12,53 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [challenge, setChallenge] = useState(null);
 
-  if (ready && user) return <Navigate to={user.role === "STAFF" ? "/admin/quotations/new" : "/admin/dashboard"} replace />;
+  const homeFor = (role) => (role === "AGENT" ? "/agent" : role === "STAFF" ? "/admin/quotations/new" : "/admin/dashboard");
+
+  if (ready && user) return <Navigate to={homeFor(user.role)} replace />;
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setBusy(true);
     try {
-      const loggedInUser = await login(email, password);
-      navigate(loggedInUser.role === "STAFF" ? "/admin/quotations/new" : "/admin/dashboard");
+      const result = await login(email, password);
+      if (result.otpRequired) {
+        setChallenge(result);
+        setPassword("");
+      } else {
+        navigate(homeFor(result.user.role));
+      }
     } catch (err) {
       setError(errorMessage(err, "Invalid email or password."));
     } finally {
       setBusy(false);
     }
+  }
+
+  if (challenge) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 16,
+          background: "linear-gradient(180deg,#1b3f8b 0%,#142f68 100%)",
+        }}
+      >
+        <div className="card" style={{ width: "100%", maxWidth: 380, borderTop: "5px solid var(--imoth-red)" }}>
+          <h1 style={{ fontSize: 17, color: "var(--imoth-blue)", textAlign: "center", marginBottom: 14 }}>Check your email</h1>
+          <OtpStep
+            challenge={challenge}
+            onVerified={(u) => navigate(homeFor(u.role))}
+            onCancel={() => setChallenge(null)}
+          />
+        </div>
+      </div>
+    );
   }
 
   return (

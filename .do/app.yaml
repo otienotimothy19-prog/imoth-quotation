@@ -111,6 +111,39 @@ services:
   - key: STORAGE_LOCAL_PATH
     scope: RUN_TIME
     value: ./storage/documents
+  # Real visitor IP for rate limits, lockouts and the audit log. App Platform's
+  # load balancer sets this header; without it every visitor looks the same.
+  - key: CLIENT_IP_HEADER
+    scope: RUN_TIME
+    value: do-connecting-ip
+  # Outgoing email (login codes, quotation PDFs) goes through Imoth's Zoho
+  # Mail mailbox support@imoth.co.ke. Login codes depend on this working.
+  # SMTP_PASSWORD is a SECRET: enter the mailbox password (or a Zoho
+  # app-specific password if two-factor sign-in is on) when DO prompts.
+  # If the Zoho account lives in the EU/India data centre, use
+  # smtppro.zoho.eu / smtppro.zoho.in instead.
+  # Emergency switch: LOGIN_OTP_ENABLED=false turns the login-code step off.
+  - key: SMTP_HOST
+    scope: RUN_TIME
+    value: smtppro.zoho.com
+  - key: SMTP_PORT
+    scope: RUN_TIME
+    value: "587"
+  - key: SMTP_USE_TLS
+    scope: RUN_TIME
+    value: "true"
+  - key: SMTP_USERNAME
+    scope: RUN_TIME
+    value: support@imoth.co.ke
+  - key: SMTP_PASSWORD
+    scope: RUN_TIME
+    type: SECRET
+  - key: SMTP_FROM_EMAIL
+    scope: RUN_TIME
+    value: support@imoth.co.ke
+  - key: SMTP_FROM_NAME
+    scope: RUN_TIME
+    value: Imoth Insurance Brokers
   - key: BOOTSTRAP_ADMIN_EMAIL
     scope: RUN_TIME
     value: admin@imoth.co.ke

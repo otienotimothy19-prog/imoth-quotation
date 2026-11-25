@@ -36,8 +36,8 @@ api.interceptors.request.use((config) => {
   const needsAuth =
     token &&
     (config.url?.startsWith("/api/admin") ||
-      config.url === "/api/auth/me" ||
-      config.url === "/api/auth/logout");
+      config.url?.startsWith("/api/agent") ||
+      config.url?.startsWith("/api/auth/"));
   if (needsAuth) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -55,11 +55,34 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401 && window.location.pathname.startsWith("/admin")) {
+    const path = window.location.pathname;
+    const storedRole = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("imoth_admin_user") || "null")?.role;
+      } catch {
+        return null;
+      }
+    })();
+    const area = path.startsWith("/admin")
+      ? "/admin"
+      : path.startsWith("/agent")
+      ? "/agent"
+      : path.startsWith("/account")
+      ? storedRole === "AGENT" ? "/agent" : "/admin"
+      : null;
+
+    // A temporary password must be replaced before anything else works.
+    if (err.response?.status === 403 && err.response?.data?.detail === "PASSWORD_CHANGE_REQUIRED" && area) {
+      if (path !== "/account/password") window.location.href = "/account/password";
+      return Promise.reject(err);
+    }
+
+    if (err.response?.status === 401 && area) {
       localStorage.removeItem("imoth_admin_token");
       localStorage.removeItem("imoth_admin_user");
-      if (window.location.pathname !== "/admin/login") {
-        window.location.href = "/admin/login";
+      const publicPages = [`${area}/login`, "/agent/signup"];
+      if (!publicPages.includes(path)) {
+        window.location.href = `${area}/login`;
       }
     }
     return Promise.reject(err);

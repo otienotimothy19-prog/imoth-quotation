@@ -18,6 +18,7 @@ from app.api.routers import (
     admin_risk_notes,
     admin_settings,
     admin_users,
+    agent,
     auth,
     client_documents,
     client_quotations,
@@ -55,6 +56,23 @@ async def restore_api_prefix(request: Request, call_next):
     if not request.scope["path"].startswith("/api"):
         request.scope["path"] = "/api" + request.scope["path"]
     return await call_next(request)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Browser security headers on every API response: no MIME sniffing,
+    never framed by another site, no referrer leakage, and responses
+    (which can hold personal data and login tokens) never cached."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Cache-Control", "no-store")
+    response.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if settings.is_production:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
 
 
 @app.exception_handler(RateLimitExceeded)
@@ -98,6 +116,7 @@ app.include_router(admin_motor_classes.router)
 app.include_router(admin_rates.router)
 app.include_router(admin_settings.router)
 app.include_router(admin_users.router)
+app.include_router(agent.router)
 
 
 @app.get("/api/health")
