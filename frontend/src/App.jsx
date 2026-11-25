@@ -25,6 +25,8 @@ import Settings from "./pages/admin/Settings";
 import Users from "./pages/admin/Users";
 
 import ChangePassword from "./pages/ChangePassword";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import AgentLogin from "./pages/agent/AgentLogin";
 import AgentSignup from "./pages/agent/AgentSignup";
 import MyQuotations from "./pages/agent/MyQuotations";
@@ -59,6 +61,8 @@ export default function App() {
       </Route>
 
       <Route path="/account/password" element={<ChangePassword />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/agent/login" element={<AgentLogin />} />
       <Route path="/agent/signup" element={<AgentSignup />} />
       <Route path="/agent" element={<AgentLayout />}>

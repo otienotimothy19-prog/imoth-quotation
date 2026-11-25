@@ -67,6 +67,23 @@ def send_login_code(*, to_email: str, full_name: str, code: str, valid_minutes: 
     _send_smtp(to_email=to_email, subject=f"Your Imoth login code: {code}", body=body, attachments=[])
 
 
+def send_password_reset(*, to_email: str, full_name: str, link: str, valid_minutes: int) -> None:
+    """Emails a one-time "reset your password" link. Without SMTP outside
+    production, the link is written to the server log instead."""
+    if not settings.SMTP_HOST and not settings.is_production:
+        logger.warning("SMTP not configured -- password reset link for %s: %s (development only)", to_email, link)
+        return
+    body = (
+        f"Hello {full_name},\n\n"
+        "We received a request to reset the password for your Imoth account.\n\n"
+        f"Choose a new password here (the link works once and expires in {valid_minutes} minutes):\n"
+        f"{link}\n\n"
+        "If you didn't ask for this, you can ignore this email -- your password won't change.\n\n"
+        "Imoth Insurance Brokers Limited"
+    )
+    _send_smtp(to_email=to_email, subject="Reset your Imoth password", body=body, attachments=[])
+
+
 def send_documents_email(
     db: Session,
     *,

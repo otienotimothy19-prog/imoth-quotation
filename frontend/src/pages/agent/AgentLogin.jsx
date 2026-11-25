@@ -55,6 +55,9 @@ export default function AgentLogin() {
         <input id="agent-email" type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
         <label htmlFor="agent-password">Password</label>
         <PasswordInput id="agent-password" value={password} autoComplete="current-password" onChange={(e) => setPassword(e.target.value)} />
+        <div style={{ textAlign: "right", marginTop: 6 }}>
+          <Link to="/forgot-password?from=agent" className="hint">Forgot password?</Link>
+        </div>
         <button className="btn btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: 18 }}>
           {busy ? <span className="spinner" /> : "Log In"}
         </button>

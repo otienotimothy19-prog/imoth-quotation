@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { errorMessage } from "../../api/client";
 import OtpStep from "../../components/OtpStep";
@@ -138,6 +138,10 @@ export default function AdminLogin() {
               </svg>
             )}
           </button>
+        </div>
+
+        <div style={{ textAlign: "right", marginTop: 6 }}>
+          <Link to="/forgot-password?from=admin" className="hint">Forgot password?</Link>
         </div>
 
         <button className="btn btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: 18 }}>

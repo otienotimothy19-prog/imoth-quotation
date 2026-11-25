@@ -19,6 +19,7 @@ from app.models.enums import (
 )
 from app.models.insurer_rate import Insurer, MotorClass, RateBand, RateVersion
 from app.models.login_challenge import LoginChallenge
+from app.models.password_reset import PasswordResetToken
 from app.models.quotation import Quotation, QuotationItem, QuotationSnapshot
 from app.models.quote_selection import QuoteSelection
 from app.models.risk_note import RiskNote, RiskNoteStatusHistory
@@ -50,6 +51,7 @@ __all__ = [
     "RateBand",
     "RateVersion",
     "LoginChallenge",
+    "PasswordResetToken",
     "Quotation",
     "QuotationItem",
     "QuotationSnapshot",
