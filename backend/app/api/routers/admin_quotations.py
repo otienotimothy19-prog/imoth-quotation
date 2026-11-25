@@ -78,6 +78,7 @@ def compare_rates(payload: CompareRequest, db: Session = Depends(get_db), user: 
         category=payload.category,
         sum_insured=payload.sum_insured,
         calculated_age_years=calculate_vehicle_age(payload.vehicle.year_of_manufacture),
+        levy_rate=float(get_setting(db, "levy.rate")),
         options=options,
         ineligible_options=[IneligibleOption(**i) for i in ineligible],
     )

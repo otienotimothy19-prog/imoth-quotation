@@ -18,6 +18,7 @@ from app.models.user import User
 from app.models.enums import UserRole
 from app.seed.insurers_data import INSURERS
 from app.services.rate_config import rate_version_snapshot
+from app.services.rate_config import courtesy_car_options_from_benefits
 
 
 def _create_rate_bands(db: Session, motor_class: MotorClass, bands: list[dict], variant: str) -> None:
@@ -83,6 +84,7 @@ def seed_insurers(db: Session) -> None:
                 min_si=class_data.get("min_si", 0),
                 max_si=class_data.get("max_si"),
                 has_lr_toggle=class_data.get("has_lr_toggle", False),
+                courtesy_car_options=courtesy_car_options_from_benefits(class_data.get("benefits")) or None,
                 pll_per_seat=class_data.get("pll_per_seat"),
                 pll_options=class_data.get("pll_options"),
                 pll_included=class_data.get("pll_included", False),

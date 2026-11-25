@@ -75,6 +75,7 @@ def create_motor_class(payload: MotorClassCreate, request: Request, db: Session 
         pll_options=[o.model_dump(mode="json") for o in payload.pll_options] if payload.pll_options else None,
         pll_included=payload.pll_included,
         flat_only=payload.flat_only.model_dump() if payload.flat_only else None,
+        courtesy_car_options=[o.model_dump() for o in payload.courtesy_car_options] if payload.courtesy_car_options else None,
         excess=payload.excess,
         benefits=payload.benefits,
         limits=payload.limits,

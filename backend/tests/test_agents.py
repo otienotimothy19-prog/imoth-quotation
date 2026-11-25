@@ -130,3 +130,58 @@ def test_compare_rates_for_staff_and_agents(admin_headers):
         assert db.query(QuoteSelection).count() == offers_before
 
     assert client.post("/api/admin/quotations/compare", json=body).status_code == 401
+
+
+def test_compare_extras_and_courtesy_car(admin_headers):
+    """Each compared option says which extras can be added and what they
+    cost; a quotation with a courtesy car period includes it as a line."""
+    from app.database import SessionLocal
+    from app.models.insurer_rate import MotorClass
+
+    year = datetime.now(timezone.utc).year
+    body = {"vehicle": {"registration_no": "TBA", "year_of_manufacture": year - 3},
+            "category": "private", "sum_insured": 1300000}
+    data = client.post("/api/admin/quotations/compare", json=body, headers=admin_headers).json()
+    assert 0 < data["levy_rate"] < 0.01
+    for option in data["options"]:
+        extras = option["extras"]
+        assert extras["ep"]["status"] in {"optional", "included", "mandatory", "not_offered"}
+        if extras["ep"]["status"] == "optional":
+            assert extras["ep"]["amount"] > 0
+
+    # Pioneer and CIC private classes had courtesy car prices in their wording.
+    with_cc = [o for o in data["options"] if o["extras"]["courtesy_car"]]
+    assert with_cc, "expected at least one insurer offering a courtesy car"
+    option = with_cc[0]
+    cc = option["extras"]["courtesy_car"][0]
+
+    quote = client.post(
+        "/api/admin/quotations",
+        json={"vehicle": {"registration_no": "KCC 101C", "year_of_manufacture": year - 3},
+              "insurer_id": option["insurer_id"], "motor_class_id": option["motor_class_id"],
+              "sum_insured": 1300000, "options": {"courtesy_days": cc["days"]}},
+        headers=admin_headers,
+    ).json()
+    labels = [i["label"] for i in quote["items"]]
+    assert f"Courtesy Car ({cc['days']} days)" in labels
+    assert round(quote["subtotal"], 2) == round(option["subtotal"] + cc["amount"], 2)
+
+    # Admins can set courtesy car prices on any class.
+    with SessionLocal() as db:
+        target = db.query(MotorClass).filter(MotorClass.id == option["motor_class_id"]).one()
+        original = target.courtesy_car_options
+    resp = client.patch(f"/api/admin/motor-classes/{option['motor_class_id']}",
+                        json={"courtesy_car_options": [{"days": 20, "premium": 6500}, {"days": 10, "premium": 3500}]},
+                        headers=admin_headers)
+    assert resp.status_code == 200, resp.text
+    assert [o["days"] for o in resp.json()["courtesy_car_options"]] == [10, 20]
+    client.patch(f"/api/admin/motor-classes/{option['motor_class_id']}",
+                 json={"courtesy_car_options": original or []}, headers=admin_headers)
+
+
+def test_courtesy_car_wording_parser():
+    from app.services.rate_config import courtesy_car_options_from_benefits
+
+    assert courtesy_car_options_from_benefits(["Courtesy Car: 4,500 (10 days) / 7,500 (20 days)"]) == [
+        {"days": 10, "premium": 4500.0}, {"days": 20, "premium": 7500.0}]
+    assert courtesy_car_options_from_benefits(["Medical Expenses Kshs 30,000"]) == []

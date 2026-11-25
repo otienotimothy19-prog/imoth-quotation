@@ -48,6 +48,9 @@ class MotorClass(UUIDPKMixin, TimestampMixin, Base):
     # instead of charging from pll_options/pll_per_seat.
     pll_included: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     flat_only: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # Optional courtesy car extension, e.g. [{"days": 10, "premium": 3000},
+    # {"days": 20, "premium": 6000}]. Empty/None = not offered.
+    courtesy_car_options: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
     # Sub-use within category == "commercial" -- distinguishes goods-carrying
     # uses (own_goods, general_cartage) and passenger-carrying institutional

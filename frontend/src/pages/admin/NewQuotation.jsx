@@ -54,10 +54,54 @@ function emptyForm() {
     pllOptionKey: "",
     tonnage: "",
     lrBand: "good",
+    courtesyDays: "",
     institutionType: "",
     institutionalVehicleType: "",
     passengerCategory: "",
   };
+}
+
+// Extras an agent can tick on one compared insurer: Excess Protector and
+// PVT (where the insurer charges for them) and a courtesy car period.
+function RowExtras({ option, picked, onChange }) {
+  const x = option.extras;
+  if (!x) return null;
+  const coverChoice = (key, label) => {
+    const info = x[key] || {};
+    if (info.status === "optional") {
+      return (
+        <label key={key} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 500, margin: 0 }}>
+          <input type="checkbox" checked={!!picked[key]} onChange={(e) => onChange({ [key]: e.target.checked })} />
+          {label} <span className="hint">+{quoteMoney(info.amount)}</span>
+        </label>
+      );
+    }
+    const text = { included: "included", mandatory: "included (mandatory)", not_offered: "not offered" }[info.status];
+    return text ? <span key={key} className="hint">{label}: {text}</span> : null;
+  };
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: 6, alignItems: "center", fontSize: 12.5 }}>
+      {coverChoice("ep", "Excess Protector")}
+      {coverChoice("pvt", "PVT")}
+      {x.courtesy_car?.length > 0 ? (
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 500, margin: 0 }}>
+          Courtesy car
+          <select
+            value={picked.courtesyDays || ""}
+            onChange={(e) => onChange({ courtesyDays: e.target.value })}
+            style={{ padding: "2px 6px", minHeight: "auto", fontSize: 12.5, width: "auto" }}
+          >
+            <option value="">None</option>
+            {x.courtesy_car.map((c) => (
+              <option key={c.days} value={c.days}>{c.days} days (+{quoteMoney(c.amount)})</option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <span className="hint">Courtesy car: not offered</span>
+      )}
+    </div>
+  );
 }
 
 export default function NewQuotation() {
@@ -75,6 +119,8 @@ export default function NewQuotation() {
   const [cmp, setCmp] = useState(emptyCompare());
   const [comparing, setComparing] = useState(false);
   const [comparison, setComparison] = useState(null);
+  // Extras ticked on each compared insurer row, keyed by insurer+class.
+  const [rowExtras, setRowExtras] = useState({});
   // Set when the agent picks an insurer from the comparison: the class to
   // select once that insurer's classes have loaded, and option values
   // (institutional details) to keep when the class changes.
@@ -118,7 +164,7 @@ export default function NewQuotation() {
   useEffect(() => {
     update({
       ep: false, pvt: false, pllSeats: "", pllOptionKey: "", tonnage: "",
-      lrBand: "good", institutionType: "", institutionalVehicleType: "", passengerCategory: "",
+      lrBand: "good", courtesyDays: "", institutionType: "", institutionalVehicleType: "", passengerCategory: "",
       ...(carryRef.current || {}),
     });
     carryRef.current = null;
@@ -173,6 +219,7 @@ export default function NewQuotation() {
         options: { pll_seats: cmpInstitutional ? Number(cmp.seats) : 0 },
       });
       setComparison(res.data);
+      setRowExtras({});
     } catch (err) {
       setError(errorMessage(err, "Could not compare rates."));
     } finally {
@@ -180,17 +227,47 @@ export default function NewQuotation() {
     }
   }
 
+  const rowKey = (o) => `${o.insurer_id}-${o.motor_class_id}`;
+
+  function setRowExtra(o, patch) {
+    setRowExtras((all) => ({ ...all, [rowKey(o)]: { ...(all[rowKey(o)] || {}), ...patch } }));
+  }
+
+  // Price of an option with the extras ticked on its row. Uses the amounts
+  // the server worked out for each extra, then applies levies and stamp
+  // duty exactly as the quotation will.
+  function rowTotal(o) {
+    const picked = rowExtras[rowKey(o)] || {};
+    const x = o.extras || {};
+    let extra = 0;
+    if (picked.ep && x.ep?.status === "optional") extra += x.ep.amount;
+    if (picked.pvt && x.pvt?.status === "optional") extra += x.pvt.amount;
+    const cc = (x.courtesy_car || []).find((c) => String(c.days) === String(picked.courtesyDays));
+    if (cc) extra += cc.amount;
+    const subtotal = o.subtotal + extra;
+    return subtotal + subtotal * (comparison?.levy_rate ?? 0) + o.stamp_duty;
+  }
+
   function chooseOption(option) {
     setError("");
-    carryRef.current = cmpInstitutional
-      ? {
-          institutionType: cmp.institutionType,
-          institutionalVehicleType: cmp.institutionalVehicleType,
-          passengerCategory: cmp.passengerCategory,
-          pllSeats: cmp.seats,
-        }
-      : null;
-    if (option.insurer_id === insurerId) {
+    const picked = rowExtras[rowKey(option)] || {};
+    carryRef.current = {
+      ep: !!picked.ep,
+      pvt: !!picked.pvt,
+      courtesyDays: picked.courtesyDays || "",
+      ...(cmpInstitutional
+        ? {
+            institutionType: cmp.institutionType,
+            institutionalVehicleType: cmp.institutionalVehicleType,
+            passengerCategory: cmp.passengerCategory,
+            pllSeats: cmp.seats,
+          }
+        : {}),
+    };
+    if (option.insurer_id === insurerId && option.motor_class_id === classId) {
+      update(carryRef.current);
+      carryRef.current = null;
+    } else if (option.insurer_id === insurerId) {
       setClassId(option.motor_class_id);
     } else {
       pendingClassRef.current = option.motor_class_id;
@@ -234,6 +311,7 @@ export default function NewQuotation() {
       options: {
         ep: form.ep,
         pvt: form.pvt,
+        courtesy_days: form.courtesyDays ? Number(form.courtesyDays) : null,
         lr_band: showLrBand ? form.lrBand : null,
         pll_seats: showPll ? Number(form.pllSeats || 0) : 0,
         pll_option_key: showPll ? form.pllOptionKey || null : null,
@@ -337,7 +415,7 @@ export default function NewQuotation() {
         <div className="row2">
           <div>
             <label className="first">Registration No.</label>
-            <input value={form.regNo} onChange={(e) => update({ regNo: e.target.value.toUpperCase() })} placeholder="e.g. KCZ 538G" />
+            <input type="text" value={form.regNo} onChange={(e) => update({ regNo: e.target.value.toUpperCase() })} placeholder="e.g. KCZ 538G" />
           </div>
           <div>
             <label className="first">Year of Manufacture</label>
@@ -351,7 +429,7 @@ export default function NewQuotation() {
           </div>
           <div>
             <label>Model (optional)</label>
-            <input value={form.model} onChange={(e) => update({ model: e.target.value })} placeholder="e.g. Axio" />
+            <input type="text" value={form.model} onChange={(e) => update({ model: e.target.value })} placeholder="e.g. Axio" />
           </div>
         </div>
 
@@ -433,7 +511,7 @@ export default function NewQuotation() {
                 ) : (
                   <>
                     <div className="hint" style={{ marginBottom: 8 }}>
-                      {comparison.options.length} insurer{comparison.options.length === 1 ? "" : "s"} · vehicle age {comparison.calculated_age_years} yrs · prices exclude optional extras (Excess Protector, PVT), which you can add after choosing.
+                      {comparison.options.length} insurer{comparison.options.length === 1 ? "" : "s"} · vehicle age {comparison.calculated_age_years} yrs · tick extras on any insurer to see its price with them.
                     </div>
                     <div style={{ overflowX: "auto" }}>
                       <table>
@@ -454,9 +532,10 @@ export default function NewQuotation() {
                                   {o.motor_class_label}
                                   {o.tonnage_required && " · needs tonnage"}
                                 </div>
+                                <RowExtras option={o} picked={rowExtras[rowKey(o)] || {}} onChange={(patch) => setRowExtra(o, patch)} />
                               </td>
                               <td className="num" style={{ whiteSpace: "nowrap" }}>
-                                <strong>{quoteMoney(o.total_premium)}</strong>
+                                <strong>{quoteMoney(rowTotal(o))}</strong>
                                 <div className="hint">Basic {quoteMoney(o.basic_premium)}</div>
                               </td>
                               <td>
@@ -535,6 +614,18 @@ export default function NewQuotation() {
                   <span><strong>PVT</strong><small>Political Violence &amp; Terrorism cover, where offered.</small></span>
                 </label>
               </div>
+            )}
+
+            {selectedClass.courtesy_car_options?.length > 0 && (
+              <>
+                <label htmlFor="nq-courtesy">Courtesy Car</label>
+                <select id="nq-courtesy" value={form.courtesyDays} onChange={(e) => update({ courtesyDays: e.target.value })}>
+                  <option value="">Not added</option>
+                  {selectedClass.courtesy_car_options.map((c) => (
+                    <option key={c.days} value={c.days}>{c.days} days (+{quoteMoney(c.premium)})</option>
+                  ))}
+                </select>
+              </>
             )}
 
             {showLrBand && (

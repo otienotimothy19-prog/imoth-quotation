@@ -38,6 +38,7 @@ def _options_to_engine_dict(
         "pll_seats": options.pll_seats,
         "pll_option_key": options.pll_option_key,
         "tonnage": options.tonnage,
+        "courtesy_days": options.courtesy_days,
         "age": age,
         "commercial_use": commercial_use,
         "institution_type": institution_type.value if institution_type else None,
@@ -53,6 +54,28 @@ def _company_settings(db: Session) -> dict:
         "phone": get_setting(db, "company.phone"),
         "email": get_setting(db, "company.email"),
         "paybill": get_setting(db, "company.paybill"),
+    }
+
+
+def _extras_for(class_dict: dict, band: dict | None, sum_insured: float) -> dict:
+    """Which extras can be added to this insurer's option, and what each adds
+    to the premium (before levies), using the same rules as compute_premium."""
+    def cover(key: str) -> dict:
+        if not band or band.get(f"{key}_not_offered"):
+            return {"status": "not_offered"}
+        if band.get(f"{key}_included"):
+            return {"status": "included"}
+        if band.get(f"{key}_mandatory"):
+            return {"status": "mandatory"}
+        rate, minimum = band.get(f"{key}_rate") or 0, band.get(f"{key}_min") or 0
+        return {"status": "optional", "amount": max(sum_insured * rate, minimum), "rate": rate, "min": minimum}
+
+    return {
+        "ep": cover("ep"),
+        "pvt": cover("pvt"),
+        "courtesy_car": [
+            {"days": int(o["days"]), "amount": float(o["premium"])} for o in class_dict.get("courtesy_car_options") or []
+        ],
     }
 
 
@@ -149,6 +172,7 @@ def list_eligible_options(
                 "stamp_duty": result.stamp_duty,
                 "total_premium": result.total,
                 "tonnage_required": bool(class_dict.get("tonnage_required")),
+                "extras": _extras_for(class_dict, result.band_used, sum_insured),
             }
         )
 

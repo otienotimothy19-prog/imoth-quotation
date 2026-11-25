@@ -85,6 +85,9 @@ class QuoteOptionsIn(BaseModel):
     # Vehicle carrying capacity in tonnes, for commercial/goods-carrying
     # classes whose rate bands are split by tonnage as well as Sum Insured.
     tonnage: float | None = Field(default=None, ge=0)
+    # Courtesy car extension: number of days (e.g. 10 or 20), priced from the
+    # class's courtesy_car_options. None = not added.
+    courtesy_days: int | None = Field(default=None, ge=1, le=365)
 
 
 class CompareRequest(BaseModel):
@@ -135,6 +138,10 @@ class CompareOption(BaseModel):
     # can be generated (rare -- most classes, including every Commercial
     # Institutional product today, don't require it).
     tonnage_required: bool = False
+    # Optional extras the agent can add to this option, priced exactly as the
+    # quotation will charge them (amounts before levies/stamp duty). Status is
+    # one of: optional | included | mandatory | not_offered.
+    extras: dict | None = None
 
 
 class IneligibleOption(BaseModel):
@@ -152,6 +159,7 @@ class CompareResponse(BaseModel):
     category: str
     sum_insured: float
     calculated_age_years: int
+    levy_rate: float | None = None
     options: list[CompareOption]
     ineligible_options: list[IneligibleOption] = []
 
