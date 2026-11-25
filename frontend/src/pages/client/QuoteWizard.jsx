@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, errorMessage, quoteMoney as money } from "../../api/client";
 import QuoteOfferActions from "../../components/QuoteOfferActions";
 import QuoteShell from "../../components/wizard/QuoteShell";
+import VehicleMakeSelect from "../../components/VehicleMakeSelect";
 
 const CATEGORIES = [
   { value: "private", label: "Private Car" },
@@ -285,10 +286,10 @@ export default function QuoteWizard() {
             <div className="row2">
               <div className="field-group">
                 <div className="field-label-row">
-                  <label>Make</label>
+                  <label htmlFor="qw-make">Make</label>
                   <span className="optional-badge">Optional</span>
                 </div>
-                <input type="text" value={vehicle.make} onChange={(e) => setVehicle({ ...vehicle, make: e.target.value })} placeholder="e.g. Toyota" />
+                <VehicleMakeSelect id="qw-make" value={vehicle.make} onChange={(make) => setVehicle({ ...vehicle, make })} />
               </div>
               <div className="field-group">
                 <div className="field-label-row">
