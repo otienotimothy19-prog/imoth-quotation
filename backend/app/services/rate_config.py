@@ -28,6 +28,21 @@ def rate_band_to_dict(rb: RateBand) -> dict:
     }
 
 
+def courtesy_car_options_from_benefits(benefits: list[str] | None) -> list[dict]:
+    """Reads "Courtesy Car: 3,000 (10 days) / 6,000 (20 days)" style wording
+    into [{"days": 10, "premium": 3000.0}, {"days": 20, "premium": 6000.0}]."""
+    import re
+
+    for line in benefits or []:
+        if "courtesy car" not in line.lower():
+            continue
+        found = re.findall(r"([\d,]+(?:\.\d+)?)\s*\(\s*(\d+)\s*days?\s*\)", line, flags=re.IGNORECASE)
+        options = [{"days": int(days), "premium": float(amount.replace(",", ""))} for amount, days in found]
+        if options:
+            return sorted(options, key=lambda o: o["days"])
+    return []
+
+
 def motor_class_to_dict(mc: MotorClass) -> dict:
     active_bands = [b for b in mc.rate_bands if b.active]
     standard = sorted((b for b in active_bands if b.variant == "standard"), key=lambda b: b.sort_order)
@@ -51,6 +66,7 @@ def motor_class_to_dict(mc: MotorClass) -> dict:
         "eligible_passenger_categories": mc.eligible_passenger_categories,
         "tonnage_required": mc.tonnage_required,
         "flat_only": mc.flat_only,
+        "courtesy_car_options": mc.courtesy_car_options or [],
         "excess": mc.excess or [],
         "benefits": mc.benefits or [],
         "limits": mc.limits or [],

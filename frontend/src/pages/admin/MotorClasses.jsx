@@ -48,6 +48,12 @@ function validateClassForm(form) {
   return "";
 }
 
+// Courtesy car premium for a given number of days, or "" if not offered.
+function courtesyPrice(cls, days) {
+  const opt = (cls.courtesy_car_options || []).find((o) => Number(o.days) === days);
+  return opt ? opt.premium : "";
+}
+
 function emptyForm() {
   return {
     code: "", label: "", category: "private", max_age: "", min_si: 0, max_si: "",
@@ -146,6 +152,8 @@ export default function MotorClasses() {
       max_age: cls.max_age ?? "",
       min_si: cls.min_si ?? 0,
       max_si: cls.max_si ?? "",
+      cc10: courtesyPrice(cls, 10),
+      cc20: courtesyPrice(cls, 20),
     });
     setError("");
   }
@@ -171,6 +179,12 @@ export default function MotorClasses() {
         max_age: editForm.max_age === "" ? null : Number(editForm.max_age),
         min_si: Number(editForm.min_si) || 0,
         max_si: editForm.max_si === "" ? null : Number(editForm.max_si),
+        courtesy_car_options: [
+          ...(editForm.cc10 !== "" ? [{ days: 10, premium: Number(editForm.cc10) }] : []),
+          ...(editForm.cc20 !== "" ? [{ days: 20, premium: Number(editForm.cc20) }] : []),
+          // Keep any other periods set up for this class untouched.
+          ...((classes.find((x) => x.id === clsId)?.courtesy_car_options || []).filter((o) => o.days !== 10 && o.days !== 20)),
+        ],
       });
       cancelEdit();
       setStatus("Class updated.");
@@ -397,6 +411,7 @@ export default function MotorClasses() {
                 <th>Category</th>
                 <th>Max Age</th>
                 <th>Min SI</th>
+                <th title="Courtesy car extension premium (KES)">Courtesy Car</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -445,6 +460,30 @@ export default function MotorClasses() {
                       />
                     </td>
                     <td>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <input
+                          type="number"
+                          min="0"
+                          value={editForm.cc10}
+                          placeholder="10 days"
+                          aria-label="Courtesy car premium, 10 days"
+                          title="Courtesy car premium for 10 days (blank = not offered)"
+                          onChange={(e) => setEditForm({ ...editForm, cc10: e.target.value })}
+                          style={{ width: 90 }}
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          value={editForm.cc20}
+                          placeholder="20 days"
+                          aria-label="Courtesy car premium, 20 days"
+                          title="Courtesy car premium for 20 days (blank = not offered)"
+                          onChange={(e) => setEditForm({ ...editForm, cc20: e.target.value })}
+                          style={{ width: 90 }}
+                        />
+                      </div>
+                    </td>
+                    <td>
                       <span className={`badge ${c.active ? "badge-green" : "badge-gray"}`}>{c.active ? "Active" : "Disabled"}</span>
                     </td>
                     <td style={{ display: "flex", gap: 6 }}>
@@ -472,6 +511,11 @@ export default function MotorClasses() {
                       {c.flat_only
                         ? "Flat rate"
                         : `${Number(c.min_si).toLocaleString()}${c.max_si ? " – " + Number(c.max_si).toLocaleString() : "+"}`}
+                    </td>
+                    <td>
+                      {c.courtesy_car_options?.length
+                        ? c.courtesy_car_options.map((o) => `${o.days}d: ${Number(o.premium).toLocaleString()}`).join(" · ")
+                        : "—"}
                     </td>
                     <td>
                       <span className={`badge ${c.active ? "badge-green" : "badge-gray"}`}>{c.active ? "Active" : "Disabled"}</span>
@@ -508,7 +552,7 @@ export default function MotorClasses() {
               )}
               {!loading && classes.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", color: "var(--muted)" }}>
+                  <td colSpan={8} style={{ textAlign: "center", color: "var(--muted)" }}>
                     No classes found.
                   </td>
                 </tr>

@@ -105,6 +105,17 @@ def _validate_commercial_use(v: str | None) -> str | None:
     return v
 
 
+class CourtesyCarOption(BaseModel):
+    days: int = Field(ge=1, le=365)
+    premium: float = Field(ge=0)
+
+
+def _validate_courtesy(v):
+    if v and len({o.days for o in v}) != len(v):
+        raise ValueError("Each courtesy car period (number of days) can only be listed once")
+    return sorted(v, key=lambda o: o.days) if v else v
+
+
 class MotorClassCreate(BaseModel):
     insurer_id: uuid.UUID
     code: str = Field(min_length=1, max_length=80)
@@ -130,6 +141,12 @@ class MotorClassCreate(BaseModel):
     eligible_vehicle_types: list[InstitutionalVehicleType] | None = None
     eligible_passenger_categories: list[PassengerCategory] | None = None
     tonnage_required: bool = False
+    courtesy_car_options: list[CourtesyCarOption] | None = None
+
+    @field_validator("courtesy_car_options")
+    @classmethod
+    def _courtesy_create(cls, v):
+        return _validate_courtesy(v)
 
     @field_validator("pll_options")
     @classmethod
@@ -168,11 +185,17 @@ class MotorClassUpdate(BaseModel):
     eligible_vehicle_types: list[InstitutionalVehicleType] | None = None
     eligible_passenger_categories: list[PassengerCategory] | None = None
     tonnage_required: bool | None = None
+    courtesy_car_options: list[CourtesyCarOption] | None = None
     # Optional: when set, this update is also recorded as a new RateVersion
     # (used by the Rates screen when editing a flat-rate product's premium
     # or its Passenger Legal Liability rates, so those changes get the same
     # version history as banded rates).
     change_reason: str | None = None
+
+    @field_validator("courtesy_car_options")
+    @classmethod
+    def _courtesy_update(cls, v):
+        return _validate_courtesy(v)
 
     @field_validator("pll_options")
     @classmethod

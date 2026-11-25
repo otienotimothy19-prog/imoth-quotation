@@ -220,6 +220,13 @@ def compute_premium(
         lines.append(PremiumLine(f"Passenger Legal Liability ({pll_seats} seats @ {motor_class['pll_per_seat']:,.0f})", pll_amount))
         subtotal += pll_amount
 
+    courtesy_days = options.get("courtesy_days")
+    if courtesy_days:
+        opt = next((o for o in (motor_class.get("courtesy_car_options") or []) if int(o["days"]) == int(courtesy_days)), None)
+        if opt is not None:
+            lines.append(PremiumLine(f"Courtesy Car ({opt['days']} days)", float(opt["premium"])))
+            subtotal += float(opt["premium"])
+
     levies = subtotal * levy_rate
     total = subtotal + levies + stamp_duty
 
