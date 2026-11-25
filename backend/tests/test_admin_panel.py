@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import storage_service
+from auth_helpers import login_headers
 
 client = TestClient(app)
 
@@ -146,8 +147,7 @@ def test_last_active_super_admin_guard_survives_a_reduction_sequence(admin_heade
     assert create.status_code == 201, create.text
     second_super = create.json()
 
-    login2 = client.post("/api/auth/login", json={"email": second_super["email"], "password": "SecondSuper1"})
-    headers2 = {"Authorization": f"Bearer {login2.json()['access_token']}"}
+    headers2 = login_headers(second_super["email"], "SecondSuper1")
 
     me = client.get("/api/auth/me", headers=admin_headers).json()
     # Two active Super Admins exist, so demoting the bootstrap one from the
@@ -201,8 +201,7 @@ def test_user_management_requires_super_admin_not_just_admin(admin_headers):
         headers=admin_headers,
     )
     plain_admin = create.json()
-    login = client.post("/api/auth/login", json={"email": plain_admin["email"], "password": "LongEnough1"})
-    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    headers = login_headers(plain_admin["email"], "LongEnough1")
 
     resp = client.post(
         "/api/admin/users",
@@ -938,8 +937,7 @@ def test_settings_write_requires_super_admin(admin_headers):
         headers=admin_headers,
     )
     plain_admin = create.json()
-    login = client.post("/api/auth/login", json={"email": plain_admin["email"], "password": "LongEnough1"})
-    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    headers = login_headers(plain_admin["email"], "LongEnough1")
 
     # Read is allowed for any admin role...
     read_resp = client.get("/api/admin/settings", headers=headers)

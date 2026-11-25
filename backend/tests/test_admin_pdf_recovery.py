@@ -22,7 +22,7 @@ def test_missing_pdf_rebuilt_from_saved_quote(monkeypatch, missing_record):
     monkeypatch.setattr(router, '_company_settings', lambda _: {})
     monkeypatch.setattr(router, 'get_setting', lambda *_: [])
     monkeypatch.setattr(router.audit_service, 'record', Mock())
-    response = router.download_pdf(quote.id, db, SimpleNamespace(id=uuid.uuid4(), email='admin@example.com'))
+    response = router.download_pdf(quote.id, db, SimpleNamespace(id=uuid.uuid4(), email='admin@example.com', role='ADMIN'))
     assert response.body == b'%PDF-rebuilt'
     assert 'KAA123A' in response.headers['content-disposition']
     assert render.call_args.kwargs['quotation'] is quote

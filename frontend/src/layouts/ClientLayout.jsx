@@ -32,6 +32,9 @@ export default function ClientLayout() {
             <Link className="nav-link" to="/#retrieve">
               Retrieve Quote
             </Link>
+            <Link className="nav-link" to="/agent/login">
+              Agents
+            </Link>
             <a className="nav-link" href={`mailto:${SUPPORT_EMAIL}`}>
               Need Help?
             </a>

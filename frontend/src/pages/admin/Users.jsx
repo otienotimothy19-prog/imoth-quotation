@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { api, errorMessage } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 
-const ROLES = ["SUPER_ADMIN", "ADMIN", "STAFF"];
+const ROLES = ["SUPER_ADMIN", "ADMIN", "STAFF", "AGENT"];
+
+// A self-registered agent who has never been approved (and so never logged in).
+const isPendingAgent = (u) => u.role === "AGENT" && !u.is_active && !u.last_login_at;
+const isLocked = (u) => !!u.locked_until && new Date(u.locked_until) > new Date();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Users() {
@@ -75,6 +79,43 @@ export default function Users() {
     }
   }
 
+  async function approveAgent(u) {
+    setError("");
+    setStatus("");
+    setBusyId(u.id);
+    try {
+      await api.post(`/api/admin/users/${u.id}/approve`);
+      setStatus(`${u.full_name} approved. They can now log in to the agent app.`);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Could not approve this agent."));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const pendingAgents = users.filter(isPendingAgent);
+
+  async function securityAction(u, action) {
+    const labels = {
+      unlock: { url: "unlock", done: `${u.full_name}'s account unlocked.` },
+      revoke: { url: "revoke-sessions", done: `${u.full_name} has been signed out on all devices.` },
+    };
+    if (action === "revoke" && !window.confirm(`Sign ${u.full_name} out on every device? They'll need to log in again (with a login code).`)) return;
+    setError("");
+    setStatus("");
+    setBusyId(u.id);
+    try {
+      await api.post(`/api/admin/users/${u.id}/${labels[action].url}`);
+      setStatus(labels[action].done);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Could not update this user."));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function changeRole(u, role) {
     if (u.id === me.id || role === u.role) return;
     if (isLastActiveSuperAdmin(u) && role !== "SUPER_ADMIN") {
@@ -116,7 +157,49 @@ export default function Users() {
 
       {error && <div className="alert alert-error">{error}</div>}
       {status && <div className="alert alert-success">{status}</div>}
-      {!canManage && <div className="alert alert-info">Only Super Admins may manage users.</div>}
+      {!canManage && <div className="alert alert-info">Only Super Admins may manage users. Admins can approve new agents.</div>}
+
+      {pendingAgents.length > 0 && (
+        <div className="card" style={{ marginBottom: 16, borderLeft: "4px solid var(--imoth-red)" }}>
+          <h2 style={{ fontSize: 15, color: "var(--imoth-blue)", marginBottom: 10 }}>
+            Agents awaiting approval ({pendingAgents.length})
+          </h2>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Signed up</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingAgents.map((u) => (
+                  <tr key={u.id}>
+                    <td>{u.full_name}</td>
+                    <td>{u.email}</td>
+                    <td>{u.phone || "—"}</td>
+                    <td>{u.created_at ? new Date(u.created_at).toLocaleDateString("en-GB") : "—"}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        disabled={busyId === u.id}
+                        aria-busy={busyId === u.id}
+                        onClick={() => approveAgent(u)}
+                      >
+                        {busyId === u.id ? <span className="spinner" /> : "Approve"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {showAdd && (
         <div className="card" style={{ marginBottom: 16 }}>
@@ -164,6 +247,7 @@ export default function Users() {
               <tr>
                 <th>Name</th>
                 <th>Email</th>
+                <th>Phone</th>
                 <th>Role</th>
                 <th>Status</th>
                 {canManage && <th></th>}
@@ -180,6 +264,7 @@ export default function Users() {
                       {isSelf && <span className="hint" style={{ marginLeft: 6 }}>(you)</span>}
                     </td>
                     <td>{u.email}</td>
+                    <td>{u.phone || "—"}</td>
                     <td>
                       {canManage ? (
                         <select
@@ -200,7 +285,24 @@ export default function Users() {
                       )}
                     </td>
                     <td>
-                      <span className={`badge ${u.is_active ? "badge-green" : "badge-gray"}`}>{u.is_active ? "Active" : "Disabled"}</span>
+                      {isPendingAgent(u) ? (
+                        <span className="badge badge-amber">Pending approval</span>
+                      ) : (
+                        <span className={`badge ${u.is_active ? "badge-green" : "badge-gray"}`}>{u.is_active ? "Active" : "Disabled"}</span>
+                      )}
+                      {isLocked(u) && (
+                        <span className="badge badge-red" style={{ marginLeft: 6 }} title={`Locked until ${new Date(u.locked_until).toLocaleTimeString()}`}>
+                          Locked
+                        </span>
+                      )}
+                      {u.must_change_password && <div className="hint" style={{ marginTop: 4 }}>Must set own password</div>}
+                      {isLocked(u) && (
+                        <div style={{ marginTop: 6 }}>
+                          <button type="button" className="btn btn-ghost btn-sm" disabled={busyId === u.id} onClick={() => securityAction(u, "unlock")}>
+                            Unlock
+                          </button>
+                        </div>
+                      )}
                     </td>
                     {canManage && (
                       <td>
@@ -220,6 +322,18 @@ export default function Users() {
                         >
                           {busyId === u.id ? <span className="spinner spinner-dark" /> : u.is_active ? "Disable" : "Enable"}
                         </button>
+                        {!isSelf && u.is_active && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            style={{ marginLeft: 6 }}
+                            disabled={busyId === u.id}
+                            title="End this user's sessions on every device"
+                            onClick={() => securityAction(u, "revoke")}
+                          >
+                            Sign out everywhere
+                          </button>
+                        )}
                       </td>
                     )}
                   </tr>
@@ -227,7 +341,7 @@ export default function Users() {
               })}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={canManage ? 5 : 4} style={{ textAlign: "center", color: "var(--muted)" }}>
+                  <td colSpan={canManage ? 6 : 5} style={{ textAlign: "center", color: "var(--muted)" }}>
                     No users found.
                   </td>
                 </tr>

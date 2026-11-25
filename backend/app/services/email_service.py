@@ -36,12 +36,35 @@ def _send_smtp(*, to_email: str, subject: str, body: str, attachments: list[tupl
     for filename, content in attachments:
         msg.add_attachment(content, maintype="application", subtype="pdf", filename=filename)
 
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
-        if settings.SMTP_USE_TLS:
+    # Port 465 is SSL from the first byte (Zoho/Gmail "SSL" setting);
+    # anything else (normally 587) upgrades with STARTTLS.
+    if settings.SMTP_PORT == 465:
+        connection = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20)
+    else:
+        connection = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20)
+    with connection as smtp:
+        if settings.SMTP_USE_TLS and settings.SMTP_PORT != 465:
             smtp.starttls()
         if settings.SMTP_USERNAME:
             smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
         smtp.send_message(msg)
+
+
+def send_login_code(*, to_email: str, full_name: str, code: str, valid_minutes: int) -> None:
+    """Emails a one-time login code. Raises on failure so the login step can
+    tell the user. Without SMTP outside production, the code is written to
+    the server log so local development still works."""
+    if not settings.SMTP_HOST and not settings.is_production:
+        logger.warning("SMTP not configured -- login code for %s is %s (development only)", to_email, code)
+        return
+    body = (
+        f"Hello {full_name},\n\n"
+        f"Your Imoth login code is: {code}\n\n"
+        f"It expires in {valid_minutes} minutes. If you did not just try to log in, "
+        "someone may know your password -- please change it and tell Imoth.\n\n"
+        "Imoth Insurance Brokers Limited"
+    )
+    _send_smtp(to_email=to_email, subject=f"Your Imoth login code: {code}", body=body, attachments=[])
 
 
 def send_documents_email(

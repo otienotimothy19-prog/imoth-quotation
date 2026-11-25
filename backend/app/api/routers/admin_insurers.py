@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_client_ip, require_admin, require_any_staff
+from app.api.deps import get_client_ip, require_admin, require_quote_creator
 from app.database import get_db
 from app.models.enums import ActorType
 from app.models.insurer_rate import Insurer
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/admin/insurers", tags=["admin-insurers"])
 
 
 @router.get("", response_model=list[InsurerOut])
-def list_insurers(db: Session = Depends(get_db), user: User = Depends(require_any_staff)):
+def list_insurers(db: Session = Depends(get_db), user: User = Depends(require_quote_creator)):
     return db.query(Insurer).order_by(Insurer.name).all()
 
 

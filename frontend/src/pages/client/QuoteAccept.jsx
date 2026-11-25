@@ -33,7 +33,7 @@ export default function QuoteAccept() {
         include_quotation: true,
         include_risk_note: false,
       });
-      setEmailStatus(res.data.status === "SENT" ? "Sent!" : `Failed: ${res.data.error}`);
+      setEmailStatus(res.data.status === "SENT" ? `Sent to ${res.data.recipient}` : `Failed: ${res.data.error}`);
     } catch (err) {
       setEmailStatus(errorMessage(err));
     } finally {
@@ -159,6 +159,9 @@ export default function QuoteAccept() {
                 Send
               </button>
             </div>
+            <p className="hint" style={{ marginTop: 6 }}>
+              For your security, documents are always sent to the email address already on your quotation. The address above is only used if none is on file.
+            </p>
             {emailStatus && <div className="hint" style={{ marginTop: 6 }}>{emailStatus}</div>}
           </div>
         )}

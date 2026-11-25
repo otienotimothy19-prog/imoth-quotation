@@ -1760,6 +1760,7 @@ table tr:nth-child(even) td {
   }
   .admin-sidebar {
     width: auto;
+    align-self: stretch;
     flex-direction: row;
     align-items: center;
     padding: 12px 14px;

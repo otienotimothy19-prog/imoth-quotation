@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.limiter import limiter
+from app.core.masking import mask_email
 from app.database import get_db
 from app.models.documents_email_audit import Document
 from app.models.enums import ActorType, DocumentType
@@ -42,7 +43,9 @@ def list_documents(quotation_id: uuid.UUID, db: Session = Depends(get_db)):
     return {
         "quotation": _doc_status("quotation", quotation),
         "risk_note": _doc_status("risk_note", quotation),
-        "client_email": quotation.client.email,
+        # Masked: anyone holding the quote link can call this endpoint.
+        "client_email_masked": mask_email(quotation.client.email),
+        "has_email_on_file": bool(quotation.client.email),
     }
 
 
@@ -67,9 +70,17 @@ def email_documents(request: Request, quotation_id: uuid.UUID, payload: EmailSen
     if quotation is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quotation not found")
 
-    to_email = payload.to_email or quotation.client.email
-    if not to_email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No recipient email available; please provide one")
+    # Customer documents contain personal details, and this endpoint is
+    # reachable by anyone holding the quote link -- so they are only ever
+    # sent to the customer's own email on file. A typed address is used only
+    # when none is on file yet, and is then saved so it can't be changed later.
+    if quotation.client.email:
+        to_email = quotation.client.email
+    elif payload.to_email:
+        to_email = str(payload.to_email).strip().lower()
+        quotation.client.email = to_email
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please enter the email address to send to")
 
     documents: list[Document] = []
     parts = []
@@ -126,4 +137,4 @@ def email_documents(request: Request, quotation_id: uuid.UUID, payload: EmailSen
     )
     db.commit()
 
-    return {"status": log.status.value, "recipient": to_email, "error": log.error_message}
+    return {"status": log.status.value, "recipient": mask_email(to_email), "error": log.error_message}

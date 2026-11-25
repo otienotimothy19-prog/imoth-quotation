@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_client_ip, require_admin, require_super_admin
-from app.core.security import hash_password
+from app.core.security import hash_password, password_problem
 from app.database import get_db
 from app.models.enums import ActorType, UserRole
 from app.models.user import User
@@ -29,6 +29,9 @@ def list_users(db: Session = Depends(get_db), user: User = Depends(require_admin
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def create_user(payload: UserCreate, request: Request, db: Session = Depends(get_db), user: User = Depends(require_super_admin)):
     email = payload.email.lower()
+    problem = password_problem(payload.password, email=email)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=problem)
     if db.query(User).filter_by(email=email).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A user with this email already exists")
 
@@ -38,6 +41,8 @@ def create_user(payload: UserCreate, request: Request, db: Session = Depends(get
         full_name=payload.full_name,
         role=payload.role,
         is_active=True,
+        # The admin chose this password, so the user must replace it at first login.
+        must_change_password=True,
     )
     db.add(new_user)
     db.flush()
@@ -80,7 +85,14 @@ def update_user(user_id: uuid.UUID, payload: UserUpdate, request: Request, db: S
     if "password" in data:
         password = data.pop("password")
         if password:
+            problem = password_problem(password, email=target.email)
+            if problem:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=problem)
+            # An admin-set password is temporary, and resetting it ends the
+            # user's existing sessions.
             target.password_hash = hash_password(password)
+            target.must_change_password = True
+            target.token_version += 1
     for k, v in data.items():
         setattr(target, k, v)
 
@@ -88,6 +100,61 @@ def update_user(user_id: uuid.UUID, payload: UserUpdate, request: Request, db: S
         db, actor_type=ActorType.ADMIN, actor_label=user.email, actor_id=user.id,
         action="admin_user_changed", entity_type="user", entity_id=str(target.id),
         previous_value={k: str(v) for k, v in previous.items()}, new_value={k: str(v) for k, v in data.items()},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(target)
+    return target
+
+
+@router.post("/{user_id}/approve", response_model=UserOut)
+def approve_agent(user_id: uuid.UUID, request: Request, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    """Activates a self-registered agent account so the agent can log in.
+    Any admin may do this (unlike general user edits, which are Super
+    Admin only), and it only ever applies to AGENT accounts."""
+    target = db.get(User, user_id)
+    if target is None or target.role != UserRole.AGENT:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+    if not target.is_active:
+        target.is_active = True
+        audit_service.record(
+            db, actor_type=ActorType.ADMIN, actor_label=user.email, actor_id=user.id,
+            action="agent_approved", entity_type="user", entity_id=str(target.id),
+            new_value={"is_active": "True"}, ip_address=get_client_ip(request),
+        )
+        db.commit()
+        db.refresh(target)
+    return target
+
+
+@router.post("/{user_id}/revoke-sessions", response_model=UserOut)
+def revoke_sessions(user_id: uuid.UUID, request: Request, db: Session = Depends(get_db), user: User = Depends(require_super_admin)):
+    """Signs a user out on every device immediately (e.g. a lost phone)."""
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    target.token_version += 1
+    audit_service.record(
+        db, actor_type=ActorType.ADMIN, actor_label=user.email, actor_id=user.id,
+        action="admin_sessions_revoked", entity_type="user", entity_id=str(target.id),
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(target)
+    return target
+
+
+@router.post("/{user_id}/unlock", response_model=UserOut)
+def unlock(user_id: uuid.UUID, request: Request, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    """Lifts a lockout caused by too many failed login attempts."""
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    target.locked_until = None
+    target.failed_login_count = 0
+    audit_service.record(
+        db, actor_type=ActorType.ADMIN, actor_label=user.email, actor_id=user.id,
+        action="admin_account_unlocked", entity_type="user", entity_id=str(target.id),
         ip_address=get_client_ip(request),
     )
     db.commit()

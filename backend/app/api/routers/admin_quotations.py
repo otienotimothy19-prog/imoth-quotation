@@ -8,12 +8,12 @@ from sqlalchemy.orm import Session, joinedload
 
 from pydantic import BaseModel
 
-from app.api.deps import get_client_ip, require_admin, require_any_staff
+from app.api.deps import get_client_ip, require_admin, require_quote_creator
 from app.database import get_db
 from app.models.client_document import ClientDocumentUpload, ClientUploadStatus, VerificationStatus
 from app.models.client_vehicle import Client, Vehicle
 from app.models.documents_email_audit import AuditLog, Document, EmailLog
-from app.models.enums import ActorType, QuotationSource, QuotationStatus
+from app.models.enums import ActorType, QuotationSource, QuotationStatus, UserRole
 from app.models.insurer_rate import Insurer, RateVersion
 from app.models.quotation import Quotation
 from app.models.user import User
@@ -49,6 +49,8 @@ def _summary(q: Quotation) -> dict:
         "status": q.status.value,
         "total_premium": float(q.total_premium),
         "has_risk_note": q.risk_note is not None,
+        "created_by_name": q.created_by_user.full_name if q.created_by_user else None,
+        "created_by_role": q.created_by_user.role.value if q.created_by_user else None,
         "created_at": q.created_at,
         "generated_at": q.generated_at,
     }
@@ -58,7 +60,7 @@ def _summary(q: Quotation) -> dict:
 def create_quotation(
     payload: GenerateQuotationRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(require_any_staff),
+    user: User = Depends(require_quote_creator),
 ):
     """Lets a staff member (agent) generate a quotation directly -- picking
     the insurer/class themselves for a client on the phone or in person --
@@ -110,6 +112,7 @@ def list_quotations(
             joinedload(Quotation.vehicle),
             joinedload(Quotation.insurer),
             joinedload(Quotation.risk_note),
+            joinedload(Quotation.created_by_user),
         )
     )
     if q:
@@ -205,8 +208,11 @@ def get_quotation_detail(quotation_id: uuid.UUID, db: Session = Depends(get_db),
 
 
 @router.get("/{quotation_id}/pdf")
-def download_pdf(quotation_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(require_any_staff)):
+def download_pdf(quotation_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(require_quote_creator)):
     quotation = _get_full(db, quotation_id)
+    # Agents may only download quotations they generated themselves.
+    if user.role == UserRole.AGENT and quotation.created_by_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quotation not found")
     document = db.get(Document, quotation.pdf_document_id) if quotation.pdf_document_id else None
     content = None
     if document is not None:

@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.client_ip import client_ip
 from app.core.security import decode_access_token, decode_quote_access_token
 from app.database import get_db
 from app.models.enums import UserRole
@@ -13,16 +14,16 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_client_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else None
+    return client_ip(request)
 
 
-def get_current_user(
+def get_current_user_any_state(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
+    """Authenticated user, even one who still has to change a temporary
+    password. Only the auth endpoints (me / change-password / logout) use
+    this directly; everything else goes through get_current_user."""
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
@@ -39,6 +40,20 @@ def get_current_user(
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
 
+    # Tokens issued before a password change / "sign out everywhere" no
+    # longer match the user's current token_version.
+    if payload.get("tv", 0) != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your session has ended. Please log in again.")
+
+    return user
+
+
+PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED"
+
+
+def get_current_user(user: User = Depends(get_current_user_any_state)) -> User:
+    if user.must_change_password:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=PASSWORD_CHANGE_REQUIRED)
     return user
 
 
@@ -54,6 +69,11 @@ def require_roles(*roles: UserRole):
 require_admin = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 require_super_admin = require_roles(UserRole.SUPER_ADMIN)
 require_any_staff = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.STAFF)
+# Staff plus external agents. Use ONLY on endpoints agents genuinely need
+# (creating a quotation, the insurer/class lists, a quotation's PDF), and
+# any of those taking a quotation id must check ownership for agents.
+require_quote_creator = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.STAFF, UserRole.AGENT)
+require_agent = require_roles(UserRole.AGENT)
 
 
 def get_quote_access_subject(

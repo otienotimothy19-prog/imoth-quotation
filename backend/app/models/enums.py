@@ -5,6 +5,10 @@ class UserRole(str, enum.Enum):
     SUPER_ADMIN = "SUPER_ADMIN"
     ADMIN = "ADMIN"
     STAFF = "STAFF"
+    # External insurance agents who self-register through the agent app.
+    # Created inactive; an admin approves (activates) them before first login.
+    # They can only generate quotations and see the ones they created.
+    AGENT = "AGENT"
 
 
 class QuotationStatus(str, enum.Enum):

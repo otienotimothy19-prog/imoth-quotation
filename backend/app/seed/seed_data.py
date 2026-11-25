@@ -126,6 +126,8 @@ def seed_bootstrap_admin(db: Session) -> None:
         full_name="Imoth Super Admin",
         role=UserRole.SUPER_ADMIN,
         is_active=True,
+        # Bootstrap password comes from config; it must be replaced at first login.
+        must_change_password=True,
     )
     db.add(user)
     db.commit()
