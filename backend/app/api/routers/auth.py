@@ -11,8 +11,10 @@ Wrong passwords and wrong codes both count towards an account lockout
 Every token carries the user's token_version; bumping it (password change,
 "sign out everywhere") ends every existing session at once.
 """
+import hashlib
 import logging
 import math
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -35,15 +37,19 @@ from app.core.security import (
 from app.database import get_db
 from app.models.enums import ActorType, UserRole
 from app.models.login_challenge import LoginChallenge
+from app.models.password_reset import PasswordResetToken
 from app.models.user import User
 from app.schemas.auth import (
     AgentSignupRequest,
     AgentSignupResponse,
     ChangePasswordRequest,
+    ForgotPasswordRequest,
     LoginRequest,
     LoginResponse,
     OtpResendRequest,
     OtpVerifyRequest,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     TokenResponse,
     UserOut,
 )
@@ -284,6 +290,91 @@ def resend_otp(request: Request, payload: OtpResendRequest, db: Session = Depend
     _audit(db, request, user, "login_code_resent")
     db.commit()
     return _otp_response(challenge, user)
+
+
+FORGOT_PASSWORD_REPLY = (
+    "If an account exists for that email, we've sent a link to reset the password. "
+    "Check your inbox (and spam folder)."
+)
+RESET_LINK_INVALID = "This reset link is invalid or has expired. Please request a new one."
+
+
+def _reset_token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+@router.post("/forgot-password")
+@limiter.limit(settings.RATE_LIMIT_PASSWORD_RESET)
+def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Emails a one-time reset link. Always gives the same reply, whether or
+    not the email has an account, so it can't be used to find out who has one."""
+    email = payload.email.lower()
+    user = db.query(User).filter(User.email == email).one_or_none()
+    if user is None or not user.is_active:
+        _audit(db, request, user, "password_reset_requested_ignored", label=email,
+               new_value={"reason": "no_account" if user is None else "inactive"})
+        db.commit()
+        return {"message": FORGOT_PASSWORD_REPLY}
+
+    # Any earlier unused link stops working once a new one is issued.
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None)
+    ).update({PasswordResetToken.used_at: _now()}, synchronize_session=False)
+
+    token = secrets.token_urlsafe(32)
+    db.add(PasswordResetToken(
+        user_id=user.id,
+        token_hash=_reset_token_hash(token),
+        expires_at=_now() + timedelta(minutes=settings.PASSWORD_RESET_TTL_MINUTES),
+        ip_address=get_client_ip(request),
+    ))
+    # The token travels in the URL fragment (#token=...), which browsers never
+    # send to the server, so it stays out of access logs and referrers.
+    link = f"{settings.PUBLIC_APP_URL.rstrip('/')}/reset-password#token={token}"
+    try:
+        email_service.send_password_reset(
+            to_email=user.email, full_name=user.full_name, link=link,
+            valid_minutes=settings.PASSWORD_RESET_TTL_MINUTES,
+        )
+    except Exception:
+        logger.exception("Could not email password reset link to %s", user.email)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="We couldn't send the reset email right now. Please try again shortly or contact Imoth.",
+        )
+    _audit(db, request, user, "password_reset_requested")
+    db.commit()
+    return {"message": FORGOT_PASSWORD_REPLY}
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+@limiter.limit(settings.RATE_LIMIT_PASSWORD_RESET)
+def reset_password(request: Request, payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Sets a new password from a reset link. Ends every existing session and
+    clears any lockout; the user then logs in normally (with a login code)."""
+    record = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == _reset_token_hash(payload.token)
+    ).one_or_none()
+    if record is None or record.used_at is not None or record.expires_at <= _now():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=RESET_LINK_INVALID)
+    user = record.user
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=RESET_LINK_INVALID)
+    problem = password_problem(payload.new_password, email=user.email)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=problem)
+
+    record.used_at = _now()
+    user.password_hash = hash_password(payload.new_password)
+    user.must_change_password = False
+    user.password_changed_at = _now()
+    user.failed_login_count = 0
+    user.locked_until = None
+    user.token_version += 1
+    _audit(db, request, user, "password_reset_completed")
+    db.commit()
+    return ResetPasswordResponse(message="Your password has been changed. You can now log in.", role=user.role)
 
 
 @router.post("/change-password", response_model=TokenResponse)

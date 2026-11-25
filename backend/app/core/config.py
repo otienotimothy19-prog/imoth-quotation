@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     LOGIN_OTP_RESEND_COOLDOWN_SECONDS: int = 30
     RATE_LIMIT_OTP: str = "10/minute"
 
+    # "Forgot password" links: valid for this long, single use.
+    PASSWORD_RESET_TTL_MINUTES: int = 30
+    RATE_LIMIT_PASSWORD_RESET: str = "5/minute"
+
     # Account lockout after repeated wrong passwords / codes.
     LOGIN_MAX_FAILED_ATTEMPTS: int = 5
     LOGIN_LOCKOUT_MINUTES: int = 15

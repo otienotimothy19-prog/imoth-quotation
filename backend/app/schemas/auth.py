@@ -32,6 +32,20 @@ class OtpResendRequest(BaseModel):
     challenge_id: uuid.UUID
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    new_password: str = Field(min_length=8, max_length=200)
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str
+    role: UserRole
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=1, max_length=200)
     new_password: str = Field(min_length=8, max_length=200)
