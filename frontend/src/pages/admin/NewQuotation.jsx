@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, downloadBlob, errorMessage, quoteMoney } from "../../api/client";
+import VehicleMakeSelect from "../../components/VehicleMakeSelect";
 
 const CATEGORY_LABELS = {
   private: "Private",
@@ -248,8 +249,8 @@ export default function NewQuotation() {
         </div>
         <div className="row2">
           <div>
-            <label>Make (optional)</label>
-            <input value={form.make} onChange={(e) => update({ make: e.target.value })} placeholder="e.g. Toyota" />
+            <label htmlFor="nq-make">Make (optional)</label>
+            <VehicleMakeSelect id="nq-make" value={form.make} onChange={(make) => update({ make })} />
           </div>
           <div>
             <label>Model (optional)</label>
