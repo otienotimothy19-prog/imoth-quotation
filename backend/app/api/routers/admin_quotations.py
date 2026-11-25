@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from pydantic import BaseModel
 
-from app.api.deps import get_client_ip, require_admin, require_any_staff
+from app.api.deps import get_client_ip, require_admin, require_quote_creator
 from app.database import get_db
 from app.models.client_document import ClientDocumentUpload, ClientUploadStatus, VerificationStatus
 from app.models.client_vehicle import Client, Vehicle
@@ -60,7 +60,7 @@ def _summary(q: Quotation) -> dict:
 def create_quotation(
     payload: GenerateQuotationRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(require_any_staff),
+    user: User = Depends(require_quote_creator),
 ):
     """Lets a staff member (agent) generate a quotation directly -- picking
     the insurer/class themselves for a client on the phone or in person --
@@ -208,7 +208,7 @@ def get_quotation_detail(quotation_id: uuid.UUID, db: Session = Depends(get_db),
 
 
 @router.get("/{quotation_id}/pdf")
-def download_pdf(quotation_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(require_any_staff)):
+def download_pdf(quotation_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(require_quote_creator)):
     quotation = _get_full(db, quotation_id)
     # Agents may only download quotations they generated themselves.
     if user.role == UserRole.AGENT and quotation.created_by_id != user.id:

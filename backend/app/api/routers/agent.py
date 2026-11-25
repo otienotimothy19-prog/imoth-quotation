@@ -1,5 +1,5 @@
 """Endpoints for the agent app. Agents create quotations through the
-shared /api/admin/quotations endpoint (require_any_staff) and read the
+shared /api/admin/quotations endpoint (require_quote_creator) and read the
 insurer/class lists from the admin routers; everything here is scoped to
 the logged-in agent's own quotations."""
 from fastapi import APIRouter, Depends, Query

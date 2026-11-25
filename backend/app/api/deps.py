@@ -68,10 +68,11 @@ def require_roles(*roles: UserRole):
 
 require_admin = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 require_super_admin = require_roles(UserRole.SUPER_ADMIN)
-# Everyone who may generate quotations (and read the insurer/class lists
-# needed to do so). Agents are included but only ever see their own
-# quotations -- see the ownership checks in admin_quotations/agent routers.
-require_any_staff = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.STAFF, UserRole.AGENT)
+require_any_staff = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.STAFF)
+# Staff plus external agents. Use ONLY on endpoints agents genuinely need
+# (creating a quotation, the insurer/class lists, a quotation's PDF), and
+# any of those taking a quotation id must check ownership for agents.
+require_quote_creator = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.STAFF, UserRole.AGENT)
 require_agent = require_roles(UserRole.AGENT)
 
 
