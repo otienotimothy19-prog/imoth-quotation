@@ -156,6 +156,11 @@ def list_eligible_options(
     return results, ineligible
 
 
+# Shown on the PDF and in lists when a staff member or agent prices a
+# quotation without entering the client's details.
+CLIENT_TO_BE_CONFIRMED = "To be confirmed"
+
+
 def get_or_create_client(db: Session, client_in: ClientIn) -> Client:
     client = (
         db.execute(select(Client).where(Client.phone == client_in.phone))
@@ -226,7 +231,7 @@ def get_quotation_full(db: Session, quotation_id: uuid.UUID) -> Quotation | None
 def generate_quotation(
     db: Session,
     *,
-    client_in: ClientIn,
+    client_in: ClientIn | None,
     vehicle_in: VehicleIn,
     insurer_id: uuid.UUID,
     motor_class_id: uuid.UUID,
@@ -276,7 +281,14 @@ def generate_quotation(
     )
     result = compute_premium(class_dict, sum_insured, engine_opts, levy_rate, stamp_duty)
 
-    client = get_or_create_client(db, client_in)
+    if client_in is None:
+        # Never matched to an existing client: each unnamed quotation gets
+        # its own placeholder record so they can't merge into one another.
+        client = Client(full_name=CLIENT_TO_BE_CONFIRMED, phone="")
+        db.add(client)
+        db.flush()
+    else:
+        client = get_or_create_client(db, client_in)
     vehicle = get_or_create_vehicle(db, client, vehicle_in)
 
     quotation_number = numbering_service.generate_quotation_number(db)

@@ -356,3 +356,11 @@ class EmailSendRequest(BaseModel):
     to_email: EmailStr | None = None  # defaults to client's saved email if omitted
     include_quotation: bool = True
     include_risk_note: bool = False
+
+
+class AdminGenerateQuotationRequest(GenerateQuotationRequest):
+    """Staff/agent-generated quotations (New Quotation form). Client details
+    are optional there: the quotation can be priced from the vehicle alone,
+    and is then issued to "To be confirmed" until the client is known."""
+
+    client: ClientIn | None = None
