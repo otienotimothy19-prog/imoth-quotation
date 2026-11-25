@@ -104,3 +104,29 @@ def test_staff_quotation_without_client_details(admin_headers):
     # The public client journey still requires client details.
     public = client.post("/api/quotes/generate", json=body)
     assert public.status_code == 422
+
+
+def test_compare_rates_for_staff_and_agents(admin_headers):
+    """Staff/agents compare every insurer's price without creating any
+    customer offers; customers and anonymous callers can't use it."""
+    from app.database import SessionLocal
+    from app.models.quote_selection import QuoteSelection
+
+    year = datetime.now(timezone.utc).year
+    body = {"vehicle": {"registration_no": "TBA", "year_of_manufacture": year - 3},
+            "category": "private", "sum_insured": 1300000}
+    with SessionLocal() as db:
+        offers_before = db.query(QuoteSelection).count()
+
+    resp = client.post("/api/admin/quotations/compare", json=body, headers=admin_headers)
+    assert resp.status_code == 200, resp.text
+    options = resp.json()["options"]
+    assert len(options) >= 2
+    totals = [o["total_premium"] for o in options]
+    assert totals == sorted(totals)
+    assert len({o["insurer_id"] for o in options}) >= 2
+
+    with SessionLocal() as db:
+        assert db.query(QuoteSelection).count() == offers_before
+
+    assert client.post("/api/admin/quotations/compare", json=body).status_code == 401
