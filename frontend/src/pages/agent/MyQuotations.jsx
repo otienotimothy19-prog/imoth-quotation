@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, dateFmt, downloadBlob, errorMessage, money } from "../../api/client";
+import { api, dateFmt, downloadBlob, errorMessage, money, serverFilename } from "../../api/client";
 
 const PAGE_SIZE = 25;
 
@@ -32,7 +32,7 @@ export default function MyQuotations() {
     setDownloadingId(it.id);
     try {
       const res = await api.get(`/api/admin/quotations/${it.id}/pdf`, { responseType: "blob" });
-      downloadBlob(res.data, `Imoth-Motor-Quote-${it.insurer_name}-${it.quotation_number}.pdf`);
+      downloadBlob(res.data, serverFilename(res, `Imoth_Quote_${it.quotation_number}.pdf`));
     } catch (err) {
       setError(errorMessage(err, "Could not download the PDF."));
     } finally {

@@ -230,7 +230,7 @@ def download_pdf(quotation_id: uuid.UUID, db: Session = Depends(get_db), user: U
             footer_text=get_setting(db, "pdf.footer_text"),
             conditions=get_setting(db, "quotation.conditions"),
         )
-    filename = storage_service.sanitize_filename(f"{quotation.vehicle.registration_no}-{quotation.quotation_number}.pdf")
+    filename = storage_service.sanitize_filename(pdf_service.quotation_pdf_filename(quotation))
 
     audit_service.record(
         db, actor_type=ActorType.ADMIN, actor_label=user.email, actor_id=user.id,

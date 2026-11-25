@@ -125,6 +125,12 @@ export function fieldErrors(err) {
 // Downloads an authenticated blob response (from an axios call made with
 // responseType: "blob") as a file, without ever putting the admin bearer
 // token in a plain <a href> (protected endpoints 401 on a bare navigation).
+// The file name the server chose (Content-Disposition), e.g.
+// Imoth_Quote_CIC_General_Insurance_Ltd_KDW534A_25_November_2026.pdf
+export function serverFilename(res, fallback) {
+  return res?.headers?.["content-disposition"]?.match(/filename="([^"]+)"/)?.[1] || fallback;
+}
+
 export function downloadBlob(blob, filename) {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
