@@ -121,6 +121,8 @@ export default function NewQuotation() {
   const [comparison, setComparison] = useState(null);
   // Extras ticked on each compared insurer row, keyed by insurer+class.
   const [rowExtras, setRowExtras] = useState({});
+  // Which compared row is currently being turned into a quotation.
+  const [generatingKey, setGeneratingKey] = useState(null);
   // Set when the agent picks an insurer from the comparison: the class to
   // select once that insurer's classes have loaded, and option values
   // (institutional details) to keep when the class changes.
@@ -248,7 +250,7 @@ export default function NewQuotation() {
     return subtotal + subtotal * (comparison?.levy_rate ?? 0) + o.stamp_duty;
   }
 
-  function chooseOption(option) {
+  function openInPicker(option) {
     setError("");
     const picked = rowExtras[rowKey(option)] || {};
     carryRef.current = {
@@ -274,6 +276,53 @@ export default function NewQuotation() {
       setInsurerId(option.insurer_id);
     }
     setMode("pick");
+  }
+
+  // "Generate quote" on a compared insurer: creates the quotation straight
+  // away with that row's extras -- no second step.
+  async function generateFromOption(option) {
+    setError("");
+    if (option.tonnage_required) {
+      openInPicker(option);
+      setError("This insurer's product needs the vehicle's tonnage. Enter it below, then generate the quote.");
+      return;
+    }
+    if (!form.regNo.trim()) return setError("Enter the registration number to generate the quote.");
+    if (!form.yom) return setError("Enter the year of manufacture to generate the quote.");
+    const picked = rowExtras[rowKey(option)] || {};
+    const payload = {
+      vehicle: {
+        registration_no: form.regNo.trim(),
+        year_of_manufacture: Number(form.yom),
+        make: form.make.trim() || null,
+        model: form.model.trim() || null,
+      },
+      insurer_id: option.insurer_id,
+      motor_class_id: option.motor_class_id,
+      commercial_use: cmp.category === "commercial" ? cmp.commercialUse : null,
+      institution_type: cmpInstitutional ? cmp.institutionType : null,
+      institutional_vehicle_type: cmpInstitutional ? cmp.institutionalVehicleType : null,
+      passenger_category: cmpInstitutional ? cmp.passengerCategory : null,
+      // Same sum insured the comparison was priced with.
+      sum_insured: Number(form.sumInsured || 0),
+      options: {
+        ep: !!picked.ep,
+        pvt: !!picked.pvt,
+        courtesy_days: picked.courtesyDays ? Number(picked.courtesyDays) : null,
+        pll_seats: cmpInstitutional ? Number(cmp.seats) : 0,
+      },
+      amount_paid: Number(form.amountPaid || 0),
+    };
+    setGeneratingKey(rowKey(option));
+    try {
+      const res = await api.post("/api/admin/quotations", payload);
+      setResult(res.data);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      setError(errorMessage(err, "Could not generate this quotation."));
+    } finally {
+      setGeneratingKey(null);
+    }
   }
 
   async function submit(e) {
@@ -406,7 +455,7 @@ export default function NewQuotation() {
     <div>
       <h1 style={{ fontSize: 20, color: "var(--imoth-blue)" }}>New Quotation</h1>
       <p className="hint" style={{ marginBottom: 16 }}>
-        Compare every insurer's rate for the vehicle, choose one, then generate the quotation.
+        Compare every insurer's rate for the vehicle, then generate the quote for the one you want.
       </p>
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -511,7 +560,7 @@ export default function NewQuotation() {
                 ) : (
                   <>
                     <div className="hint" style={{ marginBottom: 8 }}>
-                      {comparison.options.length} insurer{comparison.options.length === 1 ? "" : "s"} · vehicle age {comparison.calculated_age_years} yrs · tick extras on any insurer to see its price with them.
+                      {comparison.options.length} insurer{comparison.options.length === 1 ? "" : "s"} · vehicle age {comparison.calculated_age_years} yrs · tick extras on any insurer, then generate its quote.
                     </div>
                     <div style={{ overflowX: "auto" }}>
                       <table>
@@ -539,7 +588,16 @@ export default function NewQuotation() {
                                 <div className="hint">Basic {quoteMoney(o.basic_premium)}</div>
                               </td>
                               <td>
-                                <button type="button" className="btn btn-primary btn-sm" onClick={() => chooseOption(o)}>Choose</button>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  style={{ whiteSpace: "nowrap" }}
+                                  disabled={generatingKey !== null}
+                                  aria-busy={generatingKey === rowKey(o)}
+                                  onClick={() => generateFromOption(o)}
+                                >
+                                  {generatingKey === rowKey(o) ? <span className="spinner" /> : "Generate quote"}
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -719,9 +777,11 @@ export default function NewQuotation() {
         <input type="number" min="0" step="100" value={form.amountPaid} onChange={(e) => update({ amountPaid: e.target.value })} />
         <div className="hint">Leave as 0 for a fresh quotation. Enter a part-payment to show the outstanding balance on the quote.</div>
 
-        <button className="btn btn-primary" type="submit" disabled={submitting} style={{ marginTop: 20 }}>
-          {submitting ? "Generating…" : "Generate Quote"}
-        </button>
+        {mode === "pick" && (
+          <button className="btn btn-primary" type="submit" disabled={submitting} style={{ marginTop: 20 }}>
+            {submitting ? "Generating…" : "Generate Quote"}
+          </button>
+        )}
       </form>
     </div>
   );
