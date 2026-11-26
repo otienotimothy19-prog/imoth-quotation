@@ -1274,21 +1274,22 @@ th.sortable:hover {
   table.stack-mobile tbody tr:hover td {
     background: transparent;
   }
+  /* Label sits above its value, so long insurer names and links wrap
+     within the card instead of overlapping the label. */
   table.stack-mobile td {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
     padding: 9px 0;
     border-bottom: 1px solid var(--c-border);
-    text-align: right;
+    text-align: left;
+    overflow-wrap: anywhere;
+    white-space: normal !important;
   }
   table.stack-mobile tbody tr td:last-child {
     border-bottom: none;
   }
   table.stack-mobile td::before {
     content: attr(data-label);
-    flex: none;
+    display: block;
+    margin-bottom: 4px;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
@@ -1324,6 +1325,13 @@ th.sortable:hover {
     border-radius: 0;
     padding: 0;
     margin-bottom: 0;
+  }
+  table.stack-mobile.kv td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    text-align: right;
   }
   table.stack-mobile.kv td::before {
     content: none;
