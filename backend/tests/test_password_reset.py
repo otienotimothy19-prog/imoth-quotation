@@ -95,6 +95,25 @@ def test_disabled_account_gets_no_email(user, sent, admin_headers):
     assert resp.status_code == 200 and sent == []
 
 
+def test_email_failure_shows_an_error_and_leaves_no_live_link(user, monkeypatch):
+    import uuid as _uuid
+
+    def smtp_down(**kwargs):
+        raise RuntimeError("SMTP unavailable")
+
+    monkeypatch.setattr(email_service, "send_password_reset", smtp_down)
+    resp = client.post("/api/auth/forgot-password", json={"email": user["email"]})
+    assert resp.status_code == 503 and "couldn't send the reset email" in resp.json()["detail"]
+
+    with SessionLocal() as db:
+        live = (
+            db.query(PasswordResetToken)
+            .filter(PasswordResetToken.user_id == _uuid.UUID(user["id"]), PasswordResetToken.used_at.is_(None))
+            .count()
+        )
+    assert live == 0
+
+
 def test_bad_token_rejected():
     resp = client.post("/api/auth/reset-password", json={"token": "x" * 43, "new_password": "BrandNew2026"})
     assert resp.status_code == 400 and "invalid or has expired" in resp.json()["detail"]

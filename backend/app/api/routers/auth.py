@@ -337,6 +337,10 @@ def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Sessio
             valid_minutes=settings.PASSWORD_RESET_TTL_MINUTES,
         )
     except Exception:
+        # Shown to the user on purpose, so they know to try again or contact
+        # Imoth. This reveals that an account exists for this address only when
+        # the email itself fails. The unsent link is rolled back, so nothing
+        # stays usable.
         logger.exception("Could not email password reset link to %s", user.email)
         db.rollback()
         raise HTTPException(
