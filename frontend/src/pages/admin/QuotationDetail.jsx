@@ -226,7 +226,7 @@ export default function QuotationDetail() {
           </div>
           <div className="stack">
           <Card title="Premium breakdown" icon={Receipt}>
-            <table>
+            <table className="stack-mobile kv">
               <tbody>
                 {q.items.map((it, i) => (
                   <tr key={i}>
@@ -266,7 +266,7 @@ export default function QuotationDetail() {
             {documents.all_uploaded ? " — complete." : "."}
           </p>
           <div className="table-wrap">
-          <table>
+          <table className="stack-mobile">
             <thead>
               <tr>
                 <th>Type</th>
@@ -282,12 +282,12 @@ export default function QuotationDetail() {
                 const isBusy = rowBusy === d.id;
                 return (
                   <tr key={d.id} style={d.status !== "ACTIVE" ? { opacity: 0.55 } : undefined}>
-                    <td>{d.label}</td>
-                    <td>{d.original_filename}</td>
-                    <td>
+                    <td data-label="Type">{d.label}</td>
+                    <td data-label="Filename">{d.original_filename}</td>
+                    <td data-label="Status">
                       <span className={`badge ${d.status === "ACTIVE" ? "badge-green" : "badge-gray"}`}>{d.status}</span>
                     </td>
-                    <td>
+                    <td data-label="Verification">
                       <span
                         className={`badge ${
                           d.verification_status === "VERIFIED"
@@ -300,8 +300,8 @@ export default function QuotationDetail() {
                         {d.verification_status}
                       </span>
                     </td>
-                    <td>{dateTimeFmt(d.uploaded_at)}</td>
-                    <td>
+                    <td data-label="Uploaded at">{dateTimeFmt(d.uploaded_at)}</td>
+                    <td data-label="">
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         <button type="button" className="btn btn-secondary btn-sm" disabled={isBusy} onClick={() => downloadDocument(d.id, d.original_filename)}>
                           {isBusy ? <span className="spinner spinner-dark" /> : "Download"}
@@ -323,7 +323,7 @@ export default function QuotationDetail() {
               })}
               {documents.documents.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", color: "var(--muted)" }}>
+                  <td colSpan={6} className="cell-empty" style={{ textAlign: "center", color: "var(--muted)" }}>
                     No documents uploaded yet.
                   </td>
                 </tr>
@@ -337,7 +337,7 @@ export default function QuotationDetail() {
       {tab === "emails" && (
         <div className="card">
           <div className="table-wrap">
-          <table>
+          <table className="stack-mobile">
             <thead>
               <tr>
                 <th>Recipient</th>
@@ -351,14 +351,14 @@ export default function QuotationDetail() {
             <tbody>
               {emails.map((e) => (
                 <tr key={e.id}>
-                  <td>{e.recipient}</td>
-                  <td>{e.subject}</td>
-                  <td>
+                  <td data-label="Recipient">{e.recipient}</td>
+                  <td data-label="Subject">{e.subject}</td>
+                  <td data-label="Status">
                     <span className={`badge ${e.status === "SENT" ? "badge-green" : e.status === "FAILED" ? "badge-red" : "badge-gray"}`}>{e.status}</span>
                   </td>
-                  <td>{dateTimeFmt(e.sent_at)}</td>
-                  <td>{e.initiated_by}</td>
-                  <td>
+                  <td data-label="Sent at">{dateTimeFmt(e.sent_at)}</td>
+                  <td data-label="Initiated by">{e.initiated_by}</td>
+                  <td data-label="">
                     {e.status === "FAILED" && (
                       <button type="button" className="btn btn-secondary btn-sm" disabled={rowBusy === e.id} onClick={() => retryEmail(e.id)}>
                         {rowBusy === e.id ? <span className="spinner spinner-dark" /> : "Retry"}
@@ -369,7 +369,7 @@ export default function QuotationDetail() {
               ))}
               {emails.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", color: "var(--muted)" }}>
+                  <td colSpan={6} className="cell-empty" style={{ textAlign: "center", color: "var(--muted)" }}>
                     No emails sent yet.
                   </td>
                 </tr>
@@ -383,7 +383,7 @@ export default function QuotationDetail() {
       {tab === "audit" && (
         <div className="card">
           <div className="table-wrap">
-          <table>
+          <table className="stack-mobile">
             <thead>
               <tr>
                 <th>Action</th>
@@ -395,15 +395,15 @@ export default function QuotationDetail() {
             <tbody>
               {audit.map((a, i) => (
                 <tr key={i}>
-                  <td>{a.action}</td>
-                  <td>{a.actor_label} ({a.actor_type})</td>
-                  <td>{dateTimeFmt(a.timestamp)}</td>
-                  <td style={{ fontSize: 11, color: "var(--muted)" }}>{JSON.stringify(a.new_value)}</td>
+                  <td data-label="Action">{a.action}</td>
+                  <td data-label="Actor">{a.actor_label} ({a.actor_type})</td>
+                  <td data-label="Timestamp">{dateTimeFmt(a.timestamp)}</td>
+                  <td data-label="Details" style={{ fontSize: 11, color: "var(--muted)" }}>{JSON.stringify(a.new_value)}</td>
                 </tr>
               ))}
               {audit.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", color: "var(--muted)" }}>
+                  <td colSpan={4} className="cell-empty" style={{ textAlign: "center", color: "var(--muted)" }}>
                     No audit entries yet.
                   </td>
                 </tr>

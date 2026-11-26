@@ -259,7 +259,7 @@ export default function Settings() {
       {loading ? (
         <div className="card"><span className="skeleton" style={{ width: "30%" }} /><span className="skeleton" style={{ width: "60%", marginTop: 12 }} /></div>
       ) : (
-        <div className="grid-main-side" style={{ gridTemplateColumns: "minmax(200px, 240px) minmax(0, 1fr)" }}>
+        <div className="grid-main-side settings-layout">
           <nav className="card" style={{ padding: 8, alignSelf: "start" }} aria-label="Settings sections">
             {TABS.map((t) => {
               const Icon = t.icon;

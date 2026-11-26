@@ -168,7 +168,7 @@ export default function QuoteDetail() {
   );
 
   const breakdown = (
-    <table style={{ marginBottom: 20 }}>
+    <table className="stack-mobile kv" style={{ marginBottom: 20 }}>
       <thead>
         <tr>
           <th>Item</th>

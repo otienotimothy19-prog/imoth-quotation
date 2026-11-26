@@ -264,7 +264,8 @@
 .app-content {
   padding: 24px;
   width: 100%;
-  max-width: 1440px;
+  max-width: 1680px;
+  margin: 0 auto;
 }
 
 /* Profile dropdown & action menus */
@@ -1229,5 +1230,102 @@ th.sortable:hover {
   }
   .menu-user-text {
     display: none;
+  }
+}
+
+/* Settings: section list beside the form. Stacks on narrower screens. Kept in
+   a class (not inline style) so the media query can override it. */
+.settings-layout {
+  grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+}
+@media (max-width: 1100px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Phone tables: each row becomes a card with the column name beside each
+   value, so nothing needs to scroll sideways. Used by DataTable (and any
+   table with class "stack-mobile" and a data-label on each cell). */
+@media (max-width: 640px) {
+  .table-wrap:has(> table.stack-mobile) {
+    overflow: visible;
+    border: none;
+    background: transparent;
+  }
+  table.stack-mobile,
+  table.stack-mobile tbody,
+  table.stack-mobile tr,
+  table.stack-mobile td {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+  }
+  table.stack-mobile thead {
+    display: none;
+  }
+  table.stack-mobile tbody tr {
+    background: #fff;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    padding: 4px 14px;
+    margin-bottom: 10px;
+  }
+  table.stack-mobile tbody tr:hover td {
+    background: transparent;
+  }
+  table.stack-mobile td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--c-border);
+    text-align: right;
+  }
+  table.stack-mobile tbody tr td:last-child {
+    border-bottom: none;
+  }
+  table.stack-mobile td::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--c-text-2);
+    text-align: left;
+  }
+  table.stack-mobile td:empty::before,
+  table.stack-mobile td[data-label=""]::before {
+    content: none;
+  }
+  /* Inline min-widths on cell content would push a card wider than the phone. */
+  table.stack-mobile td > div {
+    min-width: 0 !important;
+  }
+  table.stack-mobile td.cell-empty {
+    display: block;
+    border: none;
+    padding: 0;
+  }
+  table.stack-mobile td.cell-empty::before {
+    content: none;
+  }
+  table.stack-mobile tbody tr:has(> td.cell-empty) {
+    border: none;
+    background: transparent;
+    padding: 0;
+  }
+  /* Key/value tables (no header row): plain lines, not cards. */
+  table.stack-mobile.kv tbody tr {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 0;
+  }
+  table.stack-mobile.kv td::before {
+    content: none;
   }
 }

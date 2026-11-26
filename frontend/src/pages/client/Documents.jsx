@@ -65,7 +65,7 @@ export default function Documents() {
           Download or email your quotation and Risk Note at any time.
         </p>
 
-        <table>
+        <table className="stack-mobile">
           <thead>
             <tr>
               <th>Document</th>
@@ -76,13 +76,13 @@ export default function Documents() {
           <tbody>
             {rows.map((d) => (
               <tr key={d.type}>
-                <td>
+                <td data-label="Document">
                   {d.type === "QUOTATION" ? "Quotation" : "Risk Note"} {d.reference_number}
                 </td>
-                <td>
+                <td data-label="Status">
                   <span className={`badge ${STATUS_BADGE[d.status] || "badge-gray"}`}>{d.status}</span>
                 </td>
-                <td>
+                <td data-label="">
                   <a className="btn btn-secondary btn-sm" href={d.download_url} target="_blank" rel="noreferrer">
                     Download
                   </a>{" "}

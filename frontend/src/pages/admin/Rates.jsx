@@ -271,8 +271,8 @@ function VersionHistory({ versions }) {
       {versions.length === 0 ? (
         <p className="hint">No versions recorded yet.</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table>
+        <div className="table-wrap">
+          <table className="stack-mobile">
             <thead>
               <tr>
                 <th>Version</th>
@@ -283,9 +283,9 @@ function VersionHistory({ versions }) {
             <tbody>
               {versions.map((v) => (
                 <tr key={v.id}>
-                  <td>v{v.version_no}</td>
-                  <td>{v.change_reason}</td>
-                  <td>{dateTimeFmt(v.created_at)}</td>
+                  <td data-label="Version">v{v.version_no}</td>
+                  <td data-label="Reason">{v.change_reason}</td>
+                  <td data-label="Date">{dateTimeFmt(v.created_at)}</td>
                 </tr>
               ))}
             </tbody>

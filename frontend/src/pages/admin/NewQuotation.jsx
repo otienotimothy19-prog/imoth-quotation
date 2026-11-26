@@ -442,7 +442,7 @@ export default function NewQuotation() {
         <div className="grid-main-side">
           <Card title="Premium breakdown" icon={Receipt}>
             <div className="table-wrap">
-              <table>
+              <table className="stack-mobile kv">
                 <tbody>
                   {result.items.map((it, i) => (
                     <tr key={i}><td>{it.label}</td><td className="num">{quoteMoney(it.amount)}</td></tr>
@@ -734,7 +734,7 @@ export default function NewQuotation() {
                 </EmptyState>
               ) : (
                 <div className="table-wrap">
-                  <table style={{ minWidth: 760 }}>
+                  <table className="stack-mobile" style={{ minWidth: 760 }}>
                     <thead>
                       <tr>
                         <th>Insurer &amp; class</th>
@@ -750,7 +750,7 @@ export default function NewQuotation() {
                         return (
                           <Fragment key={key}>
                             <tr>
-                              <td style={{ minWidth: 220 }}>
+                              <td data-label="Insurer & class" style={{ minWidth: 220 }}>
                                 <div className="cell-main">
                                   {o.insurer_name}
                                   {i === 0 && <span className="badge badge-green no-dot" style={{ marginLeft: 6 }}>Cheapest</span>}
@@ -762,12 +762,12 @@ export default function NewQuotation() {
                                   </button>
                                 )}
                               </td>
-                              <td><RowExtras option={o} picked={rowExtras[key] || {}} onChange={(patch) => setRowExtra(o, patch)} /></td>
-                              <td className="num" style={{ whiteSpace: "nowrap" }}>
+                              <td data-label="Extras"><RowExtras option={o} picked={rowExtras[key] || {}} onChange={(patch) => setRowExtra(o, patch)} /></td>
+                              <td data-label="Total premium" className="num" style={{ whiteSpace: "nowrap" }}>
                                 <div style={{ fontWeight: 700, fontSize: 14 }}>{quoteMoney(rowTotal(o))}</div>
                                 <div className="cell-sub">Basic {quoteMoney(o.basic_premium)}</div>
                               </td>
-                              <td style={{ width: 150, textAlign: "right" }}>
+                              <td data-label="" style={{ width: 150, textAlign: "right" }}>
                                 <button
                                   type="button"
                                   className={`btn btn-sm ${i === 0 ? "btn-accent" : "btn-primary"}`}
@@ -782,7 +782,7 @@ export default function NewQuotation() {
                             </tr>
                             {open && (
                               <tr>
-                                <td colSpan={4} style={{ background: "var(--c-row-hover)" }}>
+                                <td colSpan={4} className="cell-empty" style={{ background: "var(--c-row-hover)" }}>
                                   <div className="grid-3" style={{ fontSize: 12.5 }}>
                                     {[["Benefits", o.benefits], ["Excess", o.excess], ["Limits", o.limits]].map(([title, list]) => (
                                       <div key={title}>

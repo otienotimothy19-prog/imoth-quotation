@@ -181,17 +181,17 @@ export default function RiskNoteDetail() {
               <EmptyState title="No status changes" />
             ) : (
               <div className="table-wrap">
-                <table>
+                <table className="stack-mobile">
                   <thead>
                     <tr><th>From</th><th>To</th><th>Reason</th><th>When</th></tr>
                   </thead>
                   <tbody>
                     {rn.status_history.map((h, i) => (
                       <tr key={i}>
-                        <td>{h.previous_status ? <StatusBadge status={h.previous_status} /> : "—"}</td>
-                        <td><StatusBadge status={h.new_status} /></td>
-                        <td>{h.reason}</td>
-                        <td style={{ whiteSpace: "nowrap" }}>{dateTimeFmt(h.changed_at)}</td>
+                        <td data-label="From">{h.previous_status ? <StatusBadge status={h.previous_status} /> : "—"}</td>
+                        <td data-label="To"><StatusBadge status={h.new_status} /></td>
+                        <td data-label="Reason">{h.reason}</td>
+                        <td data-label="When" style={{ whiteSpace: "nowrap" }}>{dateTimeFmt(h.changed_at)}</td>
                       </tr>
                     ))}
                   </tbody>

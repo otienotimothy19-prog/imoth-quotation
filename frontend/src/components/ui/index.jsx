@@ -298,7 +298,7 @@ export function DataTable({ columns, rows, rowKey = (r) => r.id, loading = false
 
   return (
     <div className="table-wrap">
-      <table style={minWidth ? { minWidth } : undefined}>
+      <table className="stack-mobile" style={minWidth ? { minWidth } : undefined}>
         <thead>
           <tr>
             {columns.map((col) => {
@@ -337,7 +337,7 @@ export function DataTable({ columns, rows, rowKey = (r) => r.id, loading = false
             : sorted.map((row) => (
                 <tr key={rowKey(row)} onClick={onRowClick ? () => onRowClick(row) : undefined} style={onRowClick ? { cursor: "pointer" } : undefined}>
                   {columns.map((col) => (
-                    <td key={col.key} className={`${col.align === "right" ? "num" : ""} ${col.className || ""}`}>
+                    <td key={col.key} data-label={col.mobileLabel ?? (typeof col.header === "string" ? col.header : "")} className={`${col.align === "right" ? "num" : ""} ${col.className || ""}`}>
                       {col.render ? col.render(row) : row[col.key] ?? "—"}
                     </td>
                   ))}
@@ -345,7 +345,7 @@ export function DataTable({ columns, rows, rowKey = (r) => r.id, loading = false
               ))}
           {!loading && rows.length === 0 && (
             <tr>
-              <td colSpan={columns.length} style={{ padding: 0 }}>
+              <td colSpan={columns.length} className="cell-empty" style={{ padding: 0 }}>
                 {empty || <EmptyState />}
               </td>
             </tr>
