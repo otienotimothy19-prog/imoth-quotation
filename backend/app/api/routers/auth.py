@@ -308,6 +308,18 @@ def _reset_token_hash(token: str) -> str:
 def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """Emails a one-time reset link. Always gives the same reply, whether or
     not the email has an account, so it can't be used to find out who has one."""
+    # A reset link is only useful if it points at the live site. If the
+    # production server is missing PUBLIC_APP_URL, the default is localhost,
+    # and users would get links that can't open. Refuse instead, for every
+    # request, so the reply stays the same whether or not an account exists.
+    public_url = settings.PUBLIC_APP_URL.rstrip("/").lower()
+    if settings.is_production and ("localhost" in public_url or "127.0.0.1" in public_url):
+        logger.error("PUBLIC_APP_URL is %s in production; not sending password reset links", public_url)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Password reset is temporarily unavailable. Please contact Imoth.",
+        )
+
     email = payload.email.lower()
     user = db.query(User).filter(User.email == email).one_or_none()
     if user is None or not user.is_active:

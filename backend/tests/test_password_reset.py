@@ -114,6 +114,13 @@ def test_email_failure_shows_an_error_and_leaves_no_live_link(user, monkeypatch)
     assert live == 0
 
 
+def test_production_refuses_to_send_localhost_links(user, sent, monkeypatch):
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "PUBLIC_APP_URL", "http://localhost:5173")
+    resp = client.post("/api/auth/forgot-password", json={"email": user["email"]})
+    assert resp.status_code == 503 and sent == []
+
+
 def test_bad_token_rejected():
     resp = client.post("/api/auth/reset-password", json={"token": "x" * 43, "new_password": "BrandNew2026"})
     assert resp.status_code == 400 and "invalid or has expired" in resp.json()["detail"]
